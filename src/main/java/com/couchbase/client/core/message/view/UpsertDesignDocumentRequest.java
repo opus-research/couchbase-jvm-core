@@ -23,8 +23,8 @@ public class UpsertDesignDocumentRequest extends AbstractCouchbaseRequest implem
     private final boolean development;
     private final String body;
 
-    public UpsertDesignDocumentRequest(String name, String body, boolean development, String bucket, String username, String password) {
-        super(bucket, username, password);
+    public UpsertDesignDocumentRequest(String name, String body, boolean development, String bucket, String password) {
+        super(bucket, password);
         this.name = name;
         this.development = development;
         this.body = body;

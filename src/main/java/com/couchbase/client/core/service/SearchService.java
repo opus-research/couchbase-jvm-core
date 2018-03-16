@@ -42,15 +42,14 @@ public class SearchService extends PooledService {
      *
      * @param hostname       the hostname of the service.
      * @param bucket         the name of the bucket.
-     * @param username       the user authorized for bucket access.
      * @param password       the password of the bucket.
      * @param port           the port of the service.
      * @param env            the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public SearchService(final String hostname, final String bucket, final String username, final String password, final int port,
+    public SearchService(final String hostname, final String bucket, final String password, final int port,
                          final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.searchServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+        super(hostname, bucket, password, port, env, env.searchServiceConfig(), responseBuffer, FACTORY, STRATEGY);
 
     }
 
@@ -62,11 +61,11 @@ public class SearchService extends PooledService {
     /**
      * The factory for {@link SearchEndpoint}s.
      */
-    static class SearchEndpointFactory extends AbstractEndpointFactory {
+    static class SearchEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
                                final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new SearchEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new SearchEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 

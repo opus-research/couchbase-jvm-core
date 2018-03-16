@@ -23,7 +23,7 @@ public class RemoveBucketRequest extends AbstractCouchbaseRequest implements Con
     private final String bucket;
 
     public RemoveBucketRequest(String bucket, String username, String password) {
-        super(bucket, username, password);
+        super(username, password);
         this.bucket = bucket;
     }
 

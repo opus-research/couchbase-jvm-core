@@ -35,24 +35,8 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
      * @param bucket the bucket name.
      * @param password the bucket password.
      */
-    public ViewQueryRequest(String design, String view, boolean development, String query, String keys, String bucket,
-                            String password) {
-        this(design, view, development, false, query, keys, bucket, bucket, password);
-    }
-
-    /**
-     * @param design the name of the design document.
-     * @param view the name of the view.
-     * @param development true if development mode.
-     * @param query the query parameters, except "keys".
-     * @param keys the "keys" parameter as a JSON array, null if not needed.
-     * @param bucket the bucket name.
-     * @param username the user authorized for bucket access.
-     * @param password the bucket password.
-     */
-    public ViewQueryRequest(String design, String view, boolean development, String query, String keys, String bucket,
-                            String username, String password) {
-        this(design, view, development, false, query, keys, bucket, username, password);
+    public ViewQueryRequest(String design, String view, boolean development, String query, String keys, String bucket, String password) {
+        this(design, view, development, false, query, keys, bucket, password);
     }
 
     /**
@@ -63,12 +47,10 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
      * @param query the query parameters, except "keys".
      * @param keys the "keys" parameter as a JSON array, null if not needed.
      * @param bucket the bucket name.
-     * @param username the user authorized for bucket access.
      * @param password the bucket password.
      */
-    public ViewQueryRequest(String design, String view, boolean development, boolean spatial, String query, String keys,
-                            String bucket, String username, String password) {
-        super(bucket, username, password);
+    public ViewQueryRequest(String design, String view, boolean development, boolean spatial, String query, String keys, String bucket, String password) {
+        super(bucket, password);
         this.design = design;
         this.view = view;
         this.query = query;

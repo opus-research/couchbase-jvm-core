@@ -21,8 +21,8 @@ public class GetDesignDocumentsRequest extends AbstractCouchbaseRequest implemen
 
     private final String path;
 
-    public GetDesignDocumentsRequest(String bucket, String username, String password) {
-        super(bucket, username, password);
+    public GetDesignDocumentsRequest(String bucket, String password) {
+        super(bucket, password);
         this.path = "/pools/default/buckets/" + bucket + "/ddocs";
     }
 

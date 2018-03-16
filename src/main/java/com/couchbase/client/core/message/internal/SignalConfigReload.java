@@ -22,6 +22,6 @@ public class SignalConfigReload extends AbstractCouchbaseRequest {
     public static SignalConfigReload INSTANCE = new SignalConfigReload();
 
     private SignalConfigReload() {
-        super(null, null, null);
+        super(null, null);
     }
 }
