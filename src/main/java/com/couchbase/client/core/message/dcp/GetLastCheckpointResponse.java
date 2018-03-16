@@ -45,6 +45,11 @@ public class GetLastCheckpointResponse extends AbstractDCPResponse {
         this.sequenceNumber = sequenceNumber;
     }
 
+    /**
+     * Each mutation that occurs on a vBucket is assigned a number, which strictly
+     * increases as events are assigned sequence numbers, that can be used to order
+     * that event against other mutations within the same vBucket.
+     */
     public long sequenceNumber() {
         return sequenceNumber;
     }

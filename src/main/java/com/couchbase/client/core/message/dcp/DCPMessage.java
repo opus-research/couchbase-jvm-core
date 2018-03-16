@@ -35,14 +35,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 @InterfaceAudience.Private
 public interface DCPMessage {
     /**
-     * @return total payload size of the message.
-     */
-    int totalBodyLength();
-
-    /**
      * @return key associated with event
      */
     String key();
-
-    DCPConnection connection();
 }
