@@ -218,8 +218,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     private void handleDCPRequest(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg) {
         DCPRequest request = null;
         int flags = 0;
-        long bySeqno = 0;
-        long revSeqno = 0;
 
         switch (msg.getOpcode()) {
             case OP_SNAPSHOT_MARKER:
@@ -245,26 +243,17 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     final ByteBuf extrasReleased = msg.getExtras();
                     final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
                     extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-                    bySeqno = extras.readLong();
-                    revSeqno = extras.readLong();
+                    extras.skipBytes(16); /* by_seqno, rev_seqno */
                     flags = extras.readInt();
                     expiration = extras.readInt();
                     lockTime = extras.readInt();
                     extras.release();
                 }
-                request = new MutationMessage(msg.getStatus(), msg.getKey(), msg.content().retain(), expiration,
-                        bySeqno, revSeqno, flags, lockTime, msg.getCAS(), connection.bucket());
+                request = new MutationMessage(msg.getStatus(), msg.getKey(),
+                        msg.content().retain(), expiration, flags, lockTime, msg.getCAS(), connection.bucket());
                 break;
             case OP_REMOVE:
-                if (msg.getExtrasLength() > 0) {
-                    final ByteBuf extrasReleased = msg.getExtras();
-                    final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
-                    extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-                    bySeqno = extras.readLong();
-                    revSeqno = extras.readLong();
-                    extras.release();
-                }
-                request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), bySeqno, revSeqno, connection.bucket());
+                request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), connection.bucket());
                 break;
             case OP_STREAM_END:
                 final ByteBuf extrasReleased = msg.getExtras();
