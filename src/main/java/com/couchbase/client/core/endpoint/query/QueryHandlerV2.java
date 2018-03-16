@@ -212,7 +212,7 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null);
+            super(null, null, null);
         }
     }
 
