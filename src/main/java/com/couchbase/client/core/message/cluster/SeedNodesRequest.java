@@ -23,16 +23,11 @@ package com.couchbase.client.core.message.cluster;
 
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.ConfigurationException;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * **Set up the bootstrap nodes for a {@link ClusterFacade}.**
@@ -45,11 +40,6 @@ import java.util.Set;
  * @since 1.0
  */
 public class SeedNodesRequest extends AbstractCouchbaseRequest implements ClusterRequest {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(SeedNodesRequest.class);
 
     /**
      * The default hostname which will be used if the default constructor is used.
@@ -91,20 +81,13 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
         Set<InetAddress> parsedNodes = new HashSet<InetAddress>();
         for (String node : nodes) {
             if (node == null || node.isEmpty()) {
-                LOGGER.info("Empty or null host in bootstrap list.");
-                continue;
+                throw new ConfigurationException("Empty or null host in bootstrap list.");
             }
-
             try {
                 parsedNodes.add(InetAddress.getByName(node));
             } catch (UnknownHostException e) {
-                LOGGER.info("Unknown host " + node + " in bootstrap list.", e);
+                throw new ConfigurationException("Unknown host " + node + " in bootstrap list.", e);
             }
-        }
-
-        if (parsedNodes.isEmpty()) {
-            throw new ConfigurationException("No valid node found to bootstrap from. "
-                + "Please check your network configuration.");
         }
         this.nodes = parsedNodes;
     }
