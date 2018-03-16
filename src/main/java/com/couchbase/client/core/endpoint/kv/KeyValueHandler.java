@@ -482,18 +482,12 @@ public class KeyValueHandler
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, bucket, content, request);
         } else if (request instanceof ObserveRequest) {
-            byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
-            long observedCas = 0;
-            if (status.isSuccess()) {
-                short keyLength = content.getShort(2);
-                observed = content.getByte(keyLength + 4);
-                observedCas = content.getLong(keyLength + 5);
-            }
+            byte observed = status.isSuccess()
+                ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
             if (content != null && content.refCnt() > 0) {
                 content.release();
             }
-            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), observedCas,
-                bucket, request);
+            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket, request);
         } else if (request instanceof AppendRequest) {
             response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
