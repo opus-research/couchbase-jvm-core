@@ -894,7 +894,7 @@ public class QueryHandlerTest {
                             assertTrue(decoded.size() > 0);
                             assertTrue(decoded.containsKey("horseName"));
                         } catch (Exception e) {
-                            fail(e.toString());
+                            assertTrue(false);
                         }
                     }
                 },
