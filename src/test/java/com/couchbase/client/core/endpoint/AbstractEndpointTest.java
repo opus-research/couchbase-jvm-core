@@ -227,11 +227,11 @@ public class AbstractEndpointTest {
 
     static class DummyEndpoint extends AbstractEndpoint {
         DummyEndpoint(BootstrapAdapter adapter, CoreEnvironment environment) {
-            super("default", null, adapter, false, environment, true);
+            super("default", null, adapter, false, environment);
         }
 
         DummyEndpoint(String hostname, CoreEnvironment environment) {
-            super(hostname, "default", null, 0, environment, null, false, environment.ioPool(), true);
+            super(hostname, "default", null, 0, environment, null, false, environment.ioPool());
         }
 
         @Override
