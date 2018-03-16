@@ -29,9 +29,7 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubExistRequest extends AbstractSubdocRequest {
-
     private boolean xattr;
-    private boolean accessDeleted;
 
 
     /**
@@ -68,16 +66,5 @@ public class SubExistRequest extends AbstractSubdocRequest {
 
     public void xattr(boolean xattr) {
         this.xattr = xattr;
-    }
-
-    public boolean accessDeleted() {
-        return this.accessDeleted;
-    }
-
-    public void accessDeleted(boolean accessDeleted) {
-        if (!this.xattr && accessDeleted) {
-            throw new IllegalArgumentException("Invalid to access document attributes with access deleted. It can be used only with xattr.");
-        }
-        this.accessDeleted = accessDeleted;
     }
 }
