@@ -30,6 +30,9 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
+import com.couchbase.client.core.metrics.DefaultMetricCollector;
+import com.couchbase.client.core.metrics.DefaultMetricCollectorConfig;
+import com.couchbase.client.core.metrics.MetricCollector;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -173,6 +176,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
     private final EventBus eventBus;
+    private final MetricCollector metricCollector;
 
     private final ShutdownHook ioPoolShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
@@ -251,6 +255,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                     : builder.schedulerShutdownHook;
         }
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
+        // TODO: make the config configurable too
+        this.metricCollector = new DefaultMetricCollector(eventBus, scheduler(), DefaultMetricCollectorConfig.create());
     }
 
     public static DefaultCoreEnvironment create() {
@@ -474,6 +480,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return mutationTokensEnabled;
     }
 
+    @Override
+    public MetricCollector metricCollector() {
+        return metricCollector;
+    }
+
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -506,6 +517,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private Scheduler scheduler;
         private ShutdownHook schedulerShutdownHook;
         private EventBus eventBus;
+        private MetricCollector metricCollector;
         private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
         private long keepAliveInterval = KEEPALIVEINTERVAL;
         private long autoreleaseAfter = AUTORELEASE_AFTER;
@@ -1057,6 +1069,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder mutationTokensEnabled(boolean mutationTokensEnabled) {
             this.mutationTokensEnabled = mutationTokensEnabled;
             return this;
+        }
+
+        // TODO make builder configurable (collector & config)
+
+        @Override
+        public MetricCollector metricCollector() {
+            return metricCollector;
         }
 
         public DefaultCoreEnvironment build() {
