@@ -107,7 +107,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
     public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
-    public static final boolean CERT_AUTH_ENABLED = false;
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -218,7 +217,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final WaitStrategyFactory requestBufferWaitStrategy;
     private final MemcachedHashingStrategy memcachedHashingStrategy;
     private final long configPollInterval;
-    private final boolean certAuthEnabled;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -296,7 +294,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sslKeystore = builder.sslKeystore;
         memcachedHashingStrategy = builder.memcachedHashingStrategy;
         configPollInterval = longPropertyOr("configPollInterval", builder.configPollInterval);
-        certAuthEnabled = booleanPropertyOr("certAuthEnabled", builder.certAuthEnabled);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -311,11 +308,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             this.computationPoolSize = MIN_POOL_SIZE;
         } else {
             this.computationPoolSize = computationPoolSize;
-        }
-
-        if (certAuthEnabled && !sslEnabled) {
-            throw new IllegalStateException("Client Certificate Authentication enabled, but SSL is not - " +
-                "please configure encryption properly.");
         }
 
         if (builder.ioPool == null) {
@@ -878,11 +870,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return configPollInterval;
     }
 
-    @Override
-    public boolean certAuthEnabled() {
-        return certAuthEnabled;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -938,7 +925,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private WaitStrategyFactory requestBufferWaitStrategy;
         private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
         private long configPollInterval = CONFIG_POLL_INTERVAL;
-        private boolean certAuthEnabled = CERT_AUTH_ENABLED;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
@@ -1557,17 +1543,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Allows to enable X.509 client certificate authentication. Needs to be used in
-         * combination with {@link #sslEnabled(boolean)} and related methods of course.
-         */
-        @InterfaceStability.Uncommitted
-        @InterfaceAudience.Public
-        public Builder certAuthEnabled(boolean certAuthEnabled) {
-            this.certAuthEnabled = certAuthEnabled;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1662,7 +1637,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
         sb.append(", disconnectTimeout=").append(disconnectTimeout);
         sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
-        sb.append(", certAuthEnabled=").append(certAuthEnabled);
 
         return sb;
     }
