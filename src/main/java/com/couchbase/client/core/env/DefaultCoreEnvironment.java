@@ -1165,9 +1165,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
         sb.append(", mutationTokensEnabled=").append(mutationTokensEnabled);
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
-        sb.append(", dcpConnectionBufferSize=").append(dcpConnectionBufferSize);
-        sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
-
         return sb;
     }
 
