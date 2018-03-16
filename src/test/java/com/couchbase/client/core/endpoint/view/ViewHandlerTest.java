@@ -115,7 +115,7 @@ public class ViewHandlerTest {
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<ViewRequest>();
-        handler = new ViewHandler(endpoint, responseBuffer.start(), queue, false);
+        handler = new ViewHandler(endpoint, responseBuffer.start(), queue);
         channel = new EmbeddedChannel(handler);
     }
 

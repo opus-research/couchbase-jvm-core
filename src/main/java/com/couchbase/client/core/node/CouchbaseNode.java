@@ -253,7 +253,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         int connected = 0;
         int connecting = 0;
         int disconnecting = 0;
-        int idle = 0;
         for (LifecycleState serviceState : serviceStates.values()) {
             switch (serviceState) {
                 case CONNECTED:
@@ -265,12 +264,9 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 case DISCONNECTING:
                     disconnecting++;
                     break;
-                case IDLE:
-                    idle++;
-                    break;
             }
         }
-        if (serviceStates.size() == (connected + idle)) {
+        if (serviceStates.size() == connected) {
             return LifecycleState.CONNECTED;
         } else if (connected > 0) {
             return LifecycleState.DEGRADED;
