@@ -15,14 +15,17 @@
  */
 package com.couchbase.client.core.config;
 
+import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.service.ServiceType;
-import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -37,7 +40,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
 
     private final CouchbasePartitionInfo partitionInfo;
     private final List<NodeInfo> partitionHosts;
-    private final Set<NetworkAddress> nodesWithPrimaryPartitions;
+    private final Set<InetAddress> nodesWithPrimaryPartitions;
 
     private final boolean tainted;
     private final long rev;
@@ -83,9 +86,9 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
      * @param partitions the partitions.
      * @return a set containing the addresses of nodes with primary partitions.
      */
-    private static Set<NetworkAddress> buildNodesWithPrimaryPartitions(final List<NodeInfo> nodeInfos,
+    private static Set<InetAddress> buildNodesWithPrimaryPartitions(final List<NodeInfo> nodeInfos,
         final List<Partition> partitions) {
-        Set<NetworkAddress> nodes = new HashSet<NetworkAddress>(nodeInfos.size());
+        Set<InetAddress> nodes = new HashSet<InetAddress>(nodeInfos.size());
         for (Partition partition : partitions) {
             int index = partition.master();
             if (index >= 0) {
@@ -105,18 +108,18 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     private static List<NodeInfo> buildPartitionHosts(List<NodeInfo> nodeInfos, CouchbasePartitionInfo partitionInfo) {
         List<NodeInfo> partitionHosts = new ArrayList<NodeInfo>();
         for (String rawHost : partitionInfo.partitionHosts()) {
-            NetworkAddress convertedHost;
+            InetAddress convertedHost;
             int directPort;
             try {
                 String pair[] = rawHost.split(":");
-                convertedHost = NetworkAddress.create(pair[0]);
+                convertedHost = InetAddress.getByName(pair[0]);
                 try {
                     directPort = Integer.parseInt(pair[1]);
                 } catch (NumberFormatException e) {
                     LOGGER.warn("Could not parse port from the node address: {}, fallback to 0", rawHost);
                     directPort = 0;
                 }
-            } catch (Exception e) {
+            } catch (UnknownHostException e) {
                 throw new ConfigurationException("Could not resolve " + rawHost + "on config building.");
             }
             for (NodeInfo nodeInfo : nodeInfos) {
@@ -143,7 +146,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     }
 
     @Override
-    public boolean hasPrimaryPartitionsOnNode(final NetworkAddress hostname) {
+    public boolean hasPrimaryPartitionsOnNode(final InetAddress hostname) {
         return nodesWithPrimaryPartitions.contains(hostname);
     }
 

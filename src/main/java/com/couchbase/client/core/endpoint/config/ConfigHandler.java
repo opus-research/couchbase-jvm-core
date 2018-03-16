@@ -274,8 +274,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     private CouchbaseResponse handleBucketStreamingResponse(final ChannelHandlerContext ctx,
         final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
-        String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getAddress().getHostAddress()
-            : addr.toString();
+        String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
         ResponseStatus status = ResponseStatusConverter.fromHttp(header.getStatus().code());
 
         Observable<String> scheduledObservable = null;

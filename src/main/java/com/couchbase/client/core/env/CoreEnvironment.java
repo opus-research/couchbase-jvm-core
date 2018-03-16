@@ -455,11 +455,5 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceAudience.Public
     long configPollInterval();
 
-    /**
-     * True if X.509 client certificate authentication is enabled.
-     */
-    @InterfaceStability.Uncommitted
-    @InterfaceAudience.Public
-    boolean certAuthEnabled();
 
 }
