@@ -87,6 +87,9 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             CouchbaseResponse response = (CouchbaseResponse) message;
             ResponseStatus status = response.status();
             switch(status) {
+                case CHUNKED:
+                    event.getObservable().onNext(response);
+                    break;
                 case SUCCESS:
                 case EXISTS:
                 case NOT_EXISTS:
@@ -98,7 +101,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                     retry(event);
                     break;
                 default:
-                    throw new UnsupportedOperationException("The ResponseStatus " + status + " is not supported.");
+                    throw new UnsupportedOperationException("fixme");
             }
         } else if (message instanceof CouchbaseRequest) {
             retry(event);

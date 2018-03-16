@@ -53,7 +53,6 @@ import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
-import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -106,7 +105,7 @@ public class KeyValueHandler extends AbstractGenericHandler<FullBinaryMemcacheRe
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer) {
+    public KeyValueHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
         super(endpoint, responseBuffer);
     }
 
@@ -117,7 +116,7 @@ public class KeyValueHandler extends AbstractGenericHandler<FullBinaryMemcacheRe
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue) {
+    KeyValueHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue) {
         super(endpoint, responseBuffer, queue);
     }
 
@@ -437,7 +436,6 @@ public class KeyValueHandler extends AbstractGenericHandler<FullBinaryMemcacheRe
                 + msg.getClass());
         }
 
-        finishedDecoding();
         return response;
     }
 
