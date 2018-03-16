@@ -42,22 +42,12 @@ public class RetryHelper {
     public static void retryOrCancel(final CoreEnvironment environment, final CouchbaseRequest request,
         final EventSink<ResponseEvent> responseBuffer) {
         if (environment.retryStrategy().shouldRetry(request, environment)) {
-            retry(request, responseBuffer);
+            if(!responseBuffer.tryPublishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable())) {
+                request.observable().onError(CouchbaseCore.BACKPRESSURE_EXCEPTION);
+            }
         } else {
             request.observable().onError(new RequestCancelledException("Could not dispatch request, cancelling "
                 + "instead of retrying."));
-        }
-    }
-
-    /**
-     * Always retry the request and send it into the response buffer.
-     *
-     * @param request the request to retry
-     * @param responseBuffer the response buffer to send it into.
-     */
-    public static void retry(final CouchbaseRequest request, final EventSink<ResponseEvent> responseBuffer) {
-        if(!responseBuffer.tryPublishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable())) {
-            request.observable().onError(CouchbaseCore.BACKPRESSURE_EXCEPTION);
         }
     }
 }
