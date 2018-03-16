@@ -42,16 +42,9 @@ public abstract class AbstractMetricsCollector implements MetricsCollector {
 
     private final MetricsCollectorConfig config;
     private final Subscription subscription;
-    private final boolean isEnabled;
-    private final Scheduler scheduler;
-    private final EventBus eventBus;
 
     protected AbstractMetricsCollector(final EventBus eventBus, Scheduler scheduler, MetricsCollectorConfig config) {
         this.config = config;
-        this.scheduler = scheduler;
-        this.eventBus = eventBus;
-        isEnabled = config.emitFrequency() > 0;
-
 
         if (config.emitFrequency() > 0) {
             subscription = Observable
@@ -92,30 +85,5 @@ public abstract class AbstractMetricsCollector implements MetricsCollector {
         }
 
         return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return isEnabled;
-    }
-
-    @Override
-    public void triggerEmit() {
-        if (!isEnabled()) {
-            return;
-        }
-
-        Observable
-            .just(generateCouchbaseEvent())
-            .subscribeOn(scheduler)
-            .subscribe(new Action1<CouchbaseEvent>() {
-                @Override
-                public void call(CouchbaseEvent event) {
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.trace("Manually Triggering Metric Emit to EventBus: {}", event);
-                    }
-                    eventBus.publish(event);
-                }
-            });
     }
 }

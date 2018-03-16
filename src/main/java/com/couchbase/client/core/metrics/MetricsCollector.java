@@ -39,14 +39,4 @@ public interface MetricsCollector {
      */
     boolean shutdown();
 
-    /**
-     * True if this collector actually emits something.
-     */
-    boolean isEnabled();
-
-    /**
-     * Triggers the immediate emission of whatever is currently collected. Useful for testing.
-     */
-    void triggerEmit();
-
 }
