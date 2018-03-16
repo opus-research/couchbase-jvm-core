@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.env;
 
@@ -33,6 +27,7 @@ import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -50,7 +45,7 @@ public class DefaultCoreEnvironmentTest {
         assertNotNull(env.scheduler());
 
         assertEquals(DefaultCoreEnvironment.KEYVALUE_ENDPOINTS, env.kvEndpoints());
-        assertTrue(env.shutdownAsync().toBlocking().single());
+        assertTrue(env.shutdown());
     }
 
     @Test
@@ -63,7 +58,7 @@ public class DefaultCoreEnvironmentTest {
         assertNotNull(env.scheduler());
 
         assertEquals(3, env.kvEndpoints());
-        assertTrue(env.shutdownAsync().toBlocking().single());
+        assertTrue(env.shutdown());
     }
 
     @Test
@@ -79,7 +74,7 @@ public class DefaultCoreEnvironmentTest {
         assertNotNull(env.scheduler());
 
         assertEquals(10, env.kvEndpoints());
-        assertTrue(env.shutdownAsync().toBlocking().single());
+        assertTrue(env.shutdown());
 
         System.clearProperty("com.couchbase.kvEndpoints");
     }
@@ -116,7 +111,7 @@ public class DefaultCoreEnvironmentTest {
             LOGGER.info("===Created threads:");
             Set<String> afterCreate = dump(threads(mx, ignore, false));
 
-            LOGGER.info("Shutdown result: " + env.shutdownAsync().toBlocking().single());
+            LOGGER.info("Shutdown result: " + env.shutdown());
             //we only consider threads starting with cb- or containing Rx, minus the ones existing at startup
             Set<String> afterShutdown = threads(mx, ignore, true);
 
