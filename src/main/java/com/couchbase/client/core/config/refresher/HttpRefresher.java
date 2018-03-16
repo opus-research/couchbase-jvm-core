@@ -24,6 +24,8 @@ package com.couchbase.client.core.config.refresher;
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
+import com.couchbase.client.core.logging.CouchbaseLogger;
+import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import rx.Observable;
@@ -38,6 +40,11 @@ import rx.functions.Func1;
  */
 public class HttpRefresher extends AbstractRefresher {
 
+    /**
+     * The logger used.
+     */
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(HttpRefresher.class);
+
     private static final String TERSE_PATH = "/pools/default/bs/";
     private static final String VERBOSE_PATH = "/pools/default/bucketsStreaming/";
 
@@ -47,6 +54,7 @@ public class HttpRefresher extends AbstractRefresher {
 
     @Override
     public Observable<Boolean> registerBucket(final String name, final String password) {
+        LOGGER.debug("Registering bucket " + name + ".");
         return super.registerBucket(name, password).flatMap(new Func1<Boolean, Observable<BucketStreamingResponse>>() {
             @Override
             public Observable<BucketStreamingResponse> call(Boolean aBoolean) {
@@ -78,6 +86,12 @@ public class HttpRefresher extends AbstractRefresher {
                 return true;
             }
         });
+    }
+
+    @Override
+    public Observable<Boolean> deregisterBucket(final String name) {
+        LOGGER.debug("Deregistering bucket " + name + ".");
+        return super.deregisterBucket(name);
     }
 
     @Override
