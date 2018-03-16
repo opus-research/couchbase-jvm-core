@@ -332,7 +332,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     hasWritten = false;
                 }
             } else {
-                if (channel.isActive() && channel.isWritable()) {
+                if (channel.isWritable()) {
                     channel.write(request).addListener(WRITE_LOG_LISTENER);
                     hasWritten = true;
                 } else {

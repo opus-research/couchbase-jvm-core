@@ -31,6 +31,7 @@ import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.state.LifecycleState;
 import org.junit.Test;
 import rx.Observable;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -142,7 +143,6 @@ public class RequestHandlerTest {
         handler.onEvent(mockEvent, 0, true);
         verify(mockNode).send(mockRequest);
         verify(mockNode).send(SignalFlush.INSTANCE);
-        verify(mockEvent).setRequest(null);
     }
 
     /**

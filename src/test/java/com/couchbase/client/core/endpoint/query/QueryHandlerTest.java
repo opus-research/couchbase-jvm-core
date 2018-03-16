@@ -40,7 +40,6 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -50,7 +49,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.CharsetUtil;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import rx.functions.Action1;
@@ -70,7 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -128,7 +125,10 @@ public class QueryHandlerTest {
         responseBuffer.shutdown();
     }
 
-    private void assertGenericQueryRequest(GenericQueryRequest request, boolean jsonExpected) {
+    @Test
+    public void shouldEncodeGenericQueryRequest() {
+        GenericQueryRequest request = new GenericQueryRequest("query", "bucket", "password");
+
         channel.writeOutbound(request);
         HttpRequest outbound = (HttpRequest) channel.readOutbound();
 
@@ -137,25 +137,6 @@ public class QueryHandlerTest {
         assertEquals("/query", outbound.getUri());
         assertFalse(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
-        assertTrue(outbound instanceof FullHttpRequest);
-        assertEquals("query", ((FullHttpRequest) outbound).content().toString(CharsetUtil.UTF_8));
-        if (jsonExpected) {
-            assertEquals("application/json", outbound.headers().get(HttpHeaders.Names.CONTENT_TYPE));
-        } else {
-            assertNotEquals("application/json", outbound.headers().get(HttpHeaders.Names.CONTENT_TYPE));
-        }
-    }
-
-    @Test
-    public void shouldEncodeSimpleStatementToGenericQueryRequest() {
-        GenericQueryRequest request = GenericQueryRequest.simpleStatement("query", "bucket", "password");
-        assertGenericQueryRequest(request, false);
-    }
-
-    @Test
-    public void shouldEncodeJsonQueryToGenericQueryRequest() {
-        GenericQueryRequest request = GenericQueryRequest.jsonQuery("query", "bucket", "password");
-        assertGenericQueryRequest(request, true);
     }
 
     @Test
