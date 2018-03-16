@@ -22,8 +22,6 @@
 package com.couchbase.client.core.config.refresher;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.config.BucketConfig;
-import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import rx.Observable;
@@ -87,15 +85,5 @@ public class HttpRefresher extends AbstractRefresher {
     @Override
     public Observable<Boolean> shutdown() {
         return null;
-    }
-
-    @Override
-    public void markTainted(BucketConfig config) {
-
-    }
-
-    @Override
-    public void markUntainted(BucketConfig config) {
-
     }
 }

@@ -64,5 +64,4 @@ public abstract class AbstractBucketConfig implements BucketConfig {
         this.password = password;
         return this;
     }
-
 }

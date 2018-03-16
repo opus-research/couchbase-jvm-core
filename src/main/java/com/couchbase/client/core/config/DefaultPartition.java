@@ -1,7 +1,5 @@
 package com.couchbase.client.core.config;
 
-import java.util.Arrays;
-
 public class DefaultPartition implements Partition {
 
     private final short master;
@@ -22,8 +20,4 @@ public class DefaultPartition implements Partition {
         return replicas[num];
     }
 
-    @Override
-    public String toString() {
-        return "[m: "+master+", r: "+Arrays.toString(replicas)+"]";
-    }
 }
