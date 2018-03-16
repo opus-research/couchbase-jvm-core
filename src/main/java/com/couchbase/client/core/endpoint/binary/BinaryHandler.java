@@ -38,6 +38,8 @@ import com.couchbase.client.core.message.binary.GetRequest;
 import com.couchbase.client.core.message.binary.GetResponse;
 import com.couchbase.client.core.message.binary.InsertRequest;
 import com.couchbase.client.core.message.binary.InsertResponse;
+import com.couchbase.client.core.message.binary.NoopRequest;
+import com.couchbase.client.core.message.binary.NoopResponse;
 import com.couchbase.client.core.message.binary.ObserveRequest;
 import com.couchbase.client.core.message.binary.ObserveResponse;
 import com.couchbase.client.core.message.binary.PrependRequest;
@@ -53,10 +55,6 @@ import com.couchbase.client.core.message.binary.UnlockRequest;
 import com.couchbase.client.core.message.binary.UnlockResponse;
 import com.couchbase.client.core.message.binary.UpsertRequest;
 import com.couchbase.client.core.message.binary.UpsertResponse;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
@@ -64,6 +62,11 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultB
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
+import com.lmax.disruptor.RingBuffer;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.timeout.IdleStateEvent;
 
 import java.util.Queue;
 
@@ -93,11 +96,15 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
     public static final byte OP_TOUCH = BinaryMemcacheOpcodes.TOUCH;
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
+    public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
 
     /**
      * Represents the "Not My VBucket" status response.
      */
     private static final byte STATUS_NOT_MY_VBUCKET = 0x07;
+
+    private final String bucket;
+    private final String password;
 
     /**
      * Creates a new {@link BinaryHandler} with the default queue for requests.
@@ -105,8 +112,10 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public BinaryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
+    public BinaryHandler(AbstractEndpoint endpoint, String bucket, String password, RingBuffer<ResponseEvent> responseBuffer) {
         super(endpoint, responseBuffer);
+        this.bucket = bucket;
+        this.password = password;
     }
 
     /**
@@ -116,8 +125,10 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    BinaryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue) {
+    BinaryHandler(AbstractEndpoint endpoint, String bucket, String password, RingBuffer<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue) {
         super(endpoint, responseBuffer, queue);
+        this.bucket = bucket;
+        this.password = password;
     }
 
     @Override
@@ -147,6 +158,8 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
             request = handleAppendRequest((AppendRequest) msg);
         } else if (msg instanceof PrependRequest) {
             request = handlePrependRequest((PrependRequest) msg);
+        } else if (msg instanceof NoopRequest) {
+            request = handleNoopRequest((NoopRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown incoming BinaryRequest type "
                 + msg.getClass());
@@ -386,6 +399,12 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
         return request;
     }
 
+    private static BinaryMemcacheRequest handleNoopRequest(final NoopRequest msg) {
+        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest();
+        request.setOpcode(OP_NOOP);
+        return request;
+    }
+
     @Override
     protected CouchbaseResponse decodeResponse(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg)
         throws Exception {
@@ -431,6 +450,8 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
             response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
             response = new PrependResponse(status, cas, bucket, content, request);
+        } else if (request instanceof NoopRequest) {
+            response = new NoopResponse(status, bucket, content, request);
         } else {
             throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
                 + msg.getClass());
@@ -460,4 +481,11 @@ public class BinaryHandler extends AbstractGenericHandler<FullBinaryMemcacheResp
         }
     }
 
+    @Override
+    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            ctx.channel().writeAndFlush(new NoopRequest(null, bucket, password));
+        }
+        ctx.fireUserEventTriggered(evt);
+    }
 }

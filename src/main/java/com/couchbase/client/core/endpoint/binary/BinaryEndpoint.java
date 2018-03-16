@@ -55,7 +55,7 @@ public class BinaryEndpoint extends AbstractEndpoint {
             .addLast(new BinaryMemcacheClientCodec())
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
             .addLast(new BinaryAuthHandler(bucket(), password()))
-            .addLast(new BinaryHandler(this, responseBuffer()));
+            .addLast(new BinaryHandler(this, bucket(), password(), responseBuffer()));
     }
 
 }

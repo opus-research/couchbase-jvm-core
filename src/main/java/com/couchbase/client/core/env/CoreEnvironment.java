@@ -140,11 +140,19 @@ public interface CoreEnvironment {
      */
     int viewEndpoints();
 
-
     /**
      * The number of query service endpoints.
      *
      * @return amount of endpoints per service.
      */
     int queryEndpoints();
+
+    /**
+     * The number of idle time allowed on a endpoint before an action is initiated.
+     *
+     * If set to 0, disabled.
+     *
+     * @return maximum idle time.
+     */
+    int maxIdleTime();
 }
