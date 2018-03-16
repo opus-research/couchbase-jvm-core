@@ -53,6 +53,9 @@ public abstract class AbstractBinaryMemcacheMessage
     protected AbstractBinaryMemcacheMessage(String key, ByteBuf extras) {
         this.key = key;
         this.extras = extras;
+        if (extras != null) {
+            this.extras.retain();
+        }
     }
 
     @Override
@@ -73,7 +76,13 @@ public abstract class AbstractBinaryMemcacheMessage
 
     @Override
     public BinaryMemcacheMessage setExtras(ByteBuf extras) {
+        if (this.extras != null) {
+            this.extras.release();
+        }
         this.extras = extras;
+        if (this.extras != null) {
+            this.extras.retain();
+        }
         return this;
     }
 
