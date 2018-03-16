@@ -29,8 +29,6 @@ import rx.schedulers.TestScheduler;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -47,9 +45,7 @@ public class DefaultEventBusTest {
         EventBus eventBus = new DefaultEventBus(testScheduler);
 
         TestSubscriber<CouchbaseEvent> subscriber = new TestSubscriber<CouchbaseEvent>();
-        assertFalse(eventBus.hasSubscribers());
         eventBus.get().subscribe(subscriber);
-        assertTrue(eventBus.hasSubscribers());
 
         CouchbaseEvent event1 = mock(CouchbaseEvent.class);
         CouchbaseEvent event2 = mock(CouchbaseEvent.class);
@@ -76,9 +72,7 @@ public class DefaultEventBusTest {
         CouchbaseEvent event2 = mock(CouchbaseEvent.class);
 
         eventBus.publish(event1);
-        assertFalse(eventBus.hasSubscribers());
         eventBus.get().subscribe(subscriber);
-        assertTrue(eventBus.hasSubscribers());
         eventBus.publish(event2);
 
         testScheduler.advanceTimeBy(1, TimeUnit.SECONDS);
