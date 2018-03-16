@@ -19,7 +19,6 @@ import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationException;
-import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
@@ -45,8 +44,8 @@ public class HttpRefresher extends AbstractRefresher {
     private static final String TERSE_PATH = "/pools/default/bs/";
     private static final String VERBOSE_PATH = "/pools/default/bucketsStreaming/";
 
-    public HttpRefresher(final CoreEnvironment env, final ClusterFacade cluster) {
-        super(env, cluster);
+    public HttpRefresher(final ClusterFacade cluster) {
+        super(cluster);
     }
 
     @Override
