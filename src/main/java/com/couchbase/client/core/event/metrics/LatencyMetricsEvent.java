@@ -19,29 +19,36 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.metrics;
+package com.couchbase.client.core.event.metrics;
 
-/**
- * A generic metrics collector.
- *
- * @author Michael Nitschinger
- * @since 1.2.0
- */
-public interface MetricsCollector {
+import com.couchbase.client.core.event.CouchbaseEvent;
+import com.couchbase.client.core.event.EventType;
+import com.couchbase.client.core.metrics.LatencyMetricsIdentifier;
 
-    /**
-     * Its high-level configuration.
-     */
-    MetricsCollectorConfig config();
+import java.util.Map;
 
-    /**
-     * Shuts down the collector (non-reversible) and frees bound resources.
-     */
-    boolean shutdown();
+public abstract class LatencyMetricsEvent<I extends LatencyMetricsIdentifier> implements CouchbaseEvent {
 
-    /**
-     * True if this collector actually emits something.
-     */
-    boolean isEnabled();
+    private Map<I, LatencyMetric> latencies;
 
+    public LatencyMetricsEvent(Map<I, LatencyMetric> latencies) {
+        this.latencies = latencies;
+    }
+
+    public Map<I, LatencyMetric> latencies() {
+        return latencies;
+    }
+
+    @Override
+    public EventType type() {
+        return EventType.METRIC;
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder(getClass().getSimpleName() + "{");
+        sb.append("latencies=").append(latencies);
+        sb.append('}');
+        return sb.toString();
+    }
 }

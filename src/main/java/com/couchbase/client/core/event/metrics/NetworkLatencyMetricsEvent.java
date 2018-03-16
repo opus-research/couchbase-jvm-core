@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,29 +19,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.metrics;
 
-/**
- * A generic metrics collector.
- *
- * @author Michael Nitschinger
- * @since 1.2.0
- */
-public interface MetricsCollector {
+package com.couchbase.client.core.event.metrics;
 
-    /**
-     * Its high-level configuration.
-     */
-    MetricsCollectorConfig config();
+import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 
-    /**
-     * Shuts down the collector (non-reversible) and frees bound resources.
-     */
-    boolean shutdown();
+import java.util.Map;
 
-    /**
-     * True if this collector actually emits something.
-     */
-    boolean isEnabled();
+public class NetworkLatencyMetricsEvent extends LatencyMetricsEvent<NetworkLatencyMetricsIdentifier> {
+
+    public NetworkLatencyMetricsEvent(Map<NetworkLatencyMetricsIdentifier, LatencyMetric> latencies) {
+        super(latencies);
+    }
 
 }
