@@ -226,28 +226,3 @@ publishing  {
         }
     }
 }
-
-def getVersionName() {
-    try {
-        def stdout = new ByteArrayOutputStream()
-        exec {
-            commandLine 'git', 'describe', '--always', '--dirty'
-            standardOutput = stdout
-        }
-        return stdout.toString().trim()
-    } catch (e) {
-        return "unknown"
-    }
-}
-
-version = '1.0.0-SNAPSHOT'
-gitVersion = getVersionName()
-
-jar.manifest.mainAttributes(
-        'Implementation-Title': 'Couchbase JVM Core Client',
-        'Implementation-Version': gitVersion,
-        'Implementation-Vendor': 'Couchbase, Inc.',
-        'Specification-Title': 'couchbase.client.core',
-        'Specification-Version': version,
-        'Specification-Vendor': 'Couchbase, Inc.'
-)

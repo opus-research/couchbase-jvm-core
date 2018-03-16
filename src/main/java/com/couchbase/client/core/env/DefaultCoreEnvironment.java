@@ -33,11 +33,6 @@ import rx.Scheduler;
 import rx.Subscriber;
 
 public class DefaultCoreEnvironment implements CoreEnvironment {
-    public static final String USER_AGENT = String.format("couchbase-jvm-core/%s (git: %s; %s/%s %s; %s %s)",
-            Package.getPackage("com.couchbase.client.core").getSpecificationVersion(),
-            Package.getPackage("com.couchbase.client.core").getImplementationVersion(),
-            System.getProperty("os.name"), System.getProperty("os.version"), System.getProperty("os.arch"),
-            System.getProperty("java.vm.name"), System.getProperty("java.runtime.version"));
 
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
@@ -281,11 +276,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return queryServiceEndpoints;
     }
 
-    @Override
-    public String userAgent() {
-        return USER_AGENT;
-    }
-
     public static class Builder implements CoreEnvironment {
 
         private boolean sslEnabled = SSL_ENABLED;
@@ -487,11 +477,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         @Override
         public int queryEndpoints() {
             return queryServiceEndpoints;
-        }
-
-        @Override
-        public String userAgent() {
-            return USER_AGENT;
         }
 
         public Builder queryEndpoints(final int queryServiceEndpoints) {
