@@ -23,6 +23,7 @@ package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
+import com.couchbase.client.core.env.resources.NettyShutdownHook;
 import com.couchbase.client.core.env.resources.NoOpShutdownHook;
 import com.couchbase.client.core.env.resources.ShutdownHook;
 import com.couchbase.client.core.event.CouchbaseEvent;
@@ -50,6 +51,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscription;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
 
@@ -69,8 +71,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final String SSL_KEYSTORE_PASSWORD = null;
     public static final boolean QUERY_ENABLED = false;
     public static final int QUERY_PORT = 8093;
-    private static final boolean SEARCH_ENABLED = false;
-    private static final int SEARCH_PORT = 8095;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -84,7 +84,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int KEYVALUE_ENDPOINTS = 1;
     public static final int VIEW_ENDPOINTS = 1;
     public static final int QUERY_ENDPOINTS = 1;
-    public static final int SEARCH_ENDPOINTS = 1;
     public static final Delay OBSERVE_INTERVAL_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 10);
     public static final Delay RECONNECT_DELAY = Delay.exponential(TimeUnit.MILLISECONDS, 4096, 32);
     public static final Delay RETRY_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 100);
@@ -158,8 +157,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final String sslKeystorePassword;
     private final boolean queryEnabled;
     private final int queryPort;
-    private final boolean searchEnabled;
-    private final int searchPort;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -173,7 +170,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
-    private final int searchServiceEndpoints;
     private final Delay observeIntervalDelay;
     private final Delay reconnectDelay;
     private final Delay retryDelay;
@@ -196,6 +192,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventBus eventBus;
 
     private final ShutdownHook ioPoolShutdownHook;
+    private final ShutdownHook nettyShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
 
     private final MetricsCollector runtimeMetricsCollector;
@@ -213,8 +210,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
         queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled);
         queryPort = intPropertyOr("queryPort", builder.queryPort);
-        searchEnabled = booleanPropertyOr("searchEnabled", builder.searchEnabled);
-        searchPort = intPropertyOr("searchPort", builder.searchPort);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -228,7 +223,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
-        searchServiceEndpoints = intPropertyOr("searchEndpoints", builder.searchEndpoints);
         packageNameAndVersion = stringPropertyOr("packageNameAndVersion", builder.packageNameAndVersion);
         userAgent = stringPropertyOr("userAgent", builder.userAgent);
         observeIntervalDelay = builder.observeIntervalDelay;
@@ -268,11 +262,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                     : builder.ioPoolShutdownHook;
         }
 
+        if (!(this.ioPoolShutdownHook instanceof NoOpShutdownHook)) {
+            this.nettyShutdownHook = new NettyShutdownHook();
+        } else {
+            this.nettyShutdownHook = this.ioPoolShutdownHook;
+        }
+
         if (builder.scheduler == null) {
             CoreScheduler managed = new CoreScheduler(computationPoolSize());
             this.coreScheduler = managed;
-            this.coreSchedulerShutdownHook = managed
-            ;
+            this.coreSchedulerShutdownHook = managed;
         } else {
             this.coreScheduler = builder.scheduler;
             this.coreSchedulerShutdownHook = builder.schedulerShutdownHook == null
@@ -353,23 +352,86 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
+    @Deprecated
     public Observable<Boolean> shutdown() {
+        return shutdownAsync();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Observable<Boolean> shutdownAsync() {
         if (metricsCollectorSubscription != null && !metricsCollectorSubscription.isUnsubscribed()) {
             metricsCollectorSubscription.unsubscribe();
         }
 
-        return Observable.mergeDelayError(
-            ioPoolShutdownHook.shutdown(),
-            coreSchedulerShutdownHook.shutdown(),
-            Observable.just(runtimeMetricsCollector.shutdown()),
-            Observable.just(networkLatencyMetricsCollector.shutdown())
-        ).reduce(true, new Func2<Boolean, Boolean, Boolean>() {
-            @Override
-            public Boolean call(Boolean a, Boolean b) {
-                return a && b;
-            }
-        });
+        Observable<Boolean> result = Observable.merge(
+                wrapShutdown(ioPoolShutdownHook.shutdown(), "IoPool"),
+                wrapBestEffortShutdown(nettyShutdownHook.shutdown(), "Netty"),
+                wrapShutdown(coreSchedulerShutdownHook.shutdown(), "Core Scheduler"),
+                wrapShutdown(Observable.just(runtimeMetricsCollector.shutdown()), "Runtime Metrics Collector"),
+                wrapShutdown(Observable.just(networkLatencyMetricsCollector.shutdown()), "Latency Metrics Collector"))
+                .reduce(true,
+                        new Func2<Boolean, ShutdownStatus, Boolean>() {
+                            @Override
+                            public Boolean call(Boolean previousStatus, ShutdownStatus currentStatus) {
+                                return previousStatus && currentStatus.success;
+                            }
+                        });
+        return result;
+    }
+
+    /**
+     * This method wraps an Observable of Boolean (for shutdown hook) into an Observable of ShutdownStatus.
+     * It will log each status with a short message indicating which target has been shut down, and the result of
+     * the call.
+     * Additionally it will ignore signals that shutdown status is false (as long as no exception is detected), logging that the target is "best effort" only.
+     */
+    private Observable<ShutdownStatus> wrapBestEffortShutdown(Observable<Boolean> source, final String target) {
+        return wrapShutdown(source, target)
+                .map(new Func1<ShutdownStatus, ShutdownStatus>() {
+                    @Override
+                    public ShutdownStatus call(ShutdownStatus original) {
+                        if (original.cause == null && !original.success) {
+                            LOGGER.info(target + " shutdown is best effort, ignoring failure");
+                            return new ShutdownStatus(target, true, null);
+                        } else {
+                            return original;
+                        }
+                    }
+                });
+    }
+
+    /**
+     * This method wraps an Observable of Boolean (for shutdown hook) into an Observable of ShutdownStatus.
+     * It will log each status with a short message indicating which target has been shut down, and the result of
+     * the call.
+     */
+    private Observable<ShutdownStatus> wrapShutdown(Observable<Boolean> source, final String target) {
+        return source.
+                reduce(true, new Func2<Boolean, Boolean, Boolean>() {
+                    @Override
+                    public Boolean call(Boolean previousStatus, Boolean currentStatus) {
+                        return previousStatus && currentStatus;
+                    }
+                })
+                .map(new Func1<Boolean, ShutdownStatus>() {
+                    @Override
+                    public ShutdownStatus call(Boolean status) {
+                        return new ShutdownStatus(target, status, null);
+                    }
+                })
+                .onErrorReturn(new Func1<Throwable, ShutdownStatus>() {
+                    @Override
+                    public ShutdownStatus call(Throwable throwable) {
+                        return new ShutdownStatus(target, false, throwable);
+                    }
+                })
+                .doOnNext(new Action1<ShutdownStatus>() {
+                    @Override
+                    public void call(ShutdownStatus shutdownStatus) {
+                        LOGGER.info(shutdownStatus.toString());
+                    }
+                });
     }
 
     @Override
@@ -405,16 +467,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public int queryPort() {
         return queryPort;
-    }
-
-    @Override
-    public boolean searchEnabled() {
-        return searchEnabled;
-    }
-
-    @Override
-    public int searchPort() {
-        return searchPort;
     }
 
     @Override
@@ -480,11 +532,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public int queryEndpoints() {
         return queryServiceEndpoints;
-    }
-
-    @Override
-    public int searchEndpoints() {
-        return searchServiceEndpoints;
     }
 
     @Override
@@ -577,8 +624,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean queryEnabled = QUERY_ENABLED;
         private int queryPort = QUERY_PORT;
-        public boolean searchEnabled = SEARCH_ENABLED;
-        public int searchPort = SEARCH_PORT;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
         private boolean bootstrapCarrierEnabled = BOOTSTRAP_CARRIER_ENABLED;
         private int bootstrapHttpDirectPort = BOOTSTRAP_HTTP_DIRECT_PORT;
@@ -592,7 +637,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
-        private int searchEndpoints = SEARCH_ENDPOINTS;
         private Delay observeIntervalDelay = OBSERVE_INTERVAL_DELAY;
         private Delay reconnectDelay = RECONNECT_DELAY;
         private Delay retryDelay = RETRY_DELAY;
@@ -670,16 +714,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder queryPort(final int queryPort) {
             this.queryPort = queryPort;
-            return this;
-        }
-        
-        public Builder searchEnabled(final boolean searchEnabled) {
-            this.searchEnabled = searchEnabled;
-            return this;
-        }
-
-        public Builder searchPort(final int searchPort) {
-            this.searchPort = searchPort;
             return this;
         }
 
@@ -807,17 +841,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder queryEndpoints(final int queryEndpoints) {
             this.queryEndpoints = queryEndpoints;
-            return this;
-        }
-
-        /**
-         * Sets the number of Search (CBFT) endpoints to open per node in the cluster
-         * (default value {@value #SEARCH_ENDPOINTS}).
-         *
-         * Setting this to a higher number is advised in heavy query workloads.
-         */
-        public Builder searchEndpoints(final int searchEndpoints) {
-            this.searchEndpoints = searchEndpoints;
             return this;
         }
 
@@ -1062,8 +1085,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
         sb.append(", queryEnabled=").append(queryEnabled);
         sb.append(", queryPort=").append(queryPort);
-        sb.append(", searchEnabled=").append(searchEnabled);
-        sb.append(", searchPort=").append(searchPort);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
@@ -1077,7 +1098,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", kvServiceEndpoints=").append(kvServiceEndpoints);
         sb.append(", viewServiceEndpoints=").append(viewServiceEndpoints);
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
-        sb.append(", searchServiceEndpoints=").append(searchServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");
@@ -1110,4 +1130,25 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return sb.toString();
     }
 
+    /**
+     * An internal class used to keep track of components being shut down and
+     * the result of their shutdown call / cause for failures.
+     */
+    private static final class ShutdownStatus {
+        public final String target;
+        public final boolean success;
+        public final Throwable cause;
+
+        public ShutdownStatus(String target, boolean success, Throwable cause) {
+            this.target = target;
+            this.success = success;
+            this.cause = cause;
+        }
+
+        @Override
+        public String toString() {
+            return "Shutdown " + target + ": " + (success ? "success " : "failure ") + (cause == null ? "" : " due to "
+                    + cause.toString());
+        }
+    }
 }

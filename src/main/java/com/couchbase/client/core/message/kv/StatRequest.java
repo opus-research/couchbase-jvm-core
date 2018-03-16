@@ -19,16 +19,43 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+package com.couchbase.client.core.message.kv;
 
-package com.couchbase.client.core.message.search;
+import com.couchbase.client.core.message.CouchbaseResponse;
+import rx.subjects.ReplaySubject;
 
-import com.couchbase.client.core.message.CouchbaseRequest;
+import java.net.InetAddress;
 
 /**
- * Common marker interface for all {@link SearchRequest}s.
- *
  * @author Sergey Avseyev
+ * @since 1.2.1
  */
-public interface SearchRequest extends CouchbaseRequest {
-    String path();
+public class StatRequest extends AbstractKeyValueRequest {
+    private final InetAddress hostname;
+
+    public StatRequest(final String key, final InetAddress hostname, final String bucket) {
+        super(key, bucket, null, ReplaySubject.<CouchbaseResponse>create());
+        this.hostname = hostname;
+    }
+
+    public void add(final StatResponse response) {
+        if (response.key() == null) {
+            // Skip NULL-terminator for successful response
+            if (!response.status().isSuccess()) {
+                observable().onNext(response);
+            }
+            observable().onCompleted();
+        } else {
+            observable().onNext(response);
+        }
+    }
+
+    public InetAddress hostname() {
+        return hostname;
+    }
+
+    @Override
+    public short partition() {
+        return DEFAULT_PARTITION;
+    }
 }

@@ -36,13 +36,12 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveSeqnoRequest;
 import com.couchbase.client.core.message.kv.ReplicaGetRequest;
+import com.couchbase.client.core.message.kv.StatRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.state.LifecycleState;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.net.InetAddress;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.zip.CRC32;
 
 /**
@@ -72,6 +71,9 @@ public class KeyValueLocator implements Locator {
         if (request instanceof GetBucketConfigRequest) {
             return handleBucketConfigRequest((GetBucketConfigRequest) request, nodes);
         }
+        if (request instanceof StatRequest) {
+            return handleStatRequest((StatRequest)request, nodes);
+        }
 
         BucketConfig bucket = cluster.bucketConfig(request.bucket());
         if (bucket instanceof CouchbaseBucketConfig) {
@@ -95,9 +97,17 @@ public class KeyValueLocator implements Locator {
      * @return either the found node or an empty list indicating to retry later.
      */
     private static Node[] handleBucketConfigRequest(GetBucketConfigRequest request, Set<Node> nodes) {
+        return locateByHostname(request.hostname(), nodes);
+    }
+
+    private static Node[] handleStatRequest(StatRequest request, Set<Node> nodes) {
+        return locateByHostname(request.hostname(), nodes);
+    }
+
+    private static Node[] locateByHostname(final InetAddress hostname, Set<Node> nodes) {
         for (Node node : nodes) {
             if (node.isState(LifecycleState.CONNECTED)) {
-                if (!request.hostname().equals(node.hostname())) {
+                if (!hostname.equals(node.hostname())) {
                     continue;
                 }
                 return new Node[] { node };
@@ -239,22 +249,11 @@ public class KeyValueLocator implements Locator {
      */
     private static Node[] locateForMemcacheBucket(final BinaryRequest request, final Set<Node> nodes,
         final MemcachedBucketConfig config) {
-
-        long hash = calculateKetamaHash(request.keyBytes());
-        if (!config.ketamaNodes().containsKey(hash)) {
-            SortedMap<Long, NodeInfo> tailMap = config.ketamaNodes().tailMap(hash);
-            if (tailMap.isEmpty()) {
-                hash = config.ketamaNodes().firstKey();
-            } else {
-                hash = tailMap.firstKey();
-            }
-        }
-
-        NodeInfo found = config.ketamaNodes().get(hash);
+        InetAddress hostname = config.nodeForId(request.keyBytes());
         request.partition((short) 0);
 
         for (Node node : nodes) {
-            if (node.hostname().equals(found.hostname())) {
+            if (node.hostname().equals(hostname)) {
                 return new Node[] { node };
             }
         }
@@ -268,27 +267,6 @@ public class KeyValueLocator implements Locator {
         }
 
         throw new IllegalStateException("Node not found for request" + request);
-    }
-
-    /**
-     * Calculates the ketama hash for the given key.
-     *
-     * @param key the key to calculate.
-     * @return the calculated hash.
-     */
-    private static long calculateKetamaHash(final byte[] key) {
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            md5.update(key);
-            byte[] digest = md5.digest();
-            long rv = ((long) (digest[3] & 0xFF) << 24)
-                | ((long) (digest[2] & 0xFF) << 16)
-                | ((long) (digest[1] & 0xFF) << 8)
-                | (digest[0] & 0xFF);
-            return rv & 0xffffffffL;
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Could not encode ketama hash.", e);
-        }
     }
 
 }
