@@ -155,7 +155,7 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
 
             //initialize parser for current response
             if (!parser.isInitialized()) {
-                parser.initialize(responseContent, ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()), currentRequest());
+                parser.initialize(responseContent, ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()));
             }
 
             //important to place the RawQueryRequest test before, as it extends GenericQueryRequest
