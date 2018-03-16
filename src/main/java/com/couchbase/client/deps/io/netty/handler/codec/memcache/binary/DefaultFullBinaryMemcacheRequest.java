@@ -65,45 +65,33 @@ public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheReque
 
     @Override
     public FullBinaryMemcacheRequest retain() {
-        super.retain();
         content.retain();
         return this;
     }
 
     @Override
     public FullBinaryMemcacheRequest retain(int increment) {
-        super.retain(increment);
         content.retain(increment);
         return this;
     }
 
     @Override
     public boolean release() {
-        super.release();
         return content.release();
     }
 
     @Override
     public boolean release(int decrement) {
-        super.release(decrement);
         return content.release(decrement);
     }
 
     @Override
     public FullBinaryMemcacheRequest copy() {
-        ByteBuf extras = getExtras();
-        if (extras != null) {
-            extras = extras.copy();
-        }
-        return new DefaultFullBinaryMemcacheRequest(getKey(), extras, content().copy());
+        return new DefaultFullBinaryMemcacheRequest(getKey(), getExtras(), content().copy());
     }
 
     @Override
     public FullBinaryMemcacheRequest duplicate() {
-        ByteBuf extras = getExtras();
-        if (extras != null) {
-            extras = extras.duplicate();
-        }
-        return new DefaultFullBinaryMemcacheRequest(getKey(), extras, content().duplicate());
+        return new DefaultFullBinaryMemcacheRequest(getKey(), getExtras(), content().duplicate());
     }
 }
