@@ -64,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The {@link RequestHandler} handles the overall concept of {@link Node}s and manages them concurrently.
@@ -114,6 +115,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     private final CoreEnvironment environment;
 
     /**
+     * Contains the current cluster configuration.
+     */
+    private final AtomicReference<ClusterConfig> configuration;
+
+    /**
      * The {@link ResponseEvent} {@link RingBuffer}.
      */
     private final RingBuffer<ResponseEvent> responseBuffer;
@@ -122,11 +128,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * The event bus to publish events onto.
      */
     private final EventBus eventBus;
-
-    /**
-     * Contains the current cluster configuration.
-     */
-    private volatile ClusterConfig configuration;
 
     /**
      * Create a new {@link RequestHandler}.
@@ -148,14 +149,14 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         this.environment = environment;
         this.responseBuffer = responseBuffer;
         this.eventBus = environment.eventBus();
-        configuration = null;
+        configuration = new AtomicReference<ClusterConfig>();
 
         configObservable.subscribe(new Action1<ClusterConfig>() {
             @Override
             public void call(final ClusterConfig config) {
                 try {
                     LOGGER.debug("Got notified of a new configuration arriving.");
-                    configuration = config;
+                    configuration.set(config);
                     reconfigure(config).subscribe();
                     if (eventBus != null && eventBus.hasSubscribers()) {
                         eventBus.publish(new ConfigUpdatedEvent(config));
@@ -172,7 +173,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         try {
             final CouchbaseRequest request = event.getRequest();
 
-            ClusterConfig config = configuration;
+            ClusterConfig config = configuration.get();
             //prevent non-bootstrap requests to go through if bucket not part of config
             if (!(request instanceof BootstrapMessage)) {
                 if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {

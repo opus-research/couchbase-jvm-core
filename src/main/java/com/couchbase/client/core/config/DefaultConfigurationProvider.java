@@ -51,6 +51,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * **The default implementation of a {@link ConfigurationProvider}.**
@@ -105,25 +106,26 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      */
     private final Subject<ClusterConfig, ClusterConfig> configObservable;
 
+    /**
+     * Represents the current cluster-wide configuration.
+     */
+    private final AtomicReference<ClusterConfig> currentConfig;
+
+    /**
+     * List of initial bootstrap seed hostnames.
+     */
+    private final AtomicReference<Set<InetAddress>> seedHosts;
+
     private final List<Loader> loaderChain;
     private final Map<LoaderType, Refresher> refreshers;
     private final CoreEnvironment environment;
     private final EventBus eventBus;
 
+
     /**
      * Signals if the provider is bootstrapped and serving configs.
      */
     private volatile boolean bootstrapped;
-
-    /**
-     * Represents the current cluster-wide configuration.
-     */
-    private volatile ClusterConfig currentConfig;
-
-    /**
-     * List of initial bootstrap seed hostnames.
-     */
-    private volatile Set<InetAddress> seedHosts;
 
     /**
      * Create a new {@link DefaultConfigurationProvider}.
@@ -170,9 +172,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         this.eventBus = environment.eventBus();
 
         configObservable = PublishSubject.<ClusterConfig>create().toSerialized();
-        seedHosts = null;
+        seedHosts = new AtomicReference<Set<InetAddress>>();
         bootstrapped = false;
-        currentConfig = new DefaultClusterConfig();
+        currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
 
         Observable
             .from(refreshers.values())
@@ -202,7 +204,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public ClusterConfig config() {
-        return currentConfig;
+        return currentConfig.get();
     }
 
     @Override
@@ -215,9 +217,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         if (shuffle) {
             List<InetAddress> hostsList = new ArrayList<InetAddress>(hosts);
             Collections.shuffle(hostsList);
-            seedHosts = new HashSet<InetAddress>(hostsList);
+            this.seedHosts.set(new HashSet<InetAddress>(hostsList));
         } else {
-            seedHosts = hosts;
+            this.seedHosts.set(hosts);
         }
         return true;
     }
@@ -225,20 +227,20 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     @Override
     public Observable<ClusterConfig> openBucket(final String bucket, final String password) {
         LOGGER.debug("Got instructed to open bucket {}", bucket);
-        if (currentConfig != null && currentConfig.hasBucket(bucket)) {
+        if (currentConfig.get() != null && currentConfig.get().hasBucket(bucket)) {
             LOGGER.debug("Bucket {} already opened.", bucket);
-            return Observable.just(currentConfig);
+            return Observable.just(currentConfig.get());
         }
 
-        if (seedHosts == null || seedHosts.isEmpty()) {
+        if (seedHosts.get() == null || seedHosts.get().isEmpty()) {
             return Observable.error(new ConfigurationException("Seed node list not provided or empty."));
         }
 
-        Observable<Tuple2<LoaderType, BucketConfig>> observable = loaderChain.get(0).loadConfig(seedHosts,
+        Observable<Tuple2<LoaderType, BucketConfig>> observable = loaderChain.get(0).loadConfig(seedHosts.get(),
             bucket, password);
         for (int i = 1; i < loaderChain.size(); i++) {
             observable = observable.onErrorResumeNext(
-                loaderChain.get(i).loadConfig(seedHosts, bucket, password)
+                loaderChain.get(i).loadConfig(seedHosts.get(), bucket, password)
             );
         }
 
@@ -254,7 +256,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                 @Override
                 public ClusterConfig call(final Tuple2<LoaderType, BucketConfig> tuple) {
                     upsertBucketConfig(tuple.value2());
-                    return currentConfig;
+                    return currentConfig.get();
                 }
             })
             .doOnNext(new Action1<ClusterConfig>() {
@@ -285,7 +287,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                 if (eventBus != null && eventBus.hasSubscribers()) {
                     eventBus.publish(new BucketClosedEvent(bucket));
                 }
-                return currentConfig;
+                return currentConfig.get();
             }
         });
     }
@@ -293,11 +295,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     @Override
     public Observable<Boolean> closeBuckets() {
         LOGGER.debug("Closing all open buckets");
-        if (currentConfig == null || currentConfig.bucketConfigs().isEmpty()) {
+        if (currentConfig.get() == null || currentConfig.get().bucketConfigs().isEmpty()) {
             return Observable.just(true);
         }
 
-        Set<String> configs = new HashSet<String>(currentConfig.bucketConfigs().keySet());
+        Set<String> configs = new HashSet<String>(currentConfig.get().bucketConfigs().keySet());
         return Observable
             .from(configs)
             .observeOn(environment.scheduler())
@@ -332,7 +334,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         LOGGER.debug("Received signal for outdated configuration.");
 
         for (Refresher refresher : refreshers.values()) {
-            refresher.refresh(currentConfig);
+            refresher.refresh(currentConfig.get());
         }
     }
 
@@ -361,7 +363,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      * @param newConfig the configuration of the bucket.
      */
     private void upsertBucketConfig(final BucketConfig newConfig) {
-        ClusterConfig cluster = currentConfig;
+        ClusterConfig cluster = currentConfig.get();
         BucketConfig oldConfig = cluster.bucketConfig(newConfig.name());
 
         if (newConfig.rev() > 0 && oldConfig != null && newConfig.rev() <= oldConfig.rev()) {
@@ -380,7 +382,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         cluster.setBucketConfig(newConfig.name(), newConfig);
         LOGGER.debug("Applying new configuration {}", newConfig);
 
-        currentConfig = cluster;
+        currentConfig.set(cluster);
 
         boolean tainted = newConfig.tainted();
         for (Refresher refresher : refreshers.values()) {
@@ -391,7 +393,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             }
         }
 
-        configObservable.onNext(currentConfig);
+        configObservable.onNext(currentConfig.get());
     }
 
     /**
@@ -401,9 +403,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      */
     private void removeBucketConfig(final String name) {
         LOGGER.debug("Removing bucket {} configuration from known configs.", name);
-        ClusterConfig cluster = currentConfig;
+        ClusterConfig cluster = currentConfig.get();
         cluster.deleteBucketConfig(name);
-        currentConfig = cluster;
-        configObservable.onNext(currentConfig);
+        currentConfig.set(cluster);
+        configObservable.onNext(currentConfig.get());
     }
 }
