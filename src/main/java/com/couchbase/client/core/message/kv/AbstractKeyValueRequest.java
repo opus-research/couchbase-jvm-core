@@ -31,14 +31,7 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
  */
 public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest implements BinaryRequest {
 
-    /**
-     * The opaque identifier used in the binary protocol to track requests/responses.
-     *
-     * No overflow control is applied, since once it overflows it starts with negative values again.
-     */
-    private static volatile int GLOBAL_OPAQUE = 0;
-
-    protected static final short DEFAULT_PARTITION = -1;
+    protected static short DEFAULT_PARTITION = -1;
 
     /**
      * The key of the document, should be null if not tied to any.
@@ -50,8 +43,6 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
      */
     private short partition = DEFAULT_PARTITION;
 
-    private final int opaque;
-
     /**
      * Creates a new {@link AbstractKeyValueRequest}.
      *
@@ -62,7 +53,6 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
     protected AbstractKeyValueRequest(String key, String bucket, String password) {
         super(bucket, password);
         this.key = key;
-        opaque = GLOBAL_OPAQUE++;
     }
 
     @Override
@@ -85,10 +75,5 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
         }
         this.partition = partition;
         return this;
-    }
-
-    @Override
-    public int opaque() {
-        return opaque;
     }
 }

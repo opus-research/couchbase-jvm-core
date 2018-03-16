@@ -24,11 +24,8 @@ package com.couchbase.client.core.endpoint.kv;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
-import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
 import com.couchbase.client.core.message.kv.AppendResponse;
 import com.couchbase.client.core.message.kv.BinaryRequest;
@@ -56,17 +53,17 @@ import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
-import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
+import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
 
 import java.util.Queue;
 
@@ -78,11 +75,8 @@ import java.util.Queue;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class KeyValueHandler
-    extends AbstractGenericHandler<FullBinaryMemcacheResponse, BinaryMemcacheRequest, BinaryRequest> {
+public class KeyValueHandler extends AbstractGenericHandler<FullBinaryMemcacheResponse, BinaryMemcacheRequest, BinaryRequest> {
 
-    //Memcached OPCODES are defined on 1 byte. Some cbserver specific commands are casted
-    // to byte to conform to this limitation and exploit the negative range.
     public static final byte OP_GET_BUCKET_CONFIG = (byte) 0xb5;
     public static final byte OP_GET = BinaryMemcacheOpcodes.GET;
     public static final byte OP_GET_AND_LOCK = (byte) 0x94;
@@ -99,23 +93,11 @@ public class KeyValueHandler
     public static final byte OP_TOUCH = BinaryMemcacheOpcodes.TOUCH;
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
-    public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
 
-    //Memcached response codes are defined on 2 bytes (a short)
-    public static final short SUCCESS = 0x00;
-    public static final short ERR_NOT_FOUND = 0x01;
-    public static final short ERR_EXISTS = 0x02;
-    public static final short ERR_2BIG = 0x03;
-    public static final short ERR_INVAL = 0x04;
-    public static final short ERR_NOT_STORED = 0x05;
-    public static final short ERR_DELTA_BADVAL = 0x06;
-    public static final short ERR_NOT_MY_VBUCKET = 0x07;
-    public static final short ERR_UNKNOWN_COMMAND = 0x81;
-    public static final short ERR_NO_MEM = 0x82;
-    public static final short ERR_NOT_SUPPORTED = 0x83;
-    public static final short ERR_INTERNAL = 0x84;
-    public static final short ERR_BUSY = 0x85;
-    public static final short ERR_TEMP_FAIL = 0x86;
+    /**
+     * Represents the "Not My VBucket" status response.
+     */
+    private static final byte STATUS_NOT_MY_VBUCKET = 0x07;
 
     /**
      * Creates a new {@link KeyValueHandler} with the default queue for requests.
@@ -123,8 +105,8 @@ public class KeyValueHandler
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
-        super(endpoint, responseBuffer, isTransient);
+    public KeyValueHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
+        super(endpoint, responseBuffer);
     }
 
     /**
@@ -134,8 +116,8 @@ public class KeyValueHandler
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue, boolean isTransient) {
-        super(endpoint, responseBuffer, queue, isTransient);
+    KeyValueHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue) {
+        super(endpoint, responseBuffer, queue);
     }
 
     @Override
@@ -165,8 +147,6 @@ public class KeyValueHandler
             request = handleAppendRequest((AppendRequest) msg);
         } else if (msg instanceof PrependRequest) {
             request = handlePrependRequest((PrependRequest) msg);
-        } else if (msg instanceof KeepAliveRequest) {
-            request = handleKeepAliveRequest((KeepAliveRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown incoming BinaryRequest type "
                 + msg.getClass());
@@ -174,15 +154,6 @@ public class KeyValueHandler
 
         if (msg.partition() >= 0) {
             request.setReserved(msg.partition());
-        }
-
-        request.setOpaque(msg.opaque());
-
-        // Retain just the content, since a response could be "Not my Vbucket".
-        // The response handler checks the status and then releases if needed.
-        // Observe has content, but not external, so it should not be retained.
-        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
-            ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
         return request;
@@ -319,8 +290,7 @@ public class KeyValueHandler
      *
      * @return a ready {@link BinaryMemcacheRequest}.
      */
-    private static BinaryMemcacheRequest handleCounterRequest(final ChannelHandlerContext ctx,
-        final CounterRequest msg) {
+    private static BinaryMemcacheRequest handleCounterRequest(final ChannelHandlerContext ctx, final CounterRequest msg) {
         ByteBuf extras = ctx.alloc().buffer();
         extras.writeLong(Math.abs(msg.delta()));
         extras.writeLong(msg.initial());
@@ -379,8 +349,7 @@ public class KeyValueHandler
      *
      * @return a ready {@link BinaryMemcacheRequest}.
      */
-    private static BinaryMemcacheRequest handleObserveRequest(final ChannelHandlerContext ctx,
-        final ObserveRequest msg) {
+    private static BinaryMemcacheRequest handleObserveRequest(final ChannelHandlerContext ctx, final ObserveRequest msg) {
         String key = msg.key();
         ByteBuf content = ctx.alloc().buffer();
         content.writeShort(msg.partition());
@@ -417,51 +386,14 @@ public class KeyValueHandler
         return request;
     }
 
-    /**
-     * Encodes a {@link KeepAliveRequest} request into a NOOP operation.
-     *
-     * @param msg the {@link KeepAliveRequest} triggering the NOOP.
-     * @return a ready {@link BinaryMemcacheRequest}.
-     */
-    private static BinaryMemcacheRequest handleKeepAliveRequest(KeepAliveRequest msg) {
-        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest();
-        request
-                .setOpcode(OP_NOOP)
-                .setKeyLength((short) 0)
-                .setExtras(Unpooled.EMPTY_BUFFER)
-                .setExtrasLength((byte) 0)
-                .setTotalBodyLength(0);
-        return request;
-    }
-
     @Override
     protected CouchbaseResponse decodeResponse(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg)
         throws Exception {
         BinaryRequest request = currentRequest();
-
-        if (request.opaque() != msg.getOpaque()) {
-            throw new IllegalStateException("Opaque values for " + msg.getClass() + " do not match.");
-        }
-
         ResponseStatus status = convertStatus(msg.getStatus());
 
-        // Release request content from external resources if not retried again.
-        if (!status.equals(ResponseStatus.RETRY)) {
-            ByteBuf content = null;
-            if (request instanceof BinaryStoreRequest) {
-                content = ((BinaryStoreRequest) request).content();
-            } else if (request instanceof AppendRequest) {
-                content = ((AppendRequest) request).content();
-            } else if (request instanceof PrependRequest) {
-                content = ((PrependRequest) request).content();
-            }
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-        }
-
         CouchbaseResponse response;
-        ByteBuf content = msg.content().retain();
+        ByteBuf content = msg.content().copy();
         long cas = msg.getCAS();
         String bucket = request.bucket();
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
@@ -484,58 +416,27 @@ public class KeyValueHandler
         } else if (request instanceof ReplaceRequest) {
             response = new ReplaceResponse(status, cas, bucket, content, request);
         } else if (request instanceof RemoveRequest) {
-            response = new RemoveResponse(status, cas, bucket, content, request);
+            response = new RemoveResponse(status, bucket, content, request);
         } else if (request instanceof CounterRequest) {
-            long value = status.isSuccess() ? content.readLong() : 0;
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new CounterResponse(status, bucket, value, cas, request);
+            response = new CounterResponse(status, bucket, msg.content().readLong(), cas, request);
         } else if (request instanceof UnlockRequest) {
             response = new UnlockResponse(status, bucket, content, request);
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, bucket, content, request);
         } else if (request instanceof ObserveRequest) {
-            byte observed = status.isSuccess()
-                ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket, request);
+            byte observed = content.getByte(content.getShort(2) + 4);
+            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket,
+                content, request);
         } else if (request instanceof AppendRequest) {
             response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
             response = new PrependResponse(status, cas, bucket, content, request);
-        } else if (request instanceof KeepAliveRequest) {
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new KeepAliveResponse(status, request);
         } else {
             throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
                 + msg.getClass());
         }
 
-        finishedDecoding();
         return response;
-    }
-
-    /**
-     * Releasing the content of requests that are to be cancelled.
-     *
-     * @param request the request to side effect on.
-     */
-    @Override
-    protected void sideEffectRequestToCancel(final BinaryRequest request) {
-        super.sideEffectRequestToCancel(request);
-
-        if (request instanceof BinaryStoreRequest) {
-            ((BinaryStoreRequest) request).content().release();
-        } else if (request instanceof AppendRequest) {
-            ((AppendRequest) request).content().release();
-        } else if (request instanceof PrependRequest) {
-            ((PrependRequest) request).content().release();
-        }
     }
 
     /**
@@ -544,58 +445,19 @@ public class KeyValueHandler
      * @param status the status to convert.
      * @return the converted response status.
      */
-    protected static final ResponseStatus convertStatus(final short status) {
+    private static ResponseStatus convertStatus(final short status) {
         switch (status) {
-            case SUCCESS:
+            case BinaryMemcacheResponseStatus.SUCCESS:
                 return ResponseStatus.SUCCESS;
-            case ERR_EXISTS:
+            case BinaryMemcacheResponseStatus.KEY_EEXISTS:
                 return ResponseStatus.EXISTS;
-            case ERR_NOT_FOUND:
+            case BinaryMemcacheResponseStatus.KEY_ENOENT:
                 return ResponseStatus.NOT_EXISTS;
-            case ERR_NOT_MY_VBUCKET:
+            case STATUS_NOT_MY_VBUCKET:
                 return ResponseStatus.RETRY;
-            case ERR_NOT_STORED:
-                return ResponseStatus.NOT_STORED;
-            case ERR_2BIG:
-                return ResponseStatus.TOO_BIG;
-            case ERR_TEMP_FAIL:
-                return ResponseStatus.TEMPORARY_FAILURE;
-            case ERR_BUSY:
-                return ResponseStatus.SERVER_BUSY;
-            case ERR_NO_MEM:
-                return ResponseStatus.OUT_OF_MEMORY;
-            case ERR_UNKNOWN_COMMAND:
-                return ResponseStatus.COMMAND_UNAVAILABLE;
-            case ERR_NOT_SUPPORTED:
-                return ResponseStatus.COMMAND_UNAVAILABLE;
-            case ERR_INTERNAL:
-                return ResponseStatus.INTERNAL_ERROR;
-            case ERR_INVAL:
-                return ResponseStatus.INVALID_ARGUMENTS;
-            case ERR_DELTA_BADVAL:
-                return ResponseStatus.INVALID_ARGUMENTS;
             default:
                 return ResponseStatus.FAILURE;
         }
     }
 
-    @Override
-    protected CouchbaseRequest createKeepAliveRequest() {
-        return new KeepAliveRequest();
-    }
-
-    protected static class KeepAliveRequest extends AbstractKeyValueRequest {
-
-        protected KeepAliveRequest() {
-            super(null, null, null);
-            partition((short) 0);
-        }
-    }
-
-    protected static class KeepAliveResponse extends AbstractKeyValueResponse {
-
-        public KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
-            super(status, null, null, request);
-        }
-    }
 }

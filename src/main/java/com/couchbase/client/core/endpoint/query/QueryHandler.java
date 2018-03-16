@@ -21,16 +21,9 @@
  */
 package com.couchbase.client.core.endpoint.query;
 
-import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.*;
-
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
@@ -49,8 +42,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
-import rx.Scheduler;
-import rx.subjects.AsyncSubject;
 import rx.subjects.ReplaySubject;
 
 import java.util.Queue;
@@ -65,29 +56,11 @@ import java.util.Queue;
  */
 public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest, QueryRequest> {
 
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandler.class);
-
     private static final byte QUERY_STATE_INITIAL = 0;
-    private static final byte QUERY_STATE_SIGNATURE = 1;
-    private static final byte QUERY_STATE_ROWS = 2;
+    private static final byte QUERY_STATE_ROWS = 1;
+    private static final byte QUERY_STATE_INFO = 2;
     private static final byte QUERY_STATE_ERROR = 3;
-    private static final byte QUERY_STATE_WARNING = 4;
-    private static final byte QUERY_STATE_STATUS = 5;
-    private static final byte QUERY_STATE_INFO = 6;
-    private static final byte QUERY_STATE_DONE = 7;
-
-    /**
-     * This is the number of characters expected to be present to be able to read
-     * the beginning of the JSON, including the "requestID" token and its value
-     * (currently expected to be 36 chars, but the code is adaptative).
-     */
-    private static final int MINIMUM_WINDOW_FOR_REQUESTID = 55;
-
-    /**
-     * This is a window of characters allowing to detect the clientContextID token
-     * (including room for JSON separators, etc...).
-     */
-    public static final int MINIMUM_WINDOW_FOR_CLIENTID_TOKEN = 27;
+    private static final byte QUERY_STATE_DONE = 4;
 
     /**
      * Contains the current pending response header if set.
@@ -100,30 +73,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private ByteBuf responseContent;
 
     /**
-     * Represents an observable that sends result chunks.
+     * Represents a observable that sends config chunks if instructed.
      */
     private ReplaySubject<ByteBuf> queryRowObservable;
 
     /**
-     * Represents an observable that has the signature of the N1QL results if there are any.
+     * Represents a observable tha has additional info associated (error/info).
      */
-    private AsyncSubject<ByteBuf> querySignatureObservable;
-
-    /**
-     * Represents an observable that sends errors and warnings if any during query execution.
-     */
-    private ReplaySubject<ByteBuf> queryErrorObservable;
-
-    /**
-     * Represent an observable that has the final execution status of the query, once all result rows and/or
-     * errors/warnings have been sent.
-     */
-    private AsyncSubject<String> queryStatusObservable;
-
-    /**
-     * Represents an observable containing metrics on a terminated query.
-     */
-    private AsyncSubject<ByteBuf> queryInfoObservable;
+    private ReplaySubject<ByteBuf> queryInfoObservable;
 
     /**
      * Represents the current query parsing state.
@@ -131,9 +88,9 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private byte queryParsingState = QUERY_STATE_INITIAL;
 
     /**
-     * In case of chunked processing, allows to detect we are still parsing a section.
+     * Only needed to reset the request for a streaming config.
      */
-    private boolean sectionDone = false;
+    private QueryRequest previousRequest = null;
 
     /**
      * Creates a new {@link QueryHandler} with the default queue for requests.
@@ -141,8 +98,8 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
-        super(endpoint, responseBuffer, isTransient);
+    public QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
+        super(endpoint, responseBuffer);
     }
 
     /**
@@ -152,8 +109,8 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<QueryRequest> queue, boolean isTransient) {
-        super(endpoint, responseBuffer, queue, isTransient);
+    QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<QueryRequest> queue) {
+        super(endpoint, responseBuffer, queue);
     }
 
     @Override
@@ -161,20 +118,13 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         FullHttpRequest request;
 
         if (msg instanceof GenericQueryRequest) {
-            GenericQueryRequest queryRequest = (GenericQueryRequest) msg;
             request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/query");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
-            if (queryRequest.isJsonFormat()) {
-                request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json");
-            }
             ByteBuf query = ctx.alloc().buffer(((GenericQueryRequest) msg).query().length());
             query.writeBytes(((GenericQueryRequest) msg).query().getBytes(CHARSET));
             request.headers().add(HttpHeaders.Names.CONTENT_LENGTH, query.readableBytes());
             request.content().writeBytes(query);
             query.release();
-        } else if (msg instanceof KeepAliveRequest) {
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
-            request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
         } else {
             throw new IllegalArgumentException("Unknown incoming QueryRequest type "
                 + msg.getClass());
@@ -196,46 +146,24 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             }
         }
 
-        if (currentRequest() instanceof KeepAliveRequest) {
-            if (msg instanceof LastHttpContent) {
-                response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
-                responseContent.clear();
-                responseContent.discardReadBytes();
-                finishedDecoding();
-            }
-        } else if (msg instanceof HttpContent) {
+        if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
-            boolean lastChunk = msg instanceof LastHttpContent;
+
+            if (currentRequest() == null) {
+                currentRequest(previousRequest);
+                previousRequest = null;
+            }
 
             if (currentRequest() instanceof GenericQueryRequest) {
                 if (queryRowObservable == null) {
-                    //still in initial parsing
-                    response = handleGenericQueryResponse(lastChunk);
-                    //null response indicates need for more data before continuing parsing
-                    if (response != null) {
-                        parseQueryResponse(lastChunk);
-                    }
-                } else {
-                    parseQueryResponse(lastChunk);
+                    response = handleGenericQueryResponse();
                 }
 
+                parseQueryResponse(msg instanceof LastHttpContent);
             }
         }
 
         return response;
-    }
-
-    /**
-     * Checks if there's not another section opened before the current one,
-     * which starts at openBracketPos
-     *
-     * @param openBracketPos the position of the current section's opening bracket
-     * @return true if transition to next state should be made because there's a new
-     * section opening.
-     */
-    private boolean isEmptySection(int openBracketPos) {
-        int nextColon = findNextChar(responseContent, ':');
-        return nextColon > -1 && nextColon < openBracketPos;
     }
 
     /**
@@ -246,56 +174,11 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      *
      * @return a {@link CouchbaseResponse} if eligible.
      */
-    private CouchbaseResponse handleGenericQueryResponse(boolean lastChunk) {
-        String requestId;
-        String clientId = "";
-
-        if (responseContent.readableBytes() < MINIMUM_WINDOW_FOR_REQUESTID + MINIMUM_WINDOW_FOR_CLIENTID_TOKEN
-                && !lastChunk) {
-            return null; //wait for more data
-        }
-
-        int startIndex = responseContent.readerIndex();
-
-        if (responseContent.readableBytes() >= MINIMUM_WINDOW_FOR_REQUESTID) {
-            responseContent.skipBytes(findNextChar(responseContent, ':'));
-            responseContent.skipBytes(findNextChar(responseContent, '"') + 1);
-            int endOfId = findNextChar(responseContent, '"');
-            ByteBuf slice = responseContent.readSlice(endOfId);
-            requestId = slice.toString(CHARSET);
-        } else {
-            return null;
-        }
-
-        if (responseContent.readableBytes() >= MINIMUM_WINDOW_FOR_CLIENTID_TOKEN
-                && findNextChar(responseContent, ':') < MINIMUM_WINDOW_FOR_CLIENTID_TOKEN) {
-            responseContent.markReaderIndex();
-            ByteBuf slice = responseContent.readSlice(findNextChar(responseContent, ':'));
-            if (slice.toString(CHARSET).contains("clientContextID")) {
-                //find the size of the client id
-                responseContent.skipBytes(findNextChar(responseContent, '"') + 1); //opening of clientId
-                int clientIdSize = findNextCharNotPrefixedBy(responseContent, '"', '\\');
-                if (clientIdSize < 0) {
-                    //reset the cursor way back before requestID, there was not enough data to get the whole id
-                    responseContent.readerIndex(startIndex);
-                    //wait for more data
-                    return null;
-                }
-                //read it
-                clientId = responseContent.readSlice(clientIdSize).toString(CHARSET);
-                //advance to next token
-                responseContent.skipBytes(1);//closing quote
-                responseContent.skipBytes(findNextChar(responseContent, '"')); //next token's quote
-            } else {
-                //reset the cursor, there was no client id
-                responseContent.resetReaderIndex();
-            }
-        }
-
+    private CouchbaseResponse handleGenericQueryResponse() {
         boolean success = true;
         if (responseContent.readableBytes() >= 20) {
-            ByteBuf peekForErrors = responseContent.slice(responseContent.readerIndex(), 20);
-            if (peekForErrors.toString(CHARSET).contains("errors")) {
+            ByteBuf firstPart = responseContent.slice(0, 20);
+            if (firstPart.toString(CHARSET).contains("error")) {
                 success = false;
             }
         } else {
@@ -306,59 +189,35 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         if (!success) {
             status = ResponseStatus.FAILURE;
         }
-
-        Scheduler scheduler = env().scheduler();
         queryRowObservable = ReplaySubject.create();
-        queryErrorObservable = ReplaySubject.create();
-        queryStatusObservable = AsyncSubject.create();
-        queryInfoObservable = AsyncSubject.create();
-        querySignatureObservable = AsyncSubject.create();
-        return new GenericQueryResponse(
-                queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
-                queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
-                querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
-                queryStatusObservable.onBackpressureBuffer().observeOn(scheduler),
-                queryInfoObservable.onBackpressureBuffer().observeOn(scheduler),
-                currentRequest(),
-                status, requestId, clientId
-        );
+        queryInfoObservable = ReplaySubject.create();
+        previousRequest = currentRequest();
+        return new GenericQueryResponse(queryRowObservable, queryInfoObservable, status, currentRequest());
     }
 
     /**
      * Generic dispatch method to parse the query response chunks.
      *
-     * Depending on the state the parser is currently in, several different sub-methods are called
-     * which do the actual handling.
+     * Depending on the state the parser is currently in, several different sub-methods are caleld which do the actual
+     * handling.
      *
      * @param lastChunk if the current emitted content body is the last one.
      */
     private void parseQueryResponse(boolean lastChunk) {
-        if (sectionDone || queryParsingState == QUERY_STATE_INITIAL) {
-            queryParsingState = transitionToNextToken(lastChunk);
-        }
-
-        if (queryParsingState == QUERY_STATE_SIGNATURE) {
-            parseQuerySignature(lastChunk);
+        if (queryParsingState == QUERY_STATE_INITIAL) {
+            parseQueryInitial();
         }
 
         if (queryParsingState == QUERY_STATE_ROWS) {
-            parseQueryRows(lastChunk);
-        }
-
-        if (queryParsingState == QUERY_STATE_ERROR) {
-            parseQueryError(lastChunk);
-        }
-
-        if (queryParsingState == QUERY_STATE_WARNING) {
-            parseQueryError(lastChunk); //warning are treated the same as errors -> sent to errorObservable
-        }
-
-        if (queryParsingState == QUERY_STATE_STATUS) {
-            parseQueryStatus(lastChunk);
+            parseQueryRows();
         }
 
         if (queryParsingState == QUERY_STATE_INFO) {
             parseQueryInfo(lastChunk);
+        }
+
+        if (queryParsingState == QUERY_STATE_ERROR) {
+            parseQueryError(lastChunk);
         }
 
         if (queryParsingState == QUERY_STATE_DONE) {
@@ -367,148 +226,70 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
-     * Peek the next token, returning the QUERY_STATE corresponding to it and placing the readerIndex just after
-     * the token's ':'. Must be at the end of the previous token.
-     *
-     * @param lastChunk true if this is the last chunk
-     * @return the next QUERY_STATE
+     * Helper method to parse the initial bits of the query response.
      */
-    private byte transitionToNextToken(boolean lastChunk) {
-        int endNextToken = findNextChar(responseContent, ':');
-        if (endNextToken < 0 && !lastChunk) {
-            return queryParsingState;
-        }
-        byte newState;
-        ByteBuf peekSlice = responseContent.readSlice(endNextToken + 1);
-        String peek = peekSlice.toString(CHARSET);
-        if (peek.contains("\"signature\":")) {
-            newState = QUERY_STATE_SIGNATURE;
-        } else if (peek.endsWith("\"results\":")) {
-            newState = QUERY_STATE_ROWS;
-        } else if (peek.endsWith("\"status\":")) {
-            newState = QUERY_STATE_STATUS;
-        } else if (peek.endsWith("\"errors\":")) {
-            newState = QUERY_STATE_ERROR;
-        } else if (peek.endsWith("\"warnings\":")) {
-            newState = QUERY_STATE_WARNING;
-        } else if (peek.endsWith("\"metrics\":")) {
-            newState = QUERY_STATE_INFO;
-        } else {
-            IllegalStateException e = new IllegalStateException("Error parsing query response (in TRANSITION) at " + peek);
-            if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace(responseContent.toString(CHARSET), e);
-            }
-            throw e;
-        }
+    private void parseQueryInitial() {
+        ByteBuf content = responseContent;
 
-        sectionDone = false;
-        return newState;
-    }
+        if (content.readableBytes() >= 20) {
+            ByteBuf prefixBuf = content.slice(0, 20);
+            String prefix = prefixBuf.toString(CHARSET);
 
-    private void sectionDone() {
-        this.sectionDone = true;
-        responseContent.discardReadBytes();
-    }
-
-    /**
-     * Parse the signature section in the N1QL response.
-     */
-    private void parseQuerySignature(boolean lastChunk) {
-        int openPos = findNextChar(responseContent, '{');
-        if (!isEmptySection(openPos)) { //checks for empty signature
-            int closePos = findSectionClosingPosition(responseContent, '{', '}');
-            if (closePos > 0) {
-                int length = closePos - openPos - responseContent.readerIndex() + 1;
-                responseContent.skipBytes(openPos);
-                ByteBuf signature = responseContent.readSlice(length);
-                querySignatureObservable.onNext(signature.copy());
+            if (prefix.contains("resultset")) {
+                queryParsingState = QUERY_STATE_ROWS;
+            } else if (prefix.contains("error")) {
+                queryRowObservable.onCompleted();
+                queryParsingState = QUERY_STATE_ERROR;
             } else {
-                //wait for more data
-                return;
+                throw new IllegalStateException("Error parsing query response (in INITIAL): "
+                    + content.toString(CHARSET));
             }
+            content.readerIndex(prefixBuf.bytesBefore((byte) ':')+1);
         }
-        //note: the signature section could be absent, so we'll make sure to complete the observable
-        // when receiving status since this is in every well-formed response.
-        sectionDone();
-        queryParsingState = transitionToNextToken(lastChunk);
     }
 
     /**
      * Parses the query rows from the content stream as long as there is data to be found.
      */
-    private void parseQueryRows(boolean lastChunk) {
-        while (true) {
-            int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos)) {
-                sectionDone();
-                queryParsingState = transitionToNextToken(lastChunk);
+    private void parseQueryRows() {
+        while(true) {
+            int openBracketPos = responseContent.bytesBefore((byte) '{');
+            int nextColonPos = responseContent.bytesBefore((byte) ':');
+            if (nextColonPos < openBracketPos) {
+                queryParsingState = QUERY_STATE_INFO;
+                queryRowObservable.onCompleted();
                 break;
             }
+            int closeBracketPos = -1;
+            int openBrackets = 0;
+            for (int i = responseContent.readerIndex(); i <= responseContent.writerIndex(); i++) {
+                byte current = responseContent.getByte(i);
+                if (current == '{') {
+                    openBrackets++;
+                } else if (current == '}' && openBrackets > 0) {
+                    openBrackets--;
+                    if (openBrackets == 0) {
+                        closeBracketPos = i;
+                        break;
+                    }
+                }
+            }
 
-            int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
             if (closeBracketPos == -1) {
                 break;
             }
 
-            int length = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
-            responseContent.skipBytes(openBracketPos);
-            ByteBuf resultSlice = responseContent.readSlice(length);
-            queryRowObservable.onNext(resultSlice.copy());
-            responseContent.discardSomeReadBytes();
+            int from = responseContent.readerIndex() + openBracketPos;
+            int to = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
+            queryRowObservable.onNext(responseContent.slice(from, to).copy());
+            responseContent.readerIndex(closeBracketPos);
         }
+
+        responseContent.discardReadBytes();
     }
 
     /**
-     * Parses the errors and warnings from the content stream as long as there are some to be found.
-     */
-    private void parseQueryError(boolean lastChunk) {
-        while (true) {
-            int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos)) {
-                sectionDone();
-                queryParsingState = transitionToNextToken(lastChunk); //warnings or status
-                break;
-            }
-
-            int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
-            if (closeBracketPos == -1) {
-                break;
-            }
-
-            int length = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
-            responseContent.skipBytes(openBracketPos);
-            ByteBuf resultSlice = responseContent.readSlice(length);
-            queryErrorObservable.onNext(resultSlice.copy());
-        }
-    }
-
-    /**
-     * Last before the end of the stream, we can now parse the final result status
-     * (including full execution of the query).
-     */
-    private void parseQueryStatus(boolean lastChunk) {
-        //some sections don't always come up, unlike status. Take this chance to close said sections' observables here.
-        querySignatureObservable.onCompleted();
-        queryRowObservable.onCompleted();
-        queryErrorObservable.onCompleted();
-
-        responseContent.markReaderIndex();
-        responseContent.skipBytes(findNextChar(responseContent, '"') + 1);
-        int endStatus = findNextChar(responseContent, '"');
-        if (endStatus > -1) {
-            ByteBuf resultSlice = responseContent.readSlice(endStatus);
-            queryStatusObservable.onNext(resultSlice.toString(CHARSET));
-            queryStatusObservable.onCompleted();
-            sectionDone();
-            queryParsingState = transitionToNextToken(lastChunk);
-        } else {
-            responseContent.resetReaderIndex();
-            return; //need more data
-        }
-    }
-
-    /**
-     * At the end of the response stream, parse out the info portion (metrics).
+     * At the end of the row stream, parse out the info portion.
      *
      * For the sake of easiness, since we know it comes at the end, we wait until the full data is together and read
      * the info json objects off in one shot (but they are still emitted separately).
@@ -516,23 +297,69 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @param last if this batch is the last one.
      */
     private void parseQueryInfo(boolean last) {
-        int openBracketPos = findNextChar(responseContent, '{');
-        int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
-        if (closeBracketPos == -1) {
-            if (last) {
-                throw new IllegalStateException("Could not find metrics closing in last chunk");
-            } else {
-                return; //wait for more data
+        if (!last) {
+            return;
+        }
+
+        int initColon = responseContent.bytesBefore((byte) ':');
+        responseContent.readerIndex(initColon);
+
+        while(true) {
+            int openBracketPos = responseContent.bytesBefore((byte) '{');
+            int closeBracketPos = -1;
+            int openBrackets = 0;
+            for (int i = responseContent.readerIndex(); i <= responseContent.writerIndex(); i++) {
+                byte current = responseContent.getByte(i);
+                if (current == '{') {
+                    openBrackets++;
+                } else if (current == '}' && openBrackets > 0) {
+                    openBrackets--;
+                    if (openBrackets == 0) {
+                        closeBracketPos = i;
+                        break;
+                    }
+                }
+            }
+
+            if (closeBracketPos == -1) {
+                break;
+            }
+
+            int from = responseContent.readerIndex() + openBracketPos;
+            int to = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
+            queryInfoObservable.onNext(responseContent.slice(from, to).copy());
+            responseContent.readerIndex(to + openBracketPos);
+        }
+
+        queryInfoObservable.onCompleted();
+        queryParsingState = QUERY_STATE_DONE;
+    }
+
+    /**
+     * Parses the error portion of the query response.
+     *
+     * @param last if this batch is the last one.
+     */
+    private void parseQueryError(boolean last) {
+        if (!last) {
+            return;
+        }
+
+        short found = 0;
+        int foundIndex = 0;
+        for (int i = responseContent.writerIndex(); i > responseContent.readerIndex(); i--) {
+            if (responseContent.getByte(i) == 125) {
+                found++;
+            }
+            if (found == 2) {
+                foundIndex = i;
+                break;
             }
         }
 
-        int from = responseContent.readerIndex() + openBracketPos;
-        int to = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
-        queryInfoObservable.onNext(responseContent.slice(from, to).copy());
-        responseContent.readerIndex(to + openBracketPos);
-
+        int length = foundIndex - responseContent.readerIndex() + 1;
+        queryInfoObservable.onNext(responseContent.copy(responseContent.readerIndex(), length));
         queryInfoObservable.onCompleted();
-        sectionDone();
         queryParsingState = QUERY_STATE_DONE;
     }
 
@@ -540,13 +367,10 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * Clean up the query states after all rows have been consumed.
      */
     private void cleanupQueryStates() {
-        finishedDecoding();
         queryInfoObservable = null;
         queryRowObservable = null;
-        queryErrorObservable = null;
-        queryStatusObservable = null;
-        querySignatureObservable = null;
         queryParsingState = QUERY_STATE_INITIAL;
+        currentRequest(null);
     }
 
     /**
@@ -557,7 +381,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      */
     private static ResponseStatus statusFromCode(int code) {
         ResponseStatus status;
-        switch (code) {
+        switch(code) {
             case 200:
             case 201:
                 status = ResponseStatus.SUCCESS;
@@ -579,36 +403,9 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         if (queryInfoObservable != null) {
             queryInfoObservable.onCompleted();
         }
-        if (queryErrorObservable != null) {
-            queryErrorObservable.onCompleted();
-        }
-        if (queryStatusObservable != null) {
-            queryStatusObservable.onCompleted();
-        }
-        if (querySignatureObservable != null) {
-            querySignatureObservable.onCompleted();
-        }
         cleanupQueryStates();
-        if (responseContent != null && responseContent.refCnt() > 0) {
-            responseContent.release();
-        }
         super.handlerRemoved(ctx);
     }
 
-    @Override
-    protected CouchbaseRequest createKeepAliveRequest() {
-        return new KeepAliveRequest();
-    }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest {
-        protected KeepAliveRequest() {
-            super(null, null);
-        }
-    }
-
-    protected static class KeepAliveResponse extends AbstractCouchbaseResponse {
-        protected KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
-            super(status, request);
-        }
-    }
 }

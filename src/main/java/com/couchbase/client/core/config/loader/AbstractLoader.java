@@ -28,8 +28,6 @@ import com.couchbase.client.core.config.parser.BucketConfigParser;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.lang.Tuple;
 import com.couchbase.client.core.lang.Tuple2;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -37,6 +35,7 @@ import com.couchbase.client.core.message.internal.AddServiceResponse;
 import com.couchbase.client.core.service.ServiceType;
 import rx.Observable;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
 import java.util.Set;
 
@@ -51,11 +50,6 @@ import java.util.Set;
  * @since 1.0
  */
 public abstract class AbstractLoader implements Loader {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(Loader.class);
 
     /**
      * The reference to the cluster.
@@ -81,8 +75,7 @@ public abstract class AbstractLoader implements Loader {
      * @param cluster the cluster reference.
      * @param environment the couchbase environment.
      */
-    protected AbstractLoader(final LoaderType loaderType, final ServiceType serviceType, final ClusterFacade cluster,
-        final CoreEnvironment environment) {
+    protected AbstractLoader(final LoaderType loaderType, final ServiceType serviceType, final ClusterFacade cluster, final CoreEnvironment environment) {
         this.loaderType = loaderType;
         this.serviceType = serviceType;
         this.cluster = cluster;
@@ -112,44 +105,20 @@ public abstract class AbstractLoader implements Loader {
     /**
      * Initiate the config loading process.
      *
+     * The common path handled by this abstract implementation includes making sure that the node and service are
+     * usable by the actual implementation. Finally, the raw config string config parsing is handled in this central
+     * place.
      *
      * @param seedNodes the seed nodes.
      * @param bucket the name of the bucket.
      * @param password the password of the bucket.
      * @return a valid {@link BucketConfig}.
      */
-    public Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final Set<InetAddress> seedNodes,
-        final String bucket, final String password) {
-        LOGGER.debug("Loading Config for bucket {}", bucket);
-
-        return Observable.mergeDelayError(Observable
-                .from(seedNodes)
-                .map(new Func1<InetAddress, Observable<Tuple2<LoaderType, BucketConfig>>>() {
-                    @Override
-                    public Observable<Tuple2<LoaderType, BucketConfig>> call(InetAddress inetAddress) {
-                        return loadConfigAtAddr(inetAddress, bucket, password);
-                    }
-                })
-            )
-            .take(1);
-    }
-
-    /**
-     * Helper method to load a config at a specific {@link InetAddress}.
-     *
-     * The common path handled by this abstract implementation includes making sure that the node and service are
-     * usable by the actual implementation. Finally, the raw config string config parsing is handled in this central
-     * place.
-     *
-     * @param node the node to grab a config from.
-     * @param bucket the name of the bucket.
-     * @param password the password of the bucket.
-     * @return a valid {@link BucketConfig} or an errored {@link Observable}.
-     */
-    private Observable<Tuple2<LoaderType, BucketConfig>> loadConfigAtAddr(final InetAddress node, final String bucket,
+    public Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final Set<InetAddress> seedNodes, final String bucket,
         final String password) {
         return Observable
-            .just(node)
+            .from(seedNodes)
+            .subscribeOn(env().scheduler())
             .flatMap(new Func1<InetAddress, Observable<AddNodeResponse>>() {
                 @Override
                 public Observable<AddNodeResponse> call(final InetAddress address) {
@@ -161,9 +130,8 @@ public abstract class AbstractLoader implements Loader {
                     if (!response.status().isSuccess()) {
                         return Observable.error(new IllegalStateException("Could not add node for config loading."));
                     }
-                    LOGGER.debug("Successfully added Node {}", response.hostname());
                     return cluster.send(
-                        new AddServiceRequest(serviceType, bucket, password, port(), response.hostname())
+                            new AddServiceRequest(serviceType, bucket, password, port(), response.hostname())
                     );
                 }
             }).flatMap(new Func1<AddServiceResponse, Observable<String>>() {
@@ -172,14 +140,14 @@ public abstract class AbstractLoader implements Loader {
                     if (!response.status().isSuccess()) {
                         return Observable.error(new IllegalStateException("Could not add service for config loading."));
                     }
-                    LOGGER.debug("Successfully enabled Service {} on Node {}", serviceType, response.hostname());
+
                     return discoverConfig(bucket, password, response.hostname());
                 }
             })
+            .observeOn(env().scheduler())
             .map(new Func1<String, Tuple2<LoaderType, BucketConfig>>() {
                 @Override
                 public Tuple2<LoaderType, BucketConfig> call(final String rawConfig) {
-                    LOGGER.debug("Got configuration from Service, attempting to parse.");
                     BucketConfig config = BucketConfigParser.parse(rawConfig);
                     config.password(password);
                     return Tuple.create(loaderType, config);

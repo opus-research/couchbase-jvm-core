@@ -25,10 +25,7 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
-import io.netty.buffer.ByteBuf;
-import io.netty.util.ReferenceCountUtil;
 import org.junit.Test;
-import rx.functions.Action1;
 
 import static org.junit.Assert.assertEquals;
 
@@ -43,22 +40,10 @@ public class ViewMessageTest extends ClusterDependentTest {
     @Test
     public void shouldQueryNonExistentView() {
         ViewQueryResponse single = cluster()
-            .<ViewQueryResponse>send(new ViewQueryRequest("designdoc", "foobar", false, "debug=true", bucket(), password()))
+            .<ViewQueryResponse>send(new ViewQueryRequest("beer", "brewery_beers", false, "debug=true", bucket(), password()))
             .toBlocking()
             .single();
         assertEquals(ResponseStatus.NOT_EXISTS, single.status());
-        single.info().toBlocking().forEach(new Action1<ByteBuf>() {
-            @Override
-            public void call(ByteBuf byteBuf) {
-                ReferenceCountUtil.releaseLater(byteBuf);
-            }
-        });
-        single.rows().toBlocking().forEach(new Action1<ByteBuf>() {
-            @Override
-            public void call(ByteBuf byteBuf) {
-                ReferenceCountUtil.releaseLater(byteBuf);
-            }
-        });
     }
 
 }

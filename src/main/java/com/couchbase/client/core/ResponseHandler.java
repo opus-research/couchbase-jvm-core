@@ -27,44 +27,39 @@ import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.kv.BinaryResponse;
-import com.couchbase.client.core.time.Delay;
+import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.Subscription;
 import rx.functions.Action0;
 import rx.subjects.Subject;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
     private final ClusterFacade cluster;
     private final ConfigurationProvider configurationProvider;
-    private final CoreEnvironment environment;
+    private final Scheduler.Worker worker;
 
-    /**
-     * Creates a new {@link ResponseHandler}.
-     *
-     * @param environment the global environment.
-     * @param cluster the cluster reference.
-     * @param provider th configuration provider.
-     */
+
     public ResponseHandler(CoreEnvironment environment, ClusterFacade cluster, ConfigurationProvider provider) {
         this.cluster = cluster;
         this.configurationProvider = provider;
-        this.environment = environment;
+        this.worker = environment.scheduler().createWorker();
     }
 
     /**
      * Translates {@link CouchbaseRequest}s into {@link RequestEvent}s.
      */
-    public static final EventTranslatorTwoArg<ResponseEvent, CouchbaseMessage,
-        Subject<CouchbaseResponse, CouchbaseResponse>> RESPONSE_TRANSLATOR =
+    public static final EventTranslatorTwoArg<ResponseEvent, CouchbaseMessage, Subject<CouchbaseResponse, CouchbaseResponse>> RESPONSE_TRANSLATOR =
         new EventTranslatorTwoArg<ResponseEvent, CouchbaseMessage, Subject<CouchbaseResponse, CouchbaseResponse>>() {
             @Override
-            public void translateTo(ResponseEvent event, long sequence, CouchbaseMessage message,
-                Subject<CouchbaseResponse, CouchbaseResponse> observable) {
+            public void translateTo(ResponseEvent event, long sequence, CouchbaseMessage message, Subject<CouchbaseResponse, CouchbaseResponse> observable) {
                 event.setMessage(message);
                 event.setObservable(observable);
             }
@@ -85,40 +80,33 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
      */
     @Override
     public void onEvent(final ResponseEvent event, long sequence, boolean endOfBatch) throws Exception {
-        try {
-            CouchbaseMessage message = event.getMessage();
-            if (message instanceof SignalConfigReload) {
-                configurationProvider.signalOutdated();
-            } else if (message instanceof CouchbaseResponse) {
-                final CouchbaseResponse response = (CouchbaseResponse) message;
-                ResponseStatus status = response.status();
-                if (status == ResponseStatus.RETRY) {
+        CouchbaseMessage message = event.getMessage();
+        if (message instanceof SignalConfigReload) {
+            configurationProvider.signalOutdated();
+        } else if (message instanceof CouchbaseResponse) {
+            CouchbaseResponse response = (CouchbaseResponse) message;
+            ResponseStatus status = response.status();
+            switch(status) {
+                case CHUNKED:
+                    event.getObservable().onNext(response);
+                    break;
+                case SUCCESS:
+                case EXISTS:
+                case NOT_EXISTS:
+                case FAILURE:
+                    event.getObservable().onNext(response);
+                    event.getObservable().onCompleted();
+                    break;
+                case RETRY:
                     retry(event);
-                } else {
-                    final Scheduler.Worker worker = environment.scheduler().createWorker();
-                    final Subject<CouchbaseResponse, CouchbaseResponse> obs = event.getObservable();
-                    worker.schedule(new Action0() {
-                        @Override
-                        public void call() {
-                            try {
-                                obs.onNext(response);
-                                obs.onCompleted();
-                            } catch(Exception ex) {
-                                obs.onError(ex);
-                            } finally {
-                                worker.unsubscribe();
-                            }
-                        }
-                    });
-                }
-            } else if (message instanceof CouchbaseRequest) {
-                retry(event);
-            } else {
-                throw new IllegalStateException("Got message type I do not understand: " + message);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("fixme");
             }
-        } finally {
-           event.setMessage(null);
-           event.setObservable(null);
+        } else if (message instanceof CouchbaseRequest) {
+            retry(event);
+        } else {
+            throw new IllegalStateException("Got message type I do not understand: " + message);
         }
     }
 
@@ -127,44 +115,31 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         if (message instanceof CouchbaseRequest) {
             scheduleForRetry((CouchbaseRequest) message);
         } else {
-
             CouchbaseRequest request = ((CouchbaseResponse) message).request();
             if (request != null) {
                 scheduleForRetry(request);
             } else {
-                event.getObservable().onError(new CouchbaseException("Operation failed because it does not "
-                    + "support cloning."));
+                event.getObservable().onError(new CouchbaseException("Operation failed because it does not " +
+                    "support cloning."));
             }
             if (message instanceof BinaryResponse) {
                 BinaryResponse response = (BinaryResponse) message;
                 if (response.content() != null && response.content().readableBytes() > 0) {
-                    try {
-                        String config = response.content().toString(CharsetUtil.UTF_8).trim();
-                        if (config.startsWith("{")) {
-                            configurationProvider.proposeBucketConfig(response.bucket(), config);
-                        }
-                    } finally {
-                        response.content().release();
-                    }
+                    configurationProvider.proposeBucketConfig(response.bucket(),
+                        response.content().toString(CharsetUtil.UTF_8));
                 }
             }
         }
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        CoreEnvironment env = environment;
-        Delay delay = env.retryDelay();
-
-        final Scheduler.Worker worker = env.scheduler().createWorker();
-        worker.schedule(new Action0() {
+        final AtomicReference<Subscription> subscription = new AtomicReference<Subscription>();
+        subscription.set(worker.schedule(new Action0() {
             @Override
             public void call() {
-                try {
-                    cluster.send(request);
-                } finally {
-                    worker.unsubscribe();
-                }
+                cluster.send(request);
+                subscription.get().unsubscribe();
             }
-        }, delay.calculate(request.incrementRetryCount()), delay.unit());
+        }, 10, TimeUnit.MILLISECONDS));
     }
 }

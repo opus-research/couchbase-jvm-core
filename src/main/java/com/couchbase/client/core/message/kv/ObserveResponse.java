@@ -2,6 +2,7 @@ package com.couchbase.client.core.message.kv;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
 
 /**
  * .
@@ -13,8 +14,8 @@ public class ObserveResponse extends AbstractKeyValueResponse {
     private final ObserveStatus observeStatus;
     private final boolean master;
 
-    public ObserveResponse(ResponseStatus status, byte obs, boolean master, String bucket, CouchbaseRequest request) {
-        super(status, bucket, null, request);
+    public ObserveResponse(ResponseStatus status, byte obs, boolean master, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         observeStatus = ObserveStatus.valueOf(obs);
         this.master = master;
     }
@@ -28,10 +29,6 @@ public class ObserveResponse extends AbstractKeyValueResponse {
     }
 
     public static enum ObserveStatus {
-        /**
-         * Observe status not known.
-         */
-        UNKNOWN((byte) 0xf0),
         /**
          * Response indicating the key was uninitialized.
          */
@@ -77,16 +74,11 @@ public class ObserveResponse extends AbstractKeyValueResponse {
                     return ObserveStatus.NOT_FOUND_NOT_PERSISTED;
                 case (byte) 0xfe:
                     return ObserveStatus.MODIFIED;
-                case (byte) 0xf0:
-                    return ObserveStatus.UNKNOWN;
                 default:
                     return ObserveStatus.UNINITIALIZED;
             }
         }
 
-        public byte value() {
-            return value;
-        }
     }
 
 

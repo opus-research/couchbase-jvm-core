@@ -25,27 +25,21 @@ import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
-import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.node.locate.ConfigLocator;
-import com.couchbase.client.core.node.locate.DCPLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
+import com.couchbase.client.core.node.locate.ConfigLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
 import com.couchbase.client.core.node.locate.ViewLocator;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
@@ -57,11 +51,12 @@ import rx.functions.Func1;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -73,11 +68,6 @@ import java.util.concurrent.atomic.AtomicReference;
 public class RequestHandler implements EventHandler<RequestEvent> {
 
     /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(RequestHandler.class);
-
-    /**
      * The initial number of nodes, will expand automatically if more are needed.
      */
     private static final int INITIAL_NODE_SIZE = 128;
@@ -85,27 +75,16 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     /**
      * The node locator for the binary service.
      */
-    private final Locator binaryLocator = new KeyValueLocator();
+    private final Locator BINARY_LOCATOR = new KeyValueLocator();
 
     /**
-     * The node locator for the view service.
+     * The node locator for the view service;
      */
-    private final Locator viewLocator = new ViewLocator();
+    private final Locator VIEW_LOCATOR = new ViewLocator();
 
-    /**
-     * The node locator for the query service.
-     */
-    private final Locator queryLocator = new QueryLocator();
+    private final Locator QUERY_LOCATOR = new QueryLocator();
 
-    /**
-     * The node locator for the config service.
-     */
-    private final Locator configLocator = new ConfigLocator();
-
-    /**
-     * The node locator for DCP service.
-     */
-    private final Locator dcpLocator = new DCPLocator();
+    private final Locator CONFIG_LOCATOR = new ConfigLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -132,7 +111,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(new CopyOnWriteArraySet<Node>(), environment, configObservable, responseBuffer);
+        this(Collections.newSetFromMap(new ConcurrentHashMap<Node, Boolean>(INITIAL_NODE_SIZE)), environment, configObservable, responseBuffer);
     }
 
     /**
@@ -152,10 +131,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             @Override
             public void call(final ClusterConfig config) {
                 try {
-                    LOGGER.debug("Got notified of a new configuration arriving.");
                     configuration.set(config);
                     reconfigure(config).subscribe();
-                } catch (Exception ex) {
+                } catch(Exception ex) {
                     ex.printStackTrace();
                 }
 
@@ -165,67 +143,31 @@ public class RequestHandler implements EventHandler<RequestEvent> {
 
     @Override
     public void onEvent(final RequestEvent event, long sequence, final boolean endOfBatch) throws Exception {
-        try {
-            final CouchbaseRequest request = event.getRequest();
+        final CouchbaseRequest request = event.getRequest();
 
-            ClusterConfig config = configuration.get();
-            //prevent non-bootstrap requests to go through if bucket not part of config
-            if (!(request instanceof BootstrapMessage)) {
-                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
-                    request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
-                    return;
-                }
+        Node[] found = locator(request).locate(request, nodes, configuration.get());
 
-                //short-circuit some kind of requests for which we know there won't be any handler to respond.
-                try {
-                    checkFeaturesForRequest(request, config.bucketConfig(request.bucket()));
-                } catch (UnsupportedOperationException e) {
-                    request.observable().onError(e);
-                    return;
-                }
-            }
-
-            Node[] found = locator(request).locate(request, nodes, config);
-
-            if (found == null) {
-                return;
-            }
-            if (found.length == 0) {
-                RetryHelper.retryOrCancel(environment, request, responseBuffer);
-            }
-            for (int i = 0; i < found.length; i++) {
-                try {
-                    found[i].send(request);
-                } catch (Exception ex) {
-                    request.observable().onError(ex);
-                }
-            }
-            if (endOfBatch) {
-                for (Node node : nodes) {
-                    node.send(SignalFlush.INSTANCE);
-                }
-            }
-        } finally {
+        if (found == null) {
+            event.setRequest(null);
+            return;
+        }
+        if (found.length == 0) {
+            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             event.setRequest(null);
         }
-    }
-
-    /**
-     * Checks, for a sub-set of {@link CouchbaseRequest}, if the current environment has
-     * the necessary feature activated. If not, throws an {@link UnsupportedOperationException}.
-     *
-     * @param request the request to check.
-     * @throws UnsupportedOperationException if the request type needs a particular feature which isn't activated.
-     */
-    protected void checkFeaturesForRequest(CouchbaseRequest request, BucketConfig config) {
-        if (request instanceof BinaryRequest && !config.serviceEnabled(ServiceType.BINARY)) {
-            throw new ServiceNotAvailableException("The KeyValue service is not enabled or no node in the cluster supports it.");
-        } else if (request instanceof ViewRequest && !config.serviceEnabled(ServiceType.VIEW)) {
-            throw new ServiceNotAvailableException("The View service is not enabled or no node in the cluster supports it.");
-        } else if (request instanceof QueryRequest && !(environment.queryEnabled() || config.serviceEnabled(ServiceType.QUERY))) {
-            throw new ServiceNotAvailableException("The Query service is not enabled or no node in the cluster supports it.");
-        } else if (request instanceof  DCPRequest && !(environment.dcpEnabled() || config.serviceEnabled(ServiceType.DCP))) {
-            throw new ServiceNotAvailableException("The DCP service is not enabled or no node in the cluster supports it.");
+        for (int i = 0; i < found.length; i++) {
+            try {
+                found[i].send(request);
+            } catch(Exception ex) {
+                request.observable().onError(ex);
+            } finally {
+                event.setRequest(null);
+            }
+        }
+        if (endOfBatch) {
+            for (Node node : nodes) {
+                node.send(SignalFlush.INSTANCE);
+            }
         }
     }
 
@@ -238,35 +180,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     public Observable<LifecycleState> addNode(final InetAddress hostname) {
         Node node = nodeBy(hostname);
         if (node != null) {
-            LOGGER.debug("Node {} already registered, skipping.", hostname);
             return Observable.just(node.state());
         }
         return addNode(new CouchbaseNode(hostname, environment, responseBuffer));
-    }
-
-    /**
-     * Adds a {@link Node} to the cluster.
-     *
-     * The code first initiates a asynchronous connect and then eventually adds it to the node list once it has been
-     * connected successfully.
-     */
-    Observable<LifecycleState> addNode(final Node node) {
-        LOGGER.debug("Got instructed to add Node {}", node.hostname());
-
-        if (nodes.contains(node)) {
-            LOGGER.debug("Node {} already registered, skipping.", node.hostname());
-            return Observable.just(node.state());
-        }
-
-        LOGGER.debug("Connecting Node " + node.hostname());
-        return node.connect().map(new Func1<LifecycleState, LifecycleState>() {
-            @Override
-            public LifecycleState call(LifecycleState lifecycleState) {
-                LOGGER.debug("Connect finished, registering for use.");
-                nodes.add(node);
-                return lifecycleState;
-            }
-        });
     }
 
     /**
@@ -280,25 +196,12 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     }
 
     /**
-     * Removes a {@link Node} from the cluster.
-     *
-     * The node first gets removed from the list and then is disconnected afterwards, so that outstanding
-     * operations can be handled gracefully.
-     */
-    Observable<LifecycleState> removeNode(final Node node) {
-        LOGGER.debug("Got instructed to remove Node {}", node.hostname());
-        nodes.remove(node);
-        return node.disconnect();
-    }
-
-    /**
      * Add the service to the node.
      *
      * @param request the request which contains infos about the service and node to add.
      * @return an observable which contains the newly created service.
      */
     public Observable<Service> addService(final AddServiceRequest request) {
-        LOGGER.debug("Got instructed to add Service {}, to Node {}", request.type(), request.hostname());
         return nodeBy(request.hostname()).addService(request);
     }
 
@@ -309,8 +212,38 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * @return an observable which contains the removed service.
      */
     public Observable<Service> removeService(final RemoveServiceRequest request) {
-        LOGGER.debug("Got instructed to remove Service {}, from Node {}", request.type(), request.hostname());
         return nodeBy(request.hostname()).removeService(request);
+    }
+
+    /**
+     * Adds a {@link Node} to the cluster.
+     *
+     * The code first initiates a asynchronous connect and then eventually adds it to the node list once it has been
+     * connected successfully.
+     */
+    Observable<LifecycleState> addNode(final Node node) {
+        if (nodes.contains(node)) {
+            return Observable.just(node.state());
+        }
+
+        return node.connect().map(new Func1<LifecycleState, LifecycleState>() {
+            @Override
+            public LifecycleState call(LifecycleState lifecycleState) {
+                nodes.add(node);
+                return lifecycleState;
+            }
+        });
+    }
+
+    /**
+     * Removes a {@link Node} from the cluster.
+     *
+     * The node first gets removed from the list and then is disconnected afterwards, so that outstanding
+     * operations can be handled gracefully.
+     */
+    Observable<LifecycleState> removeNode(final Node node) {
+        nodes.remove(node);
+        return node.disconnect();
     }
 
     /**
@@ -339,15 +272,13 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     protected Locator locator(final CouchbaseRequest request) {
         if (request instanceof BinaryRequest) {
-            return binaryLocator;
+            return BINARY_LOCATOR;
         } else if (request instanceof ViewRequest) {
-            return viewLocator;
+            return VIEW_LOCATOR;
         } else if (request instanceof QueryRequest) {
-            return queryLocator;
+            return QUERY_LOCATOR;
         } else if (request instanceof ConfigRequest) {
-            return configLocator;
-        } else if (request instanceof DCPRequest) {
-            return dcpLocator;
+            return CONFIG_LOCATOR;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -360,10 +291,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * and service setup with the one proposed by the configuration.
      */
     public Observable<ClusterConfig> reconfigure(final ClusterConfig config) {
-        LOGGER.debug("Starting reconfiguration.");
-
         if (config.bucketConfigs().values().isEmpty()) {
-            LOGGER.debug("No node found in config, disconnecting all nodes.");
             if (nodes.isEmpty()) {
                 return Observable.just(config);
             }
@@ -408,7 +336,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
 
                     for (Node node : nodes) {
                         if (!configNodes.contains(node.hostname())) {
-                            LOGGER.debug("Removing and disconnecting node {}.", node.hostname());
                             removeNode(node);
                             node.disconnect().subscribe();
                         }
@@ -429,8 +356,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * @param config the config for this bucket.
      */
     private Observable<Boolean> reconfigureBucket(final BucketConfig config) {
-        LOGGER.debug("Starting reconfiguration for bucket {}", config.name());
-
         List<Observable<Boolean>> observables = new ArrayList<Observable<Boolean>>();
         for (final NodeInfo nodeInfo : config.nodes()) {
             Observable<Boolean> obs = addNode(nodeInfo.hostname())
@@ -441,9 +366,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                                 environment.sslEnabled() ? nodeInfo.sslServices() : nodeInfo.services();
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
-                        }
-                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
-                            services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);
                     }

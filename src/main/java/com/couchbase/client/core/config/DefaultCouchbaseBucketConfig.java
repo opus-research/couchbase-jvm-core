@@ -24,35 +24,21 @@ package com.couchbase.client.core.config;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implements CouchbaseBucketConfig {
 
-    private final CouchbasePartitionInfo partitionInfo;
+    private final PartitionInfo partitionInfo;
     private final List<NodeInfo> partitionHosts;
-    private final Set<InetAddress> nodesWithPrimaryPartitions;
 
     private final boolean tainted;
     private final long rev;
 
-    /**
-     * Creates a new {@link CouchbaseBucketConfig}.
-     *
-     * @param rev the revision of the config.
-     * @param name the name of the bucket.
-     * @param locator the locator for this bucket.
-     * @param uri the URI for this bucket.
-     * @param streamingUri the streaming URI for this bucket.
-     * @param partitionInfo partition info for this bucket.
-     * @param nodeInfos related node information.
-     * @param portInfos port info for the nodes, including services.
-     */
     @JsonCreator
     public DefaultCouchbaseBucketConfig(
         @JsonProperty("rev") long rev,
@@ -60,34 +46,14 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         @JsonProperty("nodeLocator") String locator,
         @JsonProperty("uri") String uri,
         @JsonProperty("streamingUri") String streamingUri,
-        @JsonProperty("vBucketServerMap") CouchbasePartitionInfo partitionInfo,
+        @JsonProperty("vBucketServerMap") PartitionInfo partitionInfo,
         @JsonProperty("nodes") List<NodeInfo> nodeInfos,
         @JsonProperty("nodesExt") List<PortInfo> portInfos) {
         super(name, BucketNodeLocator.fromConfig(locator), uri, streamingUri, nodeInfos, portInfos);
         this.partitionInfo = partitionInfo;
-        this.tainted = partitionInfo.tainted();
+        this.tainted = !partitionInfo.forwardPartitions().isEmpty();
         this.partitionHosts = buildPartitionHosts(nodeInfos, partitionInfo);
-        this.nodesWithPrimaryPartitions = buildNodesWithPrimaryPartitions(nodeInfos, partitionInfo.partitions());
         this.rev = rev;
-    }
-
-    /**
-     * Pre-computes a set of nodes that have primary partitions active.
-     *
-     * @param nodeInfos the list of nodes.
-     * @param partitions the partitions.
-     * @return a set containing the addresses of nodes with primary partitions.
-     */
-    private static Set<InetAddress> buildNodesWithPrimaryPartitions(final List<NodeInfo> nodeInfos,
-        final List<Partition> partitions) {
-        Set<InetAddress> nodes = new HashSet<InetAddress>(nodeInfos.size());
-        for (Partition partition : partitions) {
-            int index = partition.master();
-            if (index >= 0) {
-                nodes.add(nodeInfos.get(index).hostname());
-            }
-        }
-        return nodes;
     }
 
     /**
@@ -97,10 +63,10 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
      * @param partitionInfo the partition info.
      * @return a ordered reference list for the partition hosts.
      */
-    private static List<NodeInfo> buildPartitionHosts(List<NodeInfo> nodeInfos, CouchbasePartitionInfo partitionInfo) {
+    private static List<NodeInfo> buildPartitionHosts(List<NodeInfo> nodeInfos, PartitionInfo partitionInfo) {
         List<NodeInfo> partitionHosts = new ArrayList<NodeInfo>();
         for (String rawHost : partitionInfo.partitionHosts()) {
-            InetAddress convertedHost;
+            InetAddress convertedHost = null;
             try {
                 convertedHost = InetAddress.getByName(rawHost);
             } catch (UnknownHostException e) {
@@ -112,10 +78,20 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
                 }
             }
         }
-        if (partitionHosts.size() != partitionInfo.partitionHosts().length) {
+        if (partitionHosts.size() != partitionInfo.partitionHosts().size()) {
             throw new ConfigurationException("Partition size is not equal after conversion, this is a bug.");
         }
         return partitionHosts;
+    }
+
+    @Override
+    public List<NodeInfo> partitionHosts() {
+        return partitionHosts;
+    }
+
+    @Override
+    public List<Partition> partitions() {
+        return partitionInfo.partitions();
     }
 
     @Override
@@ -128,29 +104,76 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         return tainted;
     }
 
-    @Override
-    public boolean hasPrimaryPartitionsOnNode(final InetAddress hostname) {
-        return nodesWithPrimaryPartitions.contains(hostname);
-    }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class PartitionInfo {
 
-    @Override
-    public short nodeIndexForMaster(int partition) {
-        return partitionInfo.partitions().get(partition).master();
-    }
+        private final int numberOfReplicas;
+        private final List<String> partitionHosts;
+        private final List<Partition> partitions;
+        private final List<Partition> forwardPartitions;
 
-    @Override
-    public short nodeIndexForReplica(int partition, int replica) {
-        return partitionInfo.partitions().get(partition).replica(replica);
-    }
+        PartitionInfo(
+            @JsonProperty("numReplicas") int numberOfReplicas,
+            @JsonProperty("serverList") List<String> partitionHosts,
+            @JsonProperty("vBucketMap") List<List<Short>> partitions,
+            @JsonProperty("vBucketMapForward") List<List<Short>> forwardPartitions) {
+            this.numberOfReplicas = numberOfReplicas;
+            trimPort(partitionHosts);
+            this.partitionHosts = partitionHosts;
+            this.partitions = fromPartitionList(partitions);
+            this.forwardPartitions = fromPartitionList(forwardPartitions);
+        }
 
-    @Override
-    public int numberOfPartitions() {
-        return partitionInfo.partitions().size();
-    }
+        public int numberOfReplicas() {
+            return numberOfReplicas;
+        }
 
-    @Override
-    public NodeInfo nodeAtIndex(int nodeIndex) {
-        return partitionHosts.get(nodeIndex);
+        public List<String> partitionHosts() {
+            return partitionHosts;
+        }
+
+        public List<Partition> partitions() {
+            return partitions;
+        }
+
+        public List<Partition> forwardPartitions() {
+            return forwardPartitions;
+        }
+
+        private static void trimPort(List<String> input) {
+            for (int i = 0; i < input.size(); i++) {
+                String[] parts =  input.get(i).split(":");
+                input.set(i, parts[0]);
+            }
+        }
+
+        private static List<Partition> fromPartitionList(List<List<Short>> input) {
+            List<Partition> partitions = new ArrayList<Partition>();
+            if (input == null) {
+                return partitions;
+            }
+
+            for (List<Short> partition : input) {
+                short master = partition.remove(0);
+                short[] replicas = new short[partition.size()];
+                int i = 0;
+                for (short replica : partition) {
+                    replicas[i++] = replica;
+                }
+                partitions.add(new DefaultPartition(master, replicas));
+            }
+            return partitions;
+        }
+
+        @Override
+        public String toString() {
+            return "PartitionInfo{" +
+                "numberOfReplicas=" + numberOfReplicas +
+                ", partitionHosts=" + partitionHosts +
+                ", partitions=" + partitions +
+                ", forwardPartitions=" + forwardPartitions +
+                '}';
+        }
     }
 
     @Override
@@ -165,14 +188,15 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
 
     @Override
     public String toString() {
-        return "DefaultCouchbaseBucketConfig{"
-            + "name='" + name() + '\''
-            + ", locator=" + locator()
-            + ", uri='" + uri() + '\''
-            + ", streamingUri='" + streamingUri() + '\''
-            + ", nodeInfo=" + nodes()
-            + ", partitionInfo=" + partitionInfo
-            + ", tainted=" + tainted
-            + ", rev=" + rev + '}';
+        return "DefaultCouchbaseBucketConfig{" +
+            "name='" + name() + '\'' +
+            ", locator=" + locator() +
+            ", uri='" + uri() + '\'' +
+            ", streamingUri='" + streamingUri() + '\'' +
+            ", nodeInfo=" + nodes() +
+            ", partitionInfo=" + partitionInfo +
+            ", tainted=" + tainted +
+            ", rev=" + rev +
+            '}';
     }
 }

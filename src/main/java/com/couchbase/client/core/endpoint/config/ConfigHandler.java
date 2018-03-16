@@ -45,7 +45,6 @@ import com.couchbase.client.core.message.config.RemoveBucketRequest;
 import com.couchbase.client.core.message.config.RemoveBucketResponse;
 import com.couchbase.client.core.message.config.UpdateBucketRequest;
 import com.couchbase.client.core.message.config.UpdateBucketResponse;
-import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -62,7 +61,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
-import rx.Observable;
 import rx.subjects.BehaviorSubject;
 
 import java.net.InetSocketAddress;
@@ -96,13 +94,18 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     private BehaviorSubject<String> streamingConfigObservable;
 
     /**
+     * Only needed to reset the request for a streaming config.
+     */
+    private ConfigRequest previousRequest = null;
+
+    /**
      * Creates a new {@link ConfigHandler} with the default queue for requests.
      *
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
-        super(endpoint, responseBuffer, isTransient);
+    public ConfigHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
+        super(endpoint, responseBuffer);
     }
 
     /**
@@ -112,8 +115,8 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue, boolean isTransient) {
-        super(endpoint, responseBuffer, queue, isTransient);
+    ConfigHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue) {
+        super(endpoint, responseBuffer, queue);
     }
 
     @Override
@@ -192,6 +195,10 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
             if (streamingConfigObservable != null) {
+                if (currentRequest() == null) {
+                    currentRequest(previousRequest);
+                    previousRequest = null;
+                }
                 maybePushConfigChunk();
             }
         }
@@ -202,7 +209,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                     streamingConfigObservable.onCompleted();
                     streamingConfigObservable = null;
                 }
-                finishedDecoding();
                 return null;
             }
 
@@ -228,8 +234,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                 boolean done = responseHeader.getStatus().code() != 201;
                 response = new FlushResponse(done, body, status);
             }
-
-            finishedDecoding();
         }
 
         return response;
@@ -242,23 +246,15 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param header the received header.
      * @return a initialized {@link CouchbaseResponse}.
      */
-    private CouchbaseResponse handleBucketStreamingResponse(final ChannelHandlerContext ctx,
-        final HttpResponse header) {
+    private CouchbaseResponse handleBucketStreamingResponse(final ChannelHandlerContext ctx, final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
         String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
         ResponseStatus status = statusFromCode(header.getStatus().code());
-
-        Observable<String> scheduledObservable = null;
         if (status.isSuccess()) {
             streamingConfigObservable = BehaviorSubject.create();
-            scheduledObservable = streamingConfigObservable.onBackpressureBuffer().observeOn(env().scheduler());
         }
-        return new BucketStreamingResponse(
-            scheduledObservable,
-            host,
-            status,
-            currentRequest()
-        );
+        previousRequest = currentRequest();
+        return new BucketStreamingResponse(streamingConfigObservable, host, status, currentRequest());
     }
 
     /**
@@ -284,7 +280,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      */
     private static ResponseStatus statusFromCode(int code) {
         ResponseStatus status;
-        switch (code) {
+        switch(code) {
             case 200:
             case 201:
             case 202:
@@ -299,32 +295,12 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         return status;
     }
 
-    /**
-     * If it is still present and open, release the content buffer. Also set it
-     * to null so that next decoding can take a new buffer from the pool.
-     */
-    private void releaseResponseContent() {
-        if (responseContent != null) {
-            if (responseContent.refCnt() > 0) {
-                responseContent.release();
-            }
-            responseContent = null;
-        }
-    }
-
-    @Override
-    protected void finishedDecoding() {
-        super.finishedDecoding();
-        releaseResponseContent();
-    }
-
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (streamingConfigObservable != null) {
             streamingConfigObservable.onCompleted();
         }
         super.handlerRemoved(ctx);
-        releaseResponseContent();
     }
 
 }

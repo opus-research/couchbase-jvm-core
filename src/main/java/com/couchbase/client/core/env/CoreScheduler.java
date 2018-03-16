@@ -96,7 +96,6 @@ public class CoreScheduler extends Scheduler {
         public Subscription schedule(Action0 action) {
             return schedule(action, 0, null);
         }
-
         @Override
         public Subscription schedule(Action0 action, long delayTime, TimeUnit unit) {
             if (innerSubscription.isUnsubscribed()) {

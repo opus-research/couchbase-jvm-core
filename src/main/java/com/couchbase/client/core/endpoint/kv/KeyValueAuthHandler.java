@@ -21,23 +21,21 @@
  */
 package com.couchbase.client.core.endpoint.kv;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.SimpleChannelInboundHandler;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -57,11 +55,6 @@ import java.net.SocketAddress;
 public class KeyValueAuthHandler
     extends SimpleChannelInboundHandler<FullBinaryMemcacheResponse>
     implements CallbackHandler, ChannelOutboundHandler {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(KeyValueAuthHandler.class);
 
     /**
      * The memcache opcode for the SASL mechs list.
@@ -145,8 +138,8 @@ public class KeyValueAuthHandler
      * Callback handler needed for the {@link SaslClient} which supplies username and password.
      *
      * @param callbacks the possible callbacks.
-     * @throws IOException if something goes wrong during negotiation.
-     * @throws UnsupportedCallbackException if something goes wrong during negotiation.
+     * @throws IOException
+     * @throws UnsupportedCallbackException
      */
     @Override
     public void handle(final Callback[] callbacks) throws IOException, UnsupportedCallbackException {
@@ -166,7 +159,7 @@ public class KeyValueAuthHandler
      *
      * @param ctx the handler context.
      * @param msg the incoming message to investigate.
-     * @throws Exception if something goes wrong during negotiation.
+     * @throws Exception
      */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg) throws Exception {
@@ -184,7 +177,7 @@ public class KeyValueAuthHandler
      *
      * @param ctx the handler context.
      * @param msg the incoming message to investigate.
-     * @throws Exception if something goes wrong during negotiation.
+     * @throws Exception
      */
     private void handleListMechsResponse(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg) throws Exception {
         String remote = ctx.channel().remoteAddress().toString();
@@ -209,15 +202,7 @@ public class KeyValueAuthHandler
             .setKeyLength((short) mechanismLength)
             .setTotalBodyLength(mechanismLength + payload.readableBytes());
 
-        ChannelFuture future = ctx.writeAndFlush(initialRequest);
-        future.addListener(new GenericFutureListener<Future<Void>>() {
-            @Override
-            public void operationComplete(Future<Void> future) throws Exception {
-                if (!future.isSuccess()) {
-                    LOGGER.warn("Error during SASL Auth negotiation phase.", future);
-                }
-            }
-        });
+        ctx.writeAndFlush(initialRequest);
     }
 
     /**
@@ -225,7 +210,7 @@ public class KeyValueAuthHandler
      *
      * @param ctx the handler context.
      * @param msg the incoming message to investigate.
-     * @throws Exception if something goes wrong during negotiation.
+     * @throws Exception
      */
     private void handleAuthResponse(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg) throws Exception {
         if (saslClient.isComplete()) {
@@ -251,15 +236,7 @@ public class KeyValueAuthHandler
                 .setKeyLength((short) selectedMechanism.length())
                 .setTotalBodyLength(content.readableBytes() + selectedMechanism.length());
 
-            ChannelFuture future = ctx.writeAndFlush(stepRequest);
-            future.addListener(new GenericFutureListener<Future<Void>>() {
-                @Override
-                public void operationComplete(Future<Void> future) throws Exception {
-                    if (!future.isSuccess()) {
-                        LOGGER.warn("Error during SASL Auth negotiation phase.", future);
-                    }
-                }
-            });
+            ctx.writeAndFlush(stepRequest);
         } else {
             throw new AuthenticationException("SASL Challenge evaluation returned null.");
         }
@@ -280,8 +257,7 @@ public class KeyValueAuthHandler
                 originalPromise.setFailure(new AuthenticationException("Authentication Failure"));
                 break;
             default:
-                originalPromise.setFailure(new AuthenticationException("Unhandled SASL auth status: "
-                    + msg.getStatus()));
+                originalPromise.setFailure(new AuthenticationException("Unhandled SASL auth status: " + msg.getStatus()));
         }
     }
 
@@ -291,8 +267,7 @@ public class KeyValueAuthHandler
     }
 
     @Override
-    public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress,
-        ChannelPromise promise) throws Exception {
+    public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) throws Exception {
         originalPromise = promise;
         ChannelPromise downPromise = ctx.newPromise();
         downPromise.addListener(new GenericFutureListener<Future<Void>>() {

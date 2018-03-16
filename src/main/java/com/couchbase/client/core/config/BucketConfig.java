@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -33,11 +32,12 @@ import java.util.List;
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     include = JsonTypeInfo.As.PROPERTY,
-    property = "nodeLocator")
+    property = "nodeLocator"
+)
 @JsonSubTypes({
     @JsonSubTypes.Type(value = CouchbaseBucketConfig.class, name = "vbucket"),
-    @JsonSubTypes.Type(value = MemcachedBucketConfig.class, name = "ketama")})
-
+    @JsonSubTypes.Type(value = MemcachedBucketConfig.class, name = "ketama")
+})
 public interface BucketConfig {
 
     /**
@@ -57,10 +57,10 @@ public interface BucketConfig {
     /**
      * Setter to inject the password manually into the config.
      *
-     * @param password the password of the bucket to inject.
+     * @param pasword
      * @return the config for proper chaining.
      */
-    BucketConfig password(String password);
+    BucketConfig password(String pasword);
 
     /**
      * The type of node locator in use for this bucket.
@@ -110,13 +110,5 @@ public interface BucketConfig {
      * @return the bucket type.
      */
     BucketType type();
-
-    /**
-     * Check if the service is enabled on the bucket.
-     *
-     * @param type the type to check.
-     * @return true if it is, false otherwise.
-     */
-    boolean serviceEnabled(ServiceType type);
 
 }

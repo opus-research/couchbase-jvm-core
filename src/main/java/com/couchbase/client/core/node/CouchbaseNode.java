@@ -22,17 +22,14 @@
 package com.couchbase.client.core.node;
 
 import com.couchbase.client.core.ResponseEvent;
+import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.event.system.NodeConnectedEvent;
-import com.couchbase.client.core.event.system.NodeDisconnectedEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceFactory;
 import com.couchbase.client.core.state.AbstractStateMachine;
@@ -77,11 +74,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     private final CoreEnvironment environment;
 
     /**
-     * The event bus to publish events onto.
-     */
-    private final EventBus eventBus;
-
-    /**
      * The {@link ResponseEvent} {@link RingBuffer}.
      */
     private final RingBuffer<ResponseEvent> responseBuffer;
@@ -107,7 +99,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.serviceRegistry = registry;
         this.environment = environment;
         this.responseBuffer = responseBuffer;
-        this.eventBus = environment.eventBus();
         this.serviceStates = new ConcurrentHashMap<Service, LifecycleState>();
     }
 
@@ -120,8 +111,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         } else {
             Service service = serviceRegistry.locate(request);
             if (service == null) {
-                RetryHelper.retryOrCancel(environment, request, responseBuffer);
-
+                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             } else {
                 service.send(request);
             }
@@ -135,14 +125,11 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     @Override
     public Observable<LifecycleState> connect() {
-        LOGGER.debug(logIdent(hostname) + "Got instructed to connect.");
-
         return Observable
             .from(serviceRegistry.services())
             .flatMap(new Func1<Service, Observable<LifecycleState>>() {
                 @Override
                 public Observable<LifecycleState> call(final Service service) {
-                    LOGGER.debug(logIdent(hostname) + "Instructing Service " + service.type() + " to connect.");
                     return service.connect();
                 }
             })
@@ -157,14 +144,11 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     @Override
     public Observable<LifecycleState> disconnect() {
-        LOGGER.debug(logIdent(hostname) + "Got instructed to disconnect.");
-
         return Observable
             .from(serviceRegistry.services())
             .flatMap(new Func1<Service, Observable<LifecycleState>>() {
                 @Override
                 public Observable<LifecycleState> call(final Service service) {
-                    LOGGER.debug(logIdent(hostname) + "Instructing Service " + service.type() + " to disconnect.");
                     return service.disconnect();
                 }
             })
@@ -179,10 +163,8 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     @Override
     public Observable<Service> addService(final AddServiceRequest request) {
-        LOGGER.debug(logIdent(hostname) + "Adding Service " + request.type());
         Service addedService = serviceRegistry.serviceBy(request.type(), request.bucket());
         if (addedService != null) {
-            LOGGER.debug(logIdent(hostname) + "Service " + request.type() + " already added, skipping.");
             return Observable.just(addedService);
         }
 
@@ -210,19 +192,12 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 if (newState == LifecycleState.CONNECTED) {
                     if (!connected) {
                         LOGGER.info("Connected to Node " + hostname.getHostName());
-
-                        if (eventBus !=  null) {
-                            eventBus.publish(new NodeConnectedEvent(hostname));
-                        }
                     }
                     connected = true;
                     LOGGER.debug("Connected (" + state() + ") to Node " + hostname);
                 } else if (newState == LifecycleState.DISCONNECTED) {
                     if (connected) {
                         LOGGER.info("Disconnected from Node " + hostname.getHostName());
-                        if (eventBus != null) {
-                            eventBus.publish(new NodeDisconnectedEvent(hostname));
-                        }
                     }
                     connected = false;
                     LOGGER.debug("Disconnected (" + state() + ") from Node " + hostname);
@@ -230,7 +205,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 transitionState(newState);
             }
         });
-        LOGGER.debug(logIdent(hostname) + "Adding Service " + request.type() + " to registry and connecting it.");
         serviceRegistry.addService(service, request.bucket());
         return service.connect().map(new Func1<LifecycleState, Service>() {
             @Override
@@ -242,8 +216,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     @Override
     public Observable<Service> removeService(final RemoveServiceRequest request) {
-        LOGGER.debug(logIdent(hostname) + "Removing Service " + request.type());
-
         Service service = serviceRegistry.serviceBy(request.type(), request.bucket());
         serviceRegistry.removeService(service, request.bucket());
         serviceStates.remove(service);
@@ -270,7 +242,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         int connected = 0;
         int connecting = 0;
         int disconnecting = 0;
-        int idle = 0;
         for (LifecycleState serviceState : serviceStates.values()) {
             switch (serviceState) {
                 case CONNECTED:
@@ -282,14 +253,9 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 case DISCONNECTING:
                     disconnecting++;
                     break;
-                case IDLE:
-                    idle++;
-                    break;
             }
         }
-        if (serviceStates.size() == idle) {
-            return LifecycleState.IDLE;
-        } else if (serviceStates.size() == (connected + idle)) {
+        if (serviceStates.size() == connected) {
             return LifecycleState.CONNECTED;
         } else if (connected > 0) {
             return LifecycleState.DEGRADED;
@@ -304,36 +270,9 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     @Override
     public String toString() {
-        return "CouchbaseNode{"
-            + "hostname=" + hostname
-            + ", services=" + serviceRegistry
-            + '}';
-    }
-
-    /**
-     * Simple log helper to give logs a common prefix.
-     *
-     * @param hostname the address.
-     * @return a prefix string for logs.
-     */
-    protected static String logIdent(final InetAddress hostname) {
-        return "[" + hostname.getHostName() + "]: ";
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        CouchbaseNode that = (CouchbaseNode) o;
-
-        if (!hostname.equals(that.hostname)) return false;
-
-        return true;
-    }
-
-    @Override
-    public int hashCode() {
-        return hostname.hashCode();
+        return "CouchbaseNode{" +
+            "hostname=" + hostname +
+            ", services=" + serviceRegistry +
+            '}';
     }
 }

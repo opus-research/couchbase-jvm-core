@@ -24,7 +24,8 @@ package com.couchbase.client.core.config.refresher;
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.config.ConfigurationException;
+import com.couchbase.client.core.logging.CouchbaseLogger;
+import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import rx.Observable;
@@ -39,6 +40,11 @@ import rx.functions.Func1;
  */
 public class HttpRefresher extends AbstractRefresher {
 
+    /**
+     * The logger used.
+     */
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(HttpRefresher.class);
+
     private static final String TERSE_PATH = "/pools/default/bs/";
     private static final String VERBOSE_PATH = "/pools/default/bucketsStreaming/";
 
@@ -48,55 +54,44 @@ public class HttpRefresher extends AbstractRefresher {
 
     @Override
     public Observable<Boolean> registerBucket(final String name, final String password) {
+        LOGGER.debug("Registering bucket " + name + ".");
         return super.registerBucket(name, password).flatMap(new Func1<Boolean, Observable<BucketStreamingResponse>>() {
             @Override
             public Observable<BucketStreamingResponse> call(Boolean aBoolean) {
-                return cluster()
-                    .<BucketStreamingResponse>send(new BucketStreamingRequest(TERSE_PATH, name, password))
-                    .doOnNext(new Action1<BucketStreamingResponse>() {
-                        @Override
-                        public void call(BucketStreamingResponse response) {
-                            if (!response.status().isSuccess()) {
-                                throw new ConfigurationException("Could not load terse config.");
-                            }
-                        }
-                    });
+                return cluster().send(new BucketStreamingRequest(TERSE_PATH, name, password));
             }
         }).onErrorResumeNext(new Func1<Throwable, Observable<BucketStreamingResponse>>() {
             @Override
             public Observable<BucketStreamingResponse> call(Throwable throwable) {
-                return cluster()
-                    .<BucketStreamingResponse>send(new BucketStreamingRequest(VERBOSE_PATH, name, password))
-                    .doOnNext(new Action1<BucketStreamingResponse>() {
-                        @Override
-                        public void call(BucketStreamingResponse response) {
-                            if (!response.status().isSuccess()) {
-                                throw new ConfigurationException("Could not load terse config.");
-                            }
-                        }
-                    });
+                return cluster().send(new BucketStreamingRequest(VERBOSE_PATH, name, password));
             }
         })
-            .map(new Func1<BucketStreamingResponse, Boolean>() {
-                @Override
-                public Boolean call(final BucketStreamingResponse response) {
-                    response
-                        .configs()
-                        .map(new Func1<String, String>() {
-                            @Override
-                            public String call(String s) {
-                                return s.replace("$HOST", response.host());
-                            }
-                        })
-                        .subscribe(new Action1<String>() {
-                            @Override
-                            public void call(final String rawConfig) {
-                                pushConfig(rawConfig);
+        .map(new Func1<BucketStreamingResponse, Boolean>() {
+            @Override
+            public Boolean call(final BucketStreamingResponse response) {
+                response
+                    .configs()
+                    .map(new Func1<String, String>() {
+                        @Override
+                        public String call(String s) {
+                            return s.replace("$HOST", response.host());
+                        }
+                    })
+                    .subscribe(new Action1<String>() {
+                        @Override
+                        public void call(final String rawConfig) {
+                            pushConfig(rawConfig);
                         }
                     });
                 return true;
             }
         });
+    }
+
+    @Override
+    public Observable<Boolean> deregisterBucket(final String name) {
+        LOGGER.debug("Deregistering bucket " + name + ".");
+        return super.deregisterBucket(name);
     }
 
     @Override

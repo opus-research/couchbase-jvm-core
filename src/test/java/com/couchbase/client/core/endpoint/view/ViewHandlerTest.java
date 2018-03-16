@@ -23,12 +23,12 @@ package com.couchbase.client.core.endpoint.view;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
+import com.couchbase.client.core.endpoint.query.QueryHandler;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.message.CouchbaseMessage;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.query.GenericQueryRequest;
+import com.couchbase.client.core.message.query.GenericQueryResponse;
+import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
 import com.couchbase.client.core.message.view.GetDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
@@ -38,13 +38,10 @@ import com.couchbase.client.core.util.Resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
@@ -55,13 +52,11 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import rx.functions.Action1;
-import rx.schedulers.Schedulers;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -74,14 +69,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.isNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -97,11 +88,9 @@ public class ViewHandlerTest {
     private Queue<ViewRequest> queue;
     private EmbeddedChannel channel;
     private Disruptor<ResponseEvent> responseBuffer;
-    private RingBuffer<ResponseEvent> responseRingBuffer;
     private List<CouchbaseMessage> firedEvents;
     private CountDownLatch latch;
     private ViewHandler handler;
-    private AbstractEndpoint endpoint;
 
     @Before
     @SuppressWarnings("unchecked")
@@ -122,16 +111,14 @@ public class ViewHandlerTest {
                 latch.countDown();
             }
         });
-        responseRingBuffer = responseBuffer.start();
 
         CoreEnvironment environment = mock(CoreEnvironment.class);
-        when(environment.scheduler()).thenReturn(Schedulers.computation());
-        endpoint = mock(AbstractEndpoint.class);
+        AbstractEndpoint endpoint = mock(AbstractEndpoint.class);
         when(endpoint.environment()).thenReturn(environment);
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<ViewRequest>();
-        handler = new ViewHandler(endpoint, responseRingBuffer, queue, false);
+        handler = new ViewHandler(endpoint, responseBuffer.start(), queue);
         channel = new EmbeddedChannel(handler);
     }
 
@@ -263,8 +250,6 @@ public class ViewHandlerTest {
         ViewQueryResponse inbound = (ViewQueryResponse) firedEvents.get(0);
 
         assertTrue(inbound.status().isSuccess());
-        assertEquals(200, inbound.responseCode());
-        assertEquals("OK", inbound.responsePhrase());
 
         final AtomicInteger calledRow = new AtomicInteger();
         inbound.rows().toBlocking().forEach(new Action1<ByteBuf>() {
@@ -341,124 +326,6 @@ public class ViewHandlerTest {
             }
         });
         assertEquals(1, called.get());
-    }
-
-    @Test
-    public void shouldFireKeepAlive() throws Exception {
-        final AtomicInteger keepAliveEventCounter = new AtomicInteger();
-        final AtomicReference<ChannelHandlerContext> ctxRef = new AtomicReference();
-
-        ViewHandler testHandler = new ViewHandler(endpoint, responseRingBuffer, queue, false) {
-            @Override
-            public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-                super.channelRegistered(ctx);
-                ctxRef.compareAndSet(null, ctx);
-            }
-
-            @Override
-            protected void onKeepAliveFired(ChannelHandlerContext ctx, CouchbaseRequest keepAliveRequest) {
-                assertEquals(1, keepAliveEventCounter.incrementAndGet());
-            }
-
-            @Override
-            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
-                assertEquals(2, keepAliveEventCounter.incrementAndGet());
-            }
-        };
-        EmbeddedChannel channel = new EmbeddedChannel(testHandler);
-
-        //test idle event triggers a view keepAlive request and hook is called
-        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT);
-
-        assertEquals(1, keepAliveEventCounter.get());
-        assertTrue(queue.peek() instanceof ViewHandler.KeepAliveRequest);
-        ViewHandler.KeepAliveRequest keepAliveRequest = (ViewHandler.KeepAliveRequest) queue.peek();
-
-        //test responding to the request with http response is interpreted into a KeepAliveResponse and hook is called
-        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
-        channel.writeInbound(response);
-        ViewHandler.KeepAliveResponse keepAliveResponse = keepAliveRequest.observable()
-                .cast(ViewHandler.KeepAliveResponse.class)
-                .timeout(1, TimeUnit.SECONDS).toBlocking().single();
-
-        assertEquals(2, keepAliveEventCounter.get());
-        assertEquals(ResponseStatus.NOT_EXISTS, keepAliveResponse.status());
-    }
-
-    @Test
-    public void shouldEncodeLongViewQueryRequestWithPOST() {
-        String keys = Resources.read("key_many.json", this.getClass());
-        String query = "stale=false&keys=" + keys + "&endKey=test";
-        ViewQueryRequest request = new ViewQueryRequest("design", "view", true, query , "bucket", "password");
-        channel.writeOutbound(request);
-        DefaultFullHttpRequest outbound = (DefaultFullHttpRequest) channel.readOutbound();
-        assertEquals(HttpMethod.POST, outbound.getMethod());
-        assertTrue(outbound.getUri().endsWith("?stale=false&endKey=test"));
-        String content = outbound.content().toString(CharsetUtil.UTF_8);
-        assertTrue(content.startsWith("{\"keys\":["));
-        assertTrue(content.endsWith("]}"));
-    }
-
-    @Test
-    public void shouldSplitOnlyKeys() {
-        String query = "keys=[1,2,3]";
-        Tuple2<String, String> split = handler.extractKeysFromQueryString(query, 4); //sure to trigger splitting
-
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNotNull(split.value2());
-        assertEquals(0, split.value1().length());
-        assertEquals("{\"keys\":[1,2,3]}", split.value2());
-    }
-
-    @Test
-    public void shouldSplitNoKeys() {
-        String query = "stale=false&endKey=test";
-        Tuple2<String, String> split = handler.extractKeysFromQueryString(query, 4); //sure to trigger splitting
-
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNotNull(split.value2());
-        assertEquals(query, split.value1());
-        assertEquals(0, split.value2().length());
-    }
-
-    @Test
-    public void shouldSplitAndReconstructParameters() {
-        String query = "stale=false&endKey=test&keys=[1,2,3]";
-        Tuple2<String, String> split = handler.extractKeysFromQueryString(query, 4); //sure to trigger splitting
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNotNull(split.value2());
-        assertEquals("stale=false&endKey=test", split.value1());
-        assertEquals("{\"keys\":[1,2,3]}", split.value2());
-
-
-        query = "keys=[1,2,3]&stale=false&endKey=test";
-        split = handler.extractKeysFromQueryString(query, 4); //sure to trigger splitting
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNotNull(split.value2());
-        assertEquals("stale=false&endKey=test", split.value1());
-        assertEquals("{\"keys\":[1,2,3]}", split.value2());
-
-        query = "stale=false&keys=[1,2,3]&endKey=test";
-        split = handler.extractKeysFromQueryString(query, 4); //sure to trigger splitting
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNotNull(split.value2());
-        assertEquals("stale=false&endKey=test", split.value1());
-        assertEquals("{\"keys\":[1,2,3]}", split.value2());
-    }
-
-    @Test
-    public void shouldNotSplitIfThresholdNotMet() {
-        String query = "stale=false&keys=[1,2,3]&endKey=test";
-        Tuple2<String, String> split = handler.extractKeysFromQueryString(query, query.length() + 1);
-        assertNotNull(split);
-        assertNotNull(split.value1());
-        assertNull(split.value2());
-        assertEquals(query, split.value1());
     }
 
     @Test

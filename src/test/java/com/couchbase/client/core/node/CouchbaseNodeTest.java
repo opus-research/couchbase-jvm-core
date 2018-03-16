@@ -21,16 +21,12 @@
  */
 package com.couchbase.client.core.node;
 
-import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
-import com.couchbase.client.core.retry.FailFastRetryStrategy;
-import com.couchbase.client.core.service.ConfigService;
 import com.couchbase.client.core.service.KeyValueService;
+import com.couchbase.client.core.service.ConfigService;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
@@ -38,14 +34,12 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import rx.Observable;
-import rx.subjects.AsyncSubject;
 import rx.subjects.BehaviorSubject;
 
 import java.net.InetAddress;
 import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -71,21 +65,6 @@ public class CouchbaseNodeTest {
     public void shouldBeDisconnectedIfNoServicesRegisteredOnConnect() {
         CouchbaseNode node = new CouchbaseNode(host, environment, null);
         assertEquals(LifecycleState.DISCONNECTED, node.connect().toBlocking().single());
-    }
-
-    @Test
-    public void shouldBeEqualOnSameInetAddr() throws Exception {
-        CouchbaseNode node1 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
-        CouchbaseNode node2 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
-        assertEquals(node1, node2);
-        assertEquals(node1.hashCode(), node2.hashCode());
-    }
-
-    @Test
-    public void shouldNotBeEqualOnDifferentInetAddr() throws Exception {
-        CouchbaseNode node1 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
-        CouchbaseNode node2 = new CouchbaseNode(InetAddress.getByName("2.3.4.5"), environment, null);
-        assertNotEquals(node1, node2);
     }
 
     @Test
@@ -223,24 +202,5 @@ public class CouchbaseNodeTest {
         node.removeService(new RemoveServiceRequest(ServiceType.BINARY, "bucket", host))
             .toBlocking().single();
         verify(registryMock).removeService(any(Service.class), anyString());
-    }
-
-    @Test(expected = RequestCancelledException.class)
-    public void shouldCancelIfServiceCouldNotBeLocated() {
-        ServiceRegistry registryMock = mock(ServiceRegistry.class);
-        Service serviceMock = mock(Service.class);
-        when(registryMock.serviceBy(ServiceType.BINARY, "bucket")).thenReturn(serviceMock);
-        when(serviceMock.states()).thenReturn(Observable.<LifecycleState>empty());
-        CoreEnvironment env = mock(CoreEnvironment.class);
-        when(env.retryStrategy()).thenReturn(FailFastRetryStrategy.INSTANCE);
-
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, env, null);
-
-        CouchbaseRequest request = mock(CouchbaseRequest.class);
-        AsyncSubject<CouchbaseResponse> response = AsyncSubject.create();
-        when(request.observable()).thenReturn(response);
-        node.send(request);
-
-        response.toBlocking().single();
     }
 }
