@@ -63,7 +63,6 @@ import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
@@ -152,9 +151,7 @@ public class CouchbaseCore implements ClusterFacade {
         responseDisruptor = new Disruptor<ResponseEvent>(
             new ResponseEventFactory(),
             environment.responseBufferSize(),
-            disruptorExecutor,
-            ProducerType.MULTI,
-            environment.waitStrategy()
+            disruptorExecutor
         );
         responseDisruptor.handleExceptionsWith(new ExceptionHandler<ResponseEvent>() {
             @Override
@@ -179,9 +176,7 @@ public class CouchbaseCore implements ClusterFacade {
         requestDisruptor = new Disruptor<RequestEvent>(
             new RequestEventFactory(),
             environment.requestBufferSize(),
-            disruptorExecutor,
-            ProducerType.MULTI,
-            environment.waitStrategy()
+            disruptorExecutor
         );
         requestHandler = new RequestHandler(environment, configProvider.configs(), responseRingBuffer);
         requestDisruptor.handleExceptionsWith(new ExceptionHandler<RequestEvent>() {
