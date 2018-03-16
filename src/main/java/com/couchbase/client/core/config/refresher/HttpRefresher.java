@@ -145,7 +145,7 @@ public class HttpRefresher extends AbstractRefresher {
 
     @Override
     public Observable<Boolean> shutdown() {
-        return null;
+        return Observable.just(true);
     }
 
     @Override
