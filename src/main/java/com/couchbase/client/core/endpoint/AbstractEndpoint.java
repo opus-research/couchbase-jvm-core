@@ -51,8 +51,6 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
@@ -329,15 +327,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
             } else {
                 if (channel.isWritable()) {
-                    ChannelFuture future = channel.write(request);
-                    future.addListener(new GenericFutureListener<Future<Void>>() {
-                        @Override
-                        public void operationComplete(Future<Void> future) throws Exception {
-                            if (!future.isSuccess()) {
-                                LOGGER.warn("Error during IO write phase.", future);
-                            }
-                        }
-                    });
+                    channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
                     responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
