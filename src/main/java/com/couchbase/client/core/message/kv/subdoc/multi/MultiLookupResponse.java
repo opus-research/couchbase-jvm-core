@@ -36,13 +36,11 @@ import java.util.List;
 public class MultiLookupResponse extends AbstractKeyValueResponse {
 
     private final List<MultiResult<Lookup>> responses;
-    private final long cas;
 
     public MultiLookupResponse(ResponseStatus status, short serverStatusCode, String bucket, List<MultiResult<Lookup>> responses,
-                               BinarySubdocMultiLookupRequest request, long cas) {
+                               BinarySubdocMultiLookupRequest request) {
         super(status, serverStatusCode, bucket, Unpooled.EMPTY_BUFFER, request);
         this.responses = responses;
-        this.cas = cas;
     }
 
     @Override
@@ -55,12 +53,5 @@ public class MultiLookupResponse extends AbstractKeyValueResponse {
      */
     public List<MultiResult<Lookup>> responses() {
         return responses;
-    }
-
-    /**
-     * @return the CAS value of the whole document.
-     */
-    public long cas() {
-        return this.cas;
     }
 }
