@@ -35,7 +35,7 @@ public class BucketClosedTest extends ClusterDependentTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        connect();
+        connect(false);
     }
 
     @Test(expected = BucketClosedException.class)
