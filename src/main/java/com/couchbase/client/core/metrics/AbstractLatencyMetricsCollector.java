@@ -25,14 +25,11 @@ import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.event.metrics.LatencyMetricsEvent;
 import org.LatencyUtils.LatencyStats;
-import org.LatencyUtils.PauseDetector;
-import org.LatencyUtils.SimplePauseDetector;
 import rx.Scheduler;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The default abstract implementation for a latency metrics collector.
@@ -43,16 +40,6 @@ import java.util.concurrent.TimeUnit;
 public abstract class AbstractLatencyMetricsCollector<I extends LatencyMetricsIdentifier, E extends LatencyMetricsEvent>
     extends AbstractMetricsCollector
     implements LatencyMetricsCollector<I> {
-
-    private static final PauseDetector PAUSE_DETECTOR = new SimplePauseDetector(
-        TimeUnit.SECONDS.toNanos(1),
-        TimeUnit.SECONDS.toNanos(1),
-        3
-    );
-
-    static {
-        LatencyStats.setDefaultPauseDetector(PAUSE_DETECTOR);
-    }
 
     private final Map<I, LatencyStats> latencyMetrics;
     private final LatencyMetricsCollectorConfig config;
