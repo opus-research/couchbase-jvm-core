@@ -21,9 +21,7 @@
  */
 package com.couchbase.client.core.message;
 
-import io.netty.util.ReferenceCounted;
-
-public interface CouchbaseResponse extends CouchbaseMessage, ReferenceCounted {
+public interface CouchbaseResponse extends CouchbaseMessage {
 
     /**
      * The typesafe status of the response.
