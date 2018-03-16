@@ -37,11 +37,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
     private final String bucket;
 
     /**
-     * User authorized for bucket access
-     */
-    private final String username;
-
-    /**
      * The password of the bucket for this request.
      */
     private final String password;
@@ -53,7 +48,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
 
     private volatile int retryCount;
 
-
     /**
      * Create a new {@link AbstractCouchbaseRequest}.
      *
@@ -65,44 +59,24 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
      * other constructor and feed it a ReplaySubject or something similar.
      *
      * @param bucket the name of the bucket.
-     * @param password user password.
-     */
-    protected AbstractCouchbaseRequest(String bucket, String password) {
-        this(bucket, bucket, password, AsyncSubject.<CouchbaseResponse>create());
-    }
-
-    /**
-     * Create a new {@link AbstractCouchbaseRequest}.
-     *
-     * Depending on the type of operation, bucket and password may be null, this needs to
-     * be enforced properly by the child implementations.
-     *
-     * This constructor will create a AsyncSubject, which implies that the response for this
-     * request only emits one message. If you need to expose a streaming response, use the
-     * other constructor and feed it a ReplaySubject or something similar.
-     *
-     * @param bucket the name of the bucket.
-     * @param username user authorized to access the bucket.
-     * @param password user password.
-     */
-    protected AbstractCouchbaseRequest(String bucket, String username, String password) {
-        this(bucket, username, password, AsyncSubject.<CouchbaseResponse>create());
-    }
-
-    /**
-     * Create a new {@link AbstractCouchbaseRequest}.
-     *
-     * Depending on the type of operation, bucket and password may be null, this needs to
-     * be enforced properly by the child implementations.
-     *
-     * @param bucket the name of the bucket.
-     * @param username user authorized to access the bucket.
      * @param password the password of the bucket.
      */
-    protected AbstractCouchbaseRequest(final String bucket, final String username, final String password,
+    protected AbstractCouchbaseRequest(String bucket, String password) {
+        this(bucket, password, AsyncSubject.<CouchbaseResponse>create());
+    }
+
+    /**
+     * Create a new {@link AbstractCouchbaseRequest}.
+     *
+     * Depending on the type of operation, bucket and password may be null, this needs to
+     * be enforced properly by the child implementations.
+     *
+     * @param bucket the name of the bucket.
+     * @param password the password of the bucket.
+     */
+    protected AbstractCouchbaseRequest(final String bucket, final String password,
         final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
         this.bucket = bucket;
-        this.username = username;
         this.password = password;
         this.observable = observable;
         this.creationTime = System.nanoTime();
@@ -117,11 +91,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
     @Override
     public String bucket() {
         return bucket;
-    }
-
-    @Override
-    public String username() {
-        return username;
     }
 
     @Override

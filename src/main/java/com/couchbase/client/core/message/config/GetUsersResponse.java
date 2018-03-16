@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.message.kv;
 
-import io.netty.buffer.ByteBuf;
+package com.couchbase.client.core.message.config;
 
-public class PrependRequest extends AbstractKeyValueRequest {
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
 
-    private final long cas;
-    private final ByteBuf content;
+/**
+ * @author Subhashni Balakrishnan
+ */
+public class GetUsersResponse extends AbstractCouchbaseResponse {
+    private final String content;
 
-    public PrependRequest(String key, long cas, ByteBuf content, String bucket) {
-        super(key, bucket, null);
-        this.cas = cas;
+    public GetUsersResponse(String content, ResponseStatus status, CouchbaseRequest request) {
+        super(status, request);
         this.content = content;
     }
 
-    public long cas() {
-        return cas;
-    }
-
-    public ByteBuf content() {
+    public String content() {
         return content;
     }
-    
 }

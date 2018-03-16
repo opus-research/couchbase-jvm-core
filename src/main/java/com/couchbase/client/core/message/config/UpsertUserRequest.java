@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.couchbase.client.core.message.config;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
-public class GetDesignDocumentsRequest extends AbstractCouchbaseRequest implements ConfigRequest {
+/**
+ * @author Subhashni Balakrishnan
+ */
+public class UpsertUserRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
-    private final String path;
+    private final String userid;
+    private final String payload;
 
-    public GetDesignDocumentsRequest(String bucket, String password) {
-        super(bucket, password);
-        this.path = "/pools/default/buckets/" + bucket + "/ddocs";
+    public UpsertUserRequest(String userid, String payload, String username, String password) {
+        super(username, password);
+        this.userid = userid;
+        this.payload = payload;
     }
 
+    @Override
     public String path() {
-        return path;
+        return "/settings/rbac/users/builtin/" + userid;
+    }
+
+    public String payload() {
+        return payload;
     }
 }

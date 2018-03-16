@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.message.kv;
+
+package com.couchbase.client.core.message.config;
+
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.ResponseStatus;
 
 /**
- * Fetch a document from one or more and/or active nodes replicas.
- *
- * @author Michael Nitschinger
- * @since 1.0
+ * @author Subhashni Balakrishnan
  */
-public class ReplicaGetRequest extends AbstractKeyValueRequest {
+public class UpsertUserResponse extends AbstractCouchbaseResponse {
+    private final String msg;
 
-    private final short replica;
-
-    public ReplicaGetRequest(String key, String bucket, short replica) {
-        super(key, bucket, null);
-        this.replica = replica;
+    public UpsertUserResponse(String msg, ResponseStatus status) {
+        super(status, null);
+        this.msg = msg;
     }
 
-    public short replica() {
-        return replica;
+    public String message() {
+        return msg;
     }
+
 }
