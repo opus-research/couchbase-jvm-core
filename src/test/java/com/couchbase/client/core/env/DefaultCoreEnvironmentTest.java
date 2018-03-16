@@ -114,11 +114,10 @@ public class DefaultCoreEnvironmentTest {
             env.scheduler().createWorker().schedule(Actions.empty());
 
             LOGGER.info("===Created threads:");
-            Set<String> afterCreate = dump(threads(mx, ignore, false));
+            Set<String> afterCreate = dump(threads(mx, ignore));
 
             env.shutdown().toBlocking().last();
-            //we only consider threads starting with cb- or containing Rx, minus the ones existing at startup
-            Set<String> afterShutdown = threads(mx, ignore, true);
+            Set<String> afterShutdown = threads(mx, ignore);
 
             peaks[i] = afterShutdown.size();
             LOGGER.info("===Shutdown went from " + afterCreate.size() + " to " + afterShutdown.size() + " threads, remaining: ");
@@ -141,20 +140,10 @@ public class DefaultCoreEnvironmentTest {
         return threads;
     }
 
-    private Set<String> threads(ThreadMXBean mx, Set<String> ignore, boolean ignoreNonCbRx) {
+    private Set<String> threads(ThreadMXBean mx, Set<String> ignore) {
         Set<String> all = threads(mx);
         all.removeAll(ignore);
-        if (!ignoreNonCbRx) {
-            return all;
-        } else {
-            Set<String> result = new HashSet<String>(all.size());
-            for (String s : all) {
-                if (s.startsWith("cb-") || s.contains("Rx")) {
-                    result.add(s);
-                }
-            }
-            return result;
-        }
+        return all;
     }
 
     private Set<String> threads(ThreadMXBean mx) {
