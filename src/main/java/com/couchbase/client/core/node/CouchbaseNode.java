@@ -36,13 +36,16 @@ import com.lmax.disruptor.RingBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rx.Observable;
+import rx.Subscription;
 import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.functions.FuncN;
 
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The general implementation of a {@link Node}.
@@ -83,7 +86,9 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      */
     private final ServiceRegistry serviceRegistry;
 
-    private final Map<Service, LifecycleState> serviceStates;
+    private final List<Observable<LifecycleState>> serviceStates;
+
+    private volatile Subscription stateSubscription;
 
     public CouchbaseNode(final InetAddress hostname, final Environment environment,
         final RingBuffer<ResponseEvent> responseBuffer) {
@@ -97,7 +102,35 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.serviceRegistry = registry;
         this.environment = environment;
         this.responseBuffer = responseBuffer;
-        this.serviceStates = new ConcurrentHashMap<Service, LifecycleState>();
+        this.serviceStates = Collections.synchronizedList(new ArrayList<Observable<LifecycleState>>());
+
+        stateSubscription = Observable.combineLatest(serviceStates, new FuncN<LifecycleState>() {
+            @Override
+            public LifecycleState call(Object... args) {
+                LifecycleState[] states = Arrays.copyOf(args, args.length, LifecycleState[].class);
+                return calculateStateFrom(Arrays.asList(states));
+            }
+        }).subscribe(new Action1<LifecycleState>() {
+            @Override
+            public void call(LifecycleState state) {
+                if (state == state()) {
+                    return;
+                }
+
+                LifecycleState before = state();
+                transitionState(state);
+
+                if (state() == LifecycleState.CONNECTED) {
+                    LOGGER.info("Connected to Node " + hostname);
+                } else if ((before == LifecycleState.CONNECTED || before == LifecycleState.DISCONNECTING)
+                    && state() == LifecycleState.DISCONNECTED) {
+                    LOGGER.info("Disconnected from Node " + hostname);
+                }
+
+
+            }
+        });
+
     }
 
     @Override
@@ -130,7 +163,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
             }
         }).toList().map(new Func1<List<LifecycleState>, LifecycleState>() {
             @Override
-            public LifecycleState call(List<LifecycleState> state) {
+            public LifecycleState call(final List<LifecycleState> serviceStates) {
                 return state();
             }
         });
@@ -149,7 +182,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
             .toList()
             .map(new Func1<List<LifecycleState>, LifecycleState>() {
                 @Override
-                public LifecycleState call(List<LifecycleState> state) {
+                public LifecycleState call(final List<LifecycleState> serviceStates) {
                     return state();
                 }
             });
@@ -172,26 +205,8 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
             responseBuffer
         );
 
-        serviceStates.put(service, service.state());
-        service.states().subscribe(new Action1<LifecycleState>() {
-            @Override
-            public void call(LifecycleState state) {
-                serviceStates.put(service, state);
-                LifecycleState oldState = state();
-                LifecycleState newState = recalculateState();
-                if (oldState == newState) {
-                    return;
-                }
-
-                if (newState == LifecycleState.CONNECTED) {
-                    LOGGER.debug("Connected ("+state()+") to Node " + hostname);
-                } else if (newState == LifecycleState.DISCONNECTED) {
-                    LOGGER.debug("Disconnected ("+state()+") from Node " + hostname);
-                }
-                transitionState(newState);
-            }
-        });
         serviceRegistry.addService(service, request.bucket());
+        serviceStates.add(service.states());
         return service.connect().map(new Func1<LifecycleState, Service>() {
             @Override
             public Service call(LifecycleState state) {
@@ -204,7 +219,10 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     public Observable<Service> removeService(final RemoveServiceRequest request) {
         Service service = serviceRegistry.serviceBy(request.type(), request.bucket());
         serviceRegistry.removeService(service, request.bucket());
-        serviceStates.remove(service);
+        if (stateSubscription != null) {
+            stateSubscription.unsubscribe();
+        }
+        serviceStates.remove(service.states());
         return Observable.from(service);
     }
 
@@ -219,16 +237,17 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      *   5) At least one Service Disconnecting -> Disconnecting
      *   6) Otherwise -> Disconnected
      *
+     * @param serviceStates the input service states.
      * @return the output node states.
      */
-    private LifecycleState recalculateState() {
+    private static LifecycleState calculateStateFrom(final List<LifecycleState> serviceStates) {
         if (serviceStates.isEmpty()) {
             return LifecycleState.DISCONNECTED;
         }
         int connected = 0;
         int connecting = 0;
         int disconnecting = 0;
-        for (LifecycleState serviceState : serviceStates.values()) {
+        for (LifecycleState serviceState : serviceStates) {
             switch (serviceState) {
                 case CONNECTED:
                     connected++;
@@ -254,11 +273,4 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         }
     }
 
-    @Override
-    public String toString() {
-        return "CouchbaseNode{" +
-            "hostname=" + hostname +
-            ", services=" + serviceRegistry +
-            '}';
-    }
 }

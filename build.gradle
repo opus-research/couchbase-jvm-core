@@ -24,7 +24,6 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'maven'
-apply plugin: 'checkstyle'
 
 group = 'com.couchbase.client'
 description = 'Official Couchbase JVM Core Library'
@@ -163,10 +162,6 @@ install {
     repositories.mavenInstaller {
         customizePom(pom)
     }
-}
-
-checkstyle {
-    configFile = new File(rootDir, "checkstyle.xml")
 }
 
 def customizePom(def pom) {
