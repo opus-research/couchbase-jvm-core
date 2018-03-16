@@ -32,11 +32,12 @@ import java.util.List;
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     include = JsonTypeInfo.As.PROPERTY,
-    property = "nodeLocator")
+    property = "nodeLocator"
+)
 @JsonSubTypes({
     @JsonSubTypes.Type(value = CouchbaseBucketConfig.class, name = "vbucket"),
-    @JsonSubTypes.Type(value = MemcachedBucketConfig.class, name = "ketama")})
-
+    @JsonSubTypes.Type(value = MemcachedBucketConfig.class, name = "ketama")
+})
 public interface BucketConfig {
 
     /**
@@ -56,10 +57,10 @@ public interface BucketConfig {
     /**
      * Setter to inject the password manually into the config.
      *
-     * @param password the password of the bucket to inject.
+     * @param pasword
      * @return the config for proper chaining.
      */
-    BucketConfig password(String password);
+    BucketConfig password(String pasword);
 
     /**
      * The type of node locator in use for this bucket.
