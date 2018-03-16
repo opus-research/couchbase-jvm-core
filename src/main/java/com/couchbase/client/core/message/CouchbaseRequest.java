@@ -54,4 +54,11 @@ public interface CouchbaseRequest extends CouchbaseMessage {
      */
     String password();
 
+    /**
+     * Returns the old retry count and increments it by one.
+     *
+     * @return the current retryCount.
+     */
+    int incrementRetryCount();
+
 }
