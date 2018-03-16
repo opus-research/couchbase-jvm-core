@@ -3,25 +3,22 @@ package com.couchbase.client.core.message.query;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
-import io.netty.buffer.ByteBuf;
-import rx.Observable;
 
-
+/**
+ * Created by michael on 21/05/14.
+ */
 public class GenericQueryResponse extends AbstractCouchbaseResponse {
 
-    private final Observable<ByteBuf> rows;
-    private final Observable<ByteBuf> info;
+    private final String content;
 
-    public GenericQueryResponse(Observable<ByteBuf> rows, Observable<ByteBuf> info, ResponseStatus status,
-        CouchbaseRequest request) {
+    public GenericQueryResponse(String content, ResponseStatus status, CouchbaseRequest request) {
         super(status, request);
-        this.rows = rows;
-        this.info = info;
+        this.content = content;
     }
 
-    public Observable<ByteBuf> rows() {
-        return rows;
+    public String content() {
+        return content;
     }
-    public Observable<ByteBuf> info() { return info; }
+
 
 }

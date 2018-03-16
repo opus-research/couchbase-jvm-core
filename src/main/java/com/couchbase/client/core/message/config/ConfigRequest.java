@@ -30,7 +30,4 @@ import com.couchbase.client.core.message.CouchbaseRequest;
  * @since 1.0
  */
 public interface ConfigRequest extends CouchbaseRequest {
-
-    String path();
-
 }

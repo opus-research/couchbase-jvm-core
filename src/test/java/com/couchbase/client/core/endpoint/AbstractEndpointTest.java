@@ -158,6 +158,23 @@ public class AbstractEndpointTest {
     }
 
     @Test
+    @Ignore
+    public void shouldReconnectWithBackoff() {
+    }
+
+    @Test
+    @Ignore
+    public void shouldReconnectWithBackoffUntilDisconnectOverrides() {
+
+    }
+
+    @Test
+    @Ignore
+    public void shouldReconnectOnceNotifiedAsInactive() {
+
+    }
+
+    @Test
     public void shouldSendMessageToChannelIfConnected() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());

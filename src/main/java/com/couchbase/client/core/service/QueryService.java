@@ -5,7 +5,6 @@ import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.endpoint.query.QueryEndpoint;
 import com.couchbase.client.core.env.Environment;
 import com.couchbase.client.core.service.strategies.RandomSelectionStrategy;
-import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
 public class QueryService extends AbstractService {
