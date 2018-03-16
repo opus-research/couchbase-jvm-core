@@ -92,14 +92,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Verifies the correct functionality of the {@link QueryHandler} using V1 Parser.
+ * Verifies the correct functionality of the {@link QueryHandler}.
  *
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class QueryHandlerWithParserV1Test {
+public class QueryHandlerTest {
 
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandlerWithParserV1Test.class);
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandlerTest.class);
 
     private static final String FAKE_REQUESTID = "1234test-7802-4fc2-acd6-dfcd1c05a288";
     private static final String FAKE_CLIENTID = "1234567890123456789012345678901234567890123456789012345678901234";
@@ -1533,6 +1533,7 @@ public class QueryHandlerWithParserV1Test {
         softly.assertThat(inbound).isNotNull();
         softly.assertThat(error).isNull();
         softly.assertThat(handler.getDecodingState()).isEqualTo(DecodingState.INITIAL);
+        softly.assertThat(handler.getQueryParsingState()).isEqualTo(QueryHandler.QUERY_STATE_INITIAL);
         softly.assertAll();
     }
 
