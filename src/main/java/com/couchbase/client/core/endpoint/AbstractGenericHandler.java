@@ -34,8 +34,6 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.MessageToMessageCodec;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -45,9 +43,7 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.subjects.Subject;
 
-import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
-import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -95,11 +91,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private REQUEST currentRequest;
 
     private DecodingState currentDecodingState;
-
-    /**
-     * The future which is used to eventually signal a connected channel.
-     */
-    private ChannelPromise connectFuture;
 
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
@@ -252,13 +243,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     }
 
     @Override
-    public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress,
-        ChannelPromise future) throws Exception {
-        connectFuture = future;
-        ctx.connect(remoteAddress, localAddress, future);
-    }
-
-    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         if (cause instanceof IOException) {
             if (LOGGER.isDebugEnabled()) {
@@ -267,15 +251,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 LOGGER.info(logIdent(ctx, endpoint) + "Connection reset by peer: " + cause.getMessage());
             }
             handleOutstandingOperations(ctx);
-        } else if (cause instanceof DecoderException && cause.getCause() instanceof SSLHandshakeException) {
-            if (!connectFuture.isDone()) {
-                connectFuture.setFailure(cause.getCause());
-            } else {
-                // This should not be possible, since handshake is done before connecting. But just in case, we
-                // can trap and log an error that might slip through for one reason or another.
-                LOGGER.warn(logIdent(ctx, endpoint) + "Caught SSL exception after being connected: "
-                    + cause.getMessage(), cause);
-            }
         } else {
             LOGGER.warn(logIdent(ctx, endpoint) + "Caught unknown exception: " + cause.getMessage(), cause);
             ctx.fireExceptionCaught(cause);
