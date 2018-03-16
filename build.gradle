@@ -26,6 +26,7 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'maven-publish'
+apply plugin: 'checkstyle'
 apply plugin: 'com.github.johnrengelman.shadow'
 
 apply plugin: 'propdeps'
@@ -160,6 +161,10 @@ task javadocJar(type: Jar) {
 artifacts {
     archives sourcesJar
     archives javadocJar
+}
+
+checkstyle {
+    configFile = new File(rootDir, "checkstyle.xml")
 }
 
 shadowJar {
