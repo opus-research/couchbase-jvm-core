@@ -33,7 +33,6 @@ import java.util.Map;
  */
 public class DefaultNodeInfo implements NodeInfo {
 
-    private final String rawHostname;
     private final NetworkAddress hostname;
     private final Map<ServiceType, Integer> directServices;
     private final Map<ServiceType, Integer> sslServices;
@@ -56,8 +55,7 @@ public class DefaultNodeInfo implements NodeInfo {
         }
 
         try {
-            this.rawHostname = trimPort(hostname);
-            this.hostname = NetworkAddress.create(rawHostname);
+            this.hostname = NetworkAddress.create(trimPort(hostname));
         } catch (Exception e) {
             throw new CouchbaseException("Could not analyze hostname from config.", e);
         }
@@ -79,7 +77,6 @@ public class DefaultNodeInfo implements NodeInfo {
         }
 
         this.hostname = hostname;
-        this.rawHostname = hostname.nameOrAddress();
         this.directServices = direct;
         this.sslServices = ssl;
     }
@@ -122,18 +119,8 @@ public class DefaultNodeInfo implements NodeInfo {
     }
 
     @Override
-    public String rawHostname() {
-        return rawHostname;
-    }
-
-    @Override
     public String toString() {
-        return "NodeInfo{"
-            + ", rawHostname" + rawHostname
-            + ", hostname=" + hostname
-            + ", configPort=" + configPort
-            + ", directServices=" + directServices
-            + ", sslServices=" + sslServices
-            + '}';
+        return "NodeInfo{" + ", hostname=" + hostname + ", configPort="
+                + configPort + ", directServices=" + directServices + ", sslServices=" + sslServices + '}';
     }
 }
