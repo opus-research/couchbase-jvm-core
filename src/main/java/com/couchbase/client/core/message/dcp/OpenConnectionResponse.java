@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (C) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,15 +22,29 @@
 
 package com.couchbase.client.core.message.dcp;
 
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.endpoint.dcp.DCPConnection;
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 
-public class OpenConnectionResponse extends AbstractCouchbaseResponse {
+/**
+ * @author Sergey Avseyev
+ * @since 1.1.0
+ */
+@InterfaceStability.Experimental
+@InterfaceAudience.Private
+public class OpenConnectionResponse extends AbstractDCPResponse {
     private final DCPConnection connection;
 
-    public OpenConnectionResponse(DCPConnection connection, ResponseStatus status) {
-        super(status, null);
+    /**
+     * Sets the required properties for the response.
+     *
+     * @param status  the status of the response.
+     * @param request
+     */
+    public OpenConnectionResponse(final ResponseStatus status, final DCPConnection connection, final CouchbaseRequest request) {
+        super(status, request);
         this.connection = connection;
     }
 

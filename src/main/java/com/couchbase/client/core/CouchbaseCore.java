@@ -24,7 +24,6 @@ package com.couchbase.client.core;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultConfigurationProvider;
-import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.env.Diagnostics;
@@ -44,8 +43,6 @@ import com.couchbase.client.core.message.cluster.OpenBucketRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
-import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
-import com.couchbase.client.core.message.dcp.OpenConnectionResponse;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -67,8 +64,8 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The general implementation of a {@link ClusterFacade}.
@@ -293,10 +290,6 @@ public class CouchbaseCore implements ClusterFacade {
                 .subscribe(request.observable());
         } else if (request instanceof GetClusterConfigRequest) {
             request.observable().onNext(new GetClusterConfigResponse(configProvider.config(), ResponseStatus.SUCCESS));
-            request.observable().onCompleted();
-        } else if (request instanceof OpenConnectionRequest) {
-            request.observable().onNext(new OpenConnectionResponse(
-                    new DCPConnection(environment, this, request.bucket(), request.password()), ResponseStatus.SUCCESS));
             request.observable().onCompleted();
         }
     }
