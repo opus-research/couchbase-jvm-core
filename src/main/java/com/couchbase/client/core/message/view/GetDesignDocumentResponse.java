@@ -35,9 +35,6 @@ public class GetDesignDocumentResponse extends AbstractCouchbaseResponse impleme
 
     public GetDesignDocumentResponse(String name, boolean development, ByteBuf content, ResponseStatus status, CouchbaseRequest request) {
         super(status, request);
-        if (content == null) {
-            throw new IllegalArgumentException("Content cannot be null. Consider using an empty buffer instead.");
-        }
         this.name = name;
         this.development = development;
         this.content = content;

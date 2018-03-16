@@ -33,9 +33,6 @@ public class UpsertDesignDocumentResponse extends AbstractCouchbaseResponse impl
 
     public UpsertDesignDocumentResponse(ResponseStatus status, ByteBuf content, CouchbaseRequest request) {
         super(status, request);
-        if (content == null) {
-            throw new IllegalArgumentException("Content cannot be null. Consider using an empty buffer instead.");
-        }
         this.content = content;
     }
 
