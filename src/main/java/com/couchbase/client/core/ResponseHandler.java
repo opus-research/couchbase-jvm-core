@@ -41,7 +41,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
 
     private final ClusterFacade cluster;
     private final ConfigurationProvider configurationProvider;
-    private final CoreEnvironment environment;
+    private final Scheduler.Worker worker;
 
     /**
      * Creates a new {@link ResponseHandler}.
@@ -53,7 +53,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     public ResponseHandler(CoreEnvironment environment, ClusterFacade cluster, ConfigurationProvider provider) {
         this.cluster = cluster;
         this.configurationProvider = provider;
-        this.environment = environment;
+        this.worker = environment.scheduler().createWorker();
     }
 
     /**
@@ -90,28 +90,15 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             if (message instanceof SignalConfigReload) {
                 configurationProvider.signalOutdated();
             } else if (message instanceof CouchbaseResponse) {
-                final CouchbaseResponse response = (CouchbaseResponse) message;
+                CouchbaseResponse response = (CouchbaseResponse) message;
                 ResponseStatus status = response.status();
                 switch (status) {
                     case SUCCESS:
                     case EXISTS:
                     case NOT_EXISTS:
                     case FAILURE:
-                        final Scheduler.Worker worker = environment.scheduler().createWorker();
-                        final Subject<CouchbaseResponse, CouchbaseResponse> obs = event.getObservable();
-                        worker.schedule(new Action0() {
-                            @Override
-                            public void call() {
-                                try {
-                                    obs.onNext(response);
-                                    obs.onCompleted();
-                                } catch(Exception ex) {
-                                    obs.onError(ex);
-                                } finally {
-                                    worker.unsubscribe();
-                                }
-                            }
-                        });
+                        event.getObservable().onNext(response);
+                        event.getObservable().onCompleted();
                         break;
                     case RETRY:
                         retry(event);
@@ -160,15 +147,10 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        final Scheduler.Worker worker = environment.scheduler().createWorker();
         worker.schedule(new Action0() {
             @Override
             public void call() {
-                try {
-                    cluster.send(request);
-                } finally {
-                    worker.unsubscribe();
-                }
+                cluster.send(request);
             }
         }, 10, TimeUnit.MILLISECONDS);
     }
