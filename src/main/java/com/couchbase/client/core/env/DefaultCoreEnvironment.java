@@ -68,7 +68,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final Delay OBSERVE_INTERVAL_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 10);
     public static final Delay RECONNECT_DELAY = Delay.exponential(TimeUnit.MILLISECONDS, 4096, 32);
     public static final RetryStrategy RETRY_STRATEGY = BestEffortRetryStrategy.INSTANCE;
-    public static final long MAX_REQUEST_LIFETIME = TimeUnit.SECONDS.toMillis(75);
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
@@ -140,7 +139,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final String userAgent;
     private final String packageNameAndVersion;
     private final RetryStrategy retryStrategy;
-    private final long maxRequestLifetime;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -178,7 +176,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         observeIntervalDelay = builder.observeIntervalDelay();
         reconnectDelay = builder.reconnectDelay();
         retryStrategy = builder.retryStrategy();
-        maxRequestLifetime = builder.maxRequestLifetime();
 
         this.ioPool = builder.ioPool() == null
             ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
@@ -386,11 +383,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return retryStrategy;
     }
 
-    @Override
-    public long maxRequestLifetime() {
-        return maxRequestLifetime;
-    }
-
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -419,9 +411,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private RetryStrategy retryStrategy = RETRY_STRATEGY;
         private EventLoopGroup ioPool;
         private Scheduler scheduler;
-        private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
 
         protected Builder() {
+
         }
 
         @Override
@@ -689,16 +681,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        @Override
-        public long maxRequestLifetime() {
-            return maxRequestLifetime;
-        }
-
-        public Builder maxRequestLifetime(final long maxRequestLifetime) {
-            this.maxRequestLifetime = maxRequestLifetime;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -730,7 +712,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);
         sb.append(", retryStrategy=").append(retryStrategy);
-        sb.append(", maxRequestLifetime=").append(maxRequestLifetime);
         sb.append('}');
         return sb.toString();
     }

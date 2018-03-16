@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.retry;
 
-import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 
 /**
@@ -41,7 +40,7 @@ public class FailFastRetryStrategy implements RetryStrategy {
     }
 
     @Override
-    public boolean shouldRetry(CouchbaseRequest request, final CoreEnvironment env) {
+    public boolean shouldRetry(CouchbaseRequest request) {
         return false;
     }
 

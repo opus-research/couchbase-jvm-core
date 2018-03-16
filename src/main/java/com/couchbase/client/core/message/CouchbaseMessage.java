@@ -22,12 +22,4 @@
 package com.couchbase.client.core.message;
 
 public interface CouchbaseMessage {
-
-    /**
-     * Returns the time in nanoseconds when the message was created.
-     *
-     * @return the creation time in nanoseconds.
-     */
-    long creationTime();
-
 }
