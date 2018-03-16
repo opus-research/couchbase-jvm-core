@@ -30,7 +30,7 @@ import com.lmax.disruptor.RingBuffer;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class QueryService extends PooledService {
+public class QueryService extends AbstractPoolingService {
 
     /**
      * The endpoint selection strategy.
@@ -54,7 +54,8 @@ public class QueryService extends PooledService {
      */
     public QueryService(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.queryServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+        super(hostname, bucket, password, port, env, env.queryEndpoints(), env.queryEndpoints(), STRATEGY,
+                responseBuffer, FACTORY);
     }
 
 
