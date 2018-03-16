@@ -28,7 +28,6 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
@@ -754,7 +753,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
+    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest {
         protected KeepAliveRequest() {
             super(null, null);
         }

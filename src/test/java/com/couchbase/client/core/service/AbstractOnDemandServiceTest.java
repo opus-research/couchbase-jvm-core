@@ -31,8 +31,6 @@ import org.junit.Test;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 
-import java.util.List;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -72,9 +70,9 @@ public class AbstractOnDemandServiceTest {
         when(endpoint.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         when(factory.create(host, bucket, password, port, env, null)).thenReturn(endpoint);
 
-        assertEquals(0, service.endpoints().size());
+        assertEquals(0, service.endpoints().length);
         assertEquals(LifecycleState.IDLE, service.connect().toBlocking().single());
-        assertEquals(0, service.endpoints().size());
+        assertEquals(0, service.endpoints().length);
 
         CouchbaseRequest req = mock(CouchbaseRequest.class);
         AsyncSubject<CouchbaseResponse> reqObservable = AsyncSubject.create();
@@ -155,7 +153,7 @@ public class AbstractOnDemandServiceTest {
         }
 
         @Override
-        public List<Endpoint> endpoints() {
+        public Endpoint[] endpoints() {
             return super.endpoints();
         }
 
