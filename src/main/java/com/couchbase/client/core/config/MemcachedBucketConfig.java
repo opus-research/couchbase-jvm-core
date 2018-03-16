@@ -23,7 +23,6 @@ package com.couchbase.client.core.config;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
-import java.net.InetAddress;
 import java.util.SortedMap;
 
 /**
@@ -33,13 +32,5 @@ import java.util.SortedMap;
 public interface MemcachedBucketConfig extends BucketConfig {
 
     SortedMap<Long, NodeInfo> ketamaNodes();
-
-    /**
-     * Returns the target node address for the given document id.
-     *
-     * @param id the id for the document.
-     * @return the node address for the given document id.
-     */
-    InetAddress nodeForId(final byte[] id);
 
 }

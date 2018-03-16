@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The default implementation of a {@link ServiceRegistry}.
@@ -51,7 +52,7 @@ public class DefaultServiceRegistry implements ServiceRegistry {
      */
     private final Map<String, Map<ServiceType, Service>> localServices;
 
-    private volatile Service[] serviceCache;
+    private AtomicReference<List<Service>> serviceCache;
 
     /**
      * Create a new {@link DefaultServiceRegistry} with custom containers.
@@ -65,7 +66,7 @@ public class DefaultServiceRegistry implements ServiceRegistry {
         final Map<String, Map<ServiceType, Service>> localServices) {
         this.globalServices = globalServices;
         this.localServices = localServices;
-        this.serviceCache = new Service[] {};
+        this.serviceCache = new AtomicReference<List<Service>>(new ArrayList<Service>());
     }
 
     /**
@@ -126,8 +127,8 @@ public class DefaultServiceRegistry implements ServiceRegistry {
     }
 
     @Override
-    public Service[] services() {
-        return serviceCache;
+    public List<Service> services() {
+        return serviceCache.get();
     }
 
     private void recalculateServiceCache() {
@@ -140,7 +141,7 @@ public class DefaultServiceRegistry implements ServiceRegistry {
                 services.add(service);
             }
         }
-        serviceCache = services.toArray(new Service[services.size()]);
+        serviceCache.set(services);
     }
 
     @Override
