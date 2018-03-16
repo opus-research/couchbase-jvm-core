@@ -31,15 +31,12 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultB
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.Attribute;
 import rx.subjects.SerializedSubject;
 import rx.subjects.Subject;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,24 +53,27 @@ public class DCPConnection {
     private final SerializedSubject<DCPRequest, DCPRequest> subject;
     private final String bucket;
     private final CoreEnvironment env;
-    private ConcurrentMap<Integer, ChannelHandlerContext> streams = new ConcurrentHashMap<Integer, ChannelHandlerContext>();
+    private volatile int totalReceivedBytes;
+    private List<Integer> streams = Collections.synchronizedList(new ArrayList<Integer>());
+    private ChannelHandlerContext lastCtx;
 
     public DCPConnection(final CoreEnvironment env, final String name, final String bucket) {
         this.name = name;
+        this.totalReceivedBytes = 0;
         this.env = env;
         this.bucket = bucket;
         subject = UnicastAutoReleaseSubject.<DCPRequest>create(env.autoreleaseAfter(), TimeUnit.MILLISECONDS, env.scheduler())
                 .toSerialized();
     }
 
-    public int addStream(ChannelHandlerContext ctx) {
+    public int addStream(final String connectionName) {
         int streamId = nextStreamId++;
-        streams.put(streamId, ctx);
+        streams.add(streamId);
         return streamId;
     }
 
     public void removeStream(final int streamId) {
-        streams.remove(streamId);
+        streams.remove((Integer) streamId);
     }
 
     public int streamsCount() {
@@ -93,32 +93,35 @@ public class DCPConnection {
     }
 
     public void consumed(final DCPMessage event) {
-        consumed(event.streamId(), event.totalBodyLength());
+        consumed(event.totalBodyLength());
     }
 
     /*package*/ void consumed(final FullBinaryMemcacheResponse response) {
-        consumed(response.getOpaque(), response.getTotalBodyLength());
+        consumed(response.getTotalBodyLength());
     }
 
-    private void consumed(int streamId, int delta) {
-        ChannelHandlerContext ctx = streams.get(streamId);
-        if (env.dcpConnectionBufferSize() > 0 && ctx != null) {
-            Attribute<Integer> attr = ctx.attr(DCPHandler.RECEIVED_BYTES);
-
-            synchronized (ctx) {
-                int receivedBytes = attr.get();
-                receivedBytes += MINIMUM_HEADER_SIZE + delta;
-                if (receivedBytes >= env.dcpConnectionBufferSize() * env.dcpConnectionBufferAckThreshold()) {
-                    ctx.writeAndFlush(createBufferAcknowledgmentRequest(ctx, receivedBytes));
-                    receivedBytes = 0;
-                }
-                attr.set(receivedBytes);
+    private void consumed(int delta) {
+        if (env.dcpConnectionBufferSize() > 0 && lastCtx != null) {
+            totalReceivedBytes += MINIMUM_HEADER_SIZE + delta;
+            if (totalReceivedBytes >= env.dcpConnectionBufferSize() * env.dcpConnectionBufferAckThreshold()) {
+                lastCtx.writeAndFlush(createBufferAcknowledgmentRequest(totalReceivedBytes));
+                totalReceivedBytes = 0;
             }
         }
     }
 
-    private BinaryMemcacheRequest createBufferAcknowledgmentRequest(ChannelHandlerContext ctx, int bufferBytes) {
-        ByteBuf extras = ctx.alloc().buffer(4).writeInt(bufferBytes);
+    /**
+     * FIXME: At the moment, we cannot use send() to schedule BufferAcknowledgmentRequest,
+     *        because requests and responses will interleave in DCPHandler. Instead the handler
+     *        store context object here, and DCPConnection can send acknowledgment as soon as
+     *        consumer signals about processed events.
+     */
+    /*package*/ void setLastContext(ChannelHandlerContext ctx) {
+        lastCtx = ctx;
+    }
+
+    private BinaryMemcacheRequest createBufferAcknowledgmentRequest(int bufferBytes) {
+        ByteBuf extras = lastCtx.alloc().buffer(4).writeInt(bufferBytes);
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(new byte[] {}, extras);
         request.setOpcode(DCPHandler.OP_BUFFER_ACK);
         request.setExtrasLength((byte) extras.readableBytes());

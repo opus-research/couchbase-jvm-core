@@ -44,17 +44,17 @@ public class MutationMessage extends AbstractDCPMessage {
     private final long bySequenceNumber;
     private final long revisionSequenceNumber;
 
-    public MutationMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
+    public MutationMessage(DCPConnection connection, int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
                            long bySequenceNumber, long revisionSequenceNumber,
                            int flags, int lockTime, long cas, String bucket) {
-        this(connection, streamId, totalBodyLength, partition, key, content, expiration, bySequenceNumber, revisionSequenceNumber,
+        this(connection, totalBodyLength, partition, key, content, expiration, bySequenceNumber, revisionSequenceNumber,
                 flags, lockTime, cas, bucket, null);
     }
 
-    public MutationMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
+    public MutationMessage(DCPConnection connection, int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
                            long bySequenceNumber, long revisionSequenceNumber,
                            int flags, int lockTime, long cas, String bucket, String password) {
-        super(connection, streamId, totalBodyLength, partition, key, bucket, password);
+        super(connection, totalBodyLength, partition, key, bucket, password);
         this.content = content;
         this.expiration = expiration;
         this.flags = flags;

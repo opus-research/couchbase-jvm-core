@@ -40,32 +40,29 @@ public abstract class AbstractDCPMessage extends AbstractDCPRequest implements D
     private final String key;
     private final int totalBodyLength;
     private final DCPConnection connection;
-    private final int streamId;
 
     /**
      * Creates a new {@link AbstractDCPMessage}.
-     *  @param connection
-     * @param streamId
+     *
+     * @param connection
      * @param totalBodyLength
      * @param partition
      * @param key
      * @param bucket          the bucket of the document.
      * @param password        the optional password of the bucket.
      */
-    public AbstractDCPMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, final String bucket, final String password) {
+    public AbstractDCPMessage(DCPConnection connection, int totalBodyLength, short partition, String key, final String bucket, final String password) {
         super(bucket, password);
         this.partition(partition);
-        this.streamId = streamId;
         this.key = key;
         this.totalBodyLength = totalBodyLength;
         this.connection = connection;
     }
 
-    public AbstractDCPMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, final String bucket, final String password,
+    public AbstractDCPMessage(DCPConnection connection, int totalBodyLength, short partition, String key, final String bucket, final String password,
                               final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
         super(bucket, password, observable);
         this.partition(partition);
-        this.streamId = streamId;
         this.key = key;
         this.totalBodyLength = totalBodyLength;
         this.connection = connection;
@@ -84,10 +81,5 @@ public abstract class AbstractDCPMessage extends AbstractDCPRequest implements D
     @Override
     public DCPConnection connection() {
         return connection;
-    }
-
-    @Override
-    public int streamId() {
-        return streamId;
     }
 }
