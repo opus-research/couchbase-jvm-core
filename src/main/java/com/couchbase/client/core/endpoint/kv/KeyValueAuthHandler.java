@@ -21,23 +21,21 @@
  */
 package com.couchbase.client.core.endpoint.kv;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.SimpleChannelInboundHandler;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -57,11 +55,6 @@ import java.net.SocketAddress;
 public class KeyValueAuthHandler
     extends SimpleChannelInboundHandler<FullBinaryMemcacheResponse>
     implements CallbackHandler, ChannelOutboundHandler {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(KeyValueAuthHandler.class);
 
     /**
      * The memcache opcode for the SASL mechs list.
@@ -209,15 +202,7 @@ public class KeyValueAuthHandler
             .setKeyLength((short) mechanismLength)
             .setTotalBodyLength(mechanismLength + payload.readableBytes());
 
-        ChannelFuture future = ctx.writeAndFlush(initialRequest);
-        future.addListener(new GenericFutureListener<Future<Void>>() {
-            @Override
-            public void operationComplete(Future<Void> future) throws Exception {
-                if (!future.isSuccess()) {
-                    LOGGER.warn("Error during SASL Auth negotiation phase.", future);
-                }
-            }
-        });
+        ctx.writeAndFlush(initialRequest);
     }
 
     /**
@@ -251,15 +236,7 @@ public class KeyValueAuthHandler
                 .setKeyLength((short) selectedMechanism.length())
                 .setTotalBodyLength(content.readableBytes() + selectedMechanism.length());
 
-            ChannelFuture future = ctx.writeAndFlush(stepRequest);
-            future.addListener(new GenericFutureListener<Future<Void>>() {
-                @Override
-                public void operationComplete(Future<Void> future) throws Exception {
-                    if (!future.isSuccess()) {
-                        LOGGER.warn("Error during SASL Auth negotiation phase.", future);
-                    }
-                }
-            });
+            ctx.writeAndFlush(stepRequest);
         } else {
             throw new AuthenticationException("SASL Challenge evaluation returned null.");
         }
