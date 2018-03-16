@@ -29,7 +29,6 @@ import com.couchbase.client.core.util.ClusterDependentTest;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import rx.Observable;
 import rx.functions.Func1;
@@ -49,11 +48,6 @@ import static org.junit.Assert.assertTrue;
  * @since 1.2.0
  */
 public class NetworkMetricsTest extends ClusterDependentTest {
-
-    @BeforeClass
-    public static void setup() throws Exception {
-        connect(false);
-    }
 
     @Test
     public void shouldCapturePerformedOperations() throws Exception {

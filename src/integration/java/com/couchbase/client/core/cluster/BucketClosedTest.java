@@ -19,7 +19,6 @@ import com.couchbase.client.core.BucketClosedException;
 import com.couchbase.client.core.message.cluster.CloseBucketRequest;
 import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.util.ClusterDependentTest;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.fail;
@@ -32,11 +31,6 @@ import static org.junit.Assert.fail;
  * @since 1.0.1
  */
 public class BucketClosedTest extends ClusterDependentTest {
-
-    @BeforeClass
-    public static void setup() throws Exception {
-        connect(false);
-    }
 
     @Test(expected = BucketClosedException.class)
     public void shouldFailFastOnRequestOnClosedBucket() {
