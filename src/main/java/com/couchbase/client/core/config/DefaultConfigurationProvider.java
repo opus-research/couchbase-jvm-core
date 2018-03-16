@@ -42,6 +42,7 @@ import rx.functions.Func1;
 import rx.subjects.PublishSubject;
 import rx.subjects.Subject;
 
+import java.io.File;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,6 +51,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.Set;
 
 /**
@@ -125,6 +127,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      */
     private volatile Set<InetAddress> seedHosts;
 
+    private final String overrideConfig;
+
     /**
      * Create a new {@link DefaultConfigurationProvider}.
      *
@@ -173,6 +177,18 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         seedHosts = null;
         bootstrapped = false;
         currentConfig = new DefaultClusterConfig();
+
+        if (System.getProperty("overrideConfig") != null) {
+            try {
+                Scanner scanner = new Scanner( new File("poem.txt") );
+                overrideConfig = scanner.useDelimiter("\\A").next();
+                scanner.close();
+            } catch (Exception ex) {
+                throw new RuntimeException("Could not load override file: ", ex);
+            }
+        } else {
+            overrideConfig = null;
+        }
 
         Observable
             .from(refreshers.values())
@@ -381,7 +397,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      *
      * @param newConfig the configuration of the bucket.
      */
-    private void upsertBucketConfig(final BucketConfig newConfig) {
+    private void upsertBucketConfig(BucketConfig newConfig) {
+        if (overrideConfig != null) {
+            newConfig = BucketConfigParser.parse(overrideConfig);
+        }
+
         ClusterConfig cluster = currentConfig;
         BucketConfig oldConfig = cluster.bucketConfig(newConfig.name());
 
