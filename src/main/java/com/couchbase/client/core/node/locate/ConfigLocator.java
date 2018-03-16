@@ -21,14 +21,10 @@
  */
 package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.BucketConfigRequest;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.retry.RetryHelper;
-import com.lmax.disruptor.RingBuffer;
 
 import java.net.InetAddress;
 import java.util.List;
@@ -38,15 +34,13 @@ public class ConfigLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public void locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig config,
-        CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
+    public Node[] locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig config) {
         if (request instanceof BucketConfigRequest) {
             BucketConfigRequest req = (BucketConfigRequest) request;
             InetAddress hostname = req.hostname();
             for (Node node : nodes) {
                 if (hostname == null || node.hostname().equals(hostname)) {
-                    node.send(request);
-                    return;
+                    return new Node[]{node};
                 }
             }
         } else {
@@ -54,13 +48,11 @@ public class ConfigLocator implements Locator {
             int i = 0;
             for (Node node : nodes) {
                 if (i++ == item) {
-                    node.send(request);
-                    return;
+                    return new Node[] { node };
                 }
             }
         }
-
-        RetryHelper.retryOrCancel(env, request, responseBuffer);
+        return new Node[0];
     }
 
 }
