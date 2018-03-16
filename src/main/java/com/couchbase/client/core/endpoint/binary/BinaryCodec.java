@@ -24,13 +24,30 @@ package com.couchbase.client.core.endpoint.binary;
 import com.couchbase.client.core.env.Environment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.binary.*;
+import com.couchbase.client.core.message.binary.BinaryRequest;
+import com.couchbase.client.core.message.binary.GetBucketConfigRequest;
+import com.couchbase.client.core.message.binary.GetBucketConfigResponse;
+import com.couchbase.client.core.message.binary.GetRequest;
+import com.couchbase.client.core.message.binary.GetResponse;
+import com.couchbase.client.core.message.binary.InsertRequest;
+import com.couchbase.client.core.message.binary.InsertResponse;
+import com.couchbase.client.core.message.binary.RemoveRequest;
+import com.couchbase.client.core.message.binary.RemoveResponse;
+import com.couchbase.client.core.message.binary.ReplaceRequest;
+import com.couchbase.client.core.message.binary.ReplaceResponse;
+import com.couchbase.client.core.message.binary.UpsertRequest;
+import com.couchbase.client.core.message.binary.UpsertResponse;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
 import io.netty.handler.codec.compression.Snappy;
-import io.netty.handler.codec.memcache.binary.*;
+import io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
+import io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
+import io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
+import io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
+import io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
+import io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
+import io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -140,14 +157,7 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
                 content.release();
                 content = compressed;
             }
-            int flags = 0;
-            if (msg.getExtrasLength() > 0)
-            {
-                final ByteBuf extras = Unpooled.copiedBuffer(msg.getExtras());
-                flags = extras.getInt(0);
-                extras.release();
-            }
-            in.add(new GetResponse(status, cas, flags, bucket, content, currentRequest));
+            in.add(new GetResponse(status, cas, bucket, content, currentRequest));
         } else if (current instanceof InsertRequest) {
             in.add(new InsertResponse(status, cas, bucket, msg.content().copy(), currentRequest));
         } else if (current instanceof UpsertRequest) {
