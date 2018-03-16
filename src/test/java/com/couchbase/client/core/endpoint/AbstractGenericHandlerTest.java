@@ -28,7 +28,6 @@ import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
-import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
@@ -119,11 +118,6 @@ public class AbstractGenericHandlerTest {
             @Override
             protected CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, R msg) throws Exception {
                 return delegate.decodeResponse(ctx, msg);
-            }
-
-            @Override
-            protected ServiceType serviceType() {
-                return null;
             }
         };
     }

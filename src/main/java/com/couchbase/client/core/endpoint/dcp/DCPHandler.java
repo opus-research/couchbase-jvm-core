@@ -26,13 +26,12 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseResponse;
+import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.dcp.AbstractDCPRequest;
 import com.couchbase.client.core.message.dcp.DCPRequest;
-import com.couchbase.client.core.message.dcp.DCPResponse;
 import com.couchbase.client.core.message.dcp.FailoverLogEntry;
 import com.couchbase.client.core.message.dcp.MutationMessage;
 import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
@@ -41,7 +40,6 @@ import com.couchbase.client.core.message.dcp.RemoveMessage;
 import com.couchbase.client.core.message.dcp.SnapshotMarkerMessage;
 import com.couchbase.client.core.message.dcp.StreamRequestRequest;
 import com.couchbase.client.core.message.dcp.StreamRequestResponse;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
@@ -133,7 +131,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             throws Exception {
         DCPRequest request = currentRequest();
 
-        DCPResponse response = null;
+        CouchbaseResponse response = null;
 
         if (msg.getOpcode() == OP_OPEN_CONNECTION && request instanceof OpenConnectionRequest) {
             response = new OpenConnectionResponse(ResponseStatusConverter.fromBinary(msg.getStatus()), request);
@@ -141,28 +139,13 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             ByteBuf content = msg.content();
             Scheduler scheduler = env().scheduler();
             DCPStream stream = streams.get(msg.getOpaque());
-            List<FailoverLogEntry> failoverLog = null;
-            long rollbackToSequenceNumber = 0;
-            KeyValueStatus status = KeyValueStatus.valueOf(msg.getStatus());
-            switch (status) {
-                case SUCCESS:
-                    failoverLog = new ArrayList<FailoverLogEntry>(content.readableBytes() / 16);
-                    while (content.readableBytes() >= 16) {
-                        FailoverLogEntry entry = new FailoverLogEntry(content.readLong(), content.readLong());
-                        failoverLog.add(entry);
-                    }
-                    break;
-                case ERR_ROLLBACK:
-                    rollbackToSequenceNumber = content.readLong();
-                    break;
-                default:
-                    LOGGER.warn("Unexpected status of StreamRequestResponse: {} (0x{}, {})",
-                            status, Integer.toHexString(status.code()), status.description());
-
+            List<FailoverLogEntry> failoverLog = new ArrayList<FailoverLogEntry>(content.readableBytes() / 16);
+            while (content.readableBytes() >= 16) {
+                FailoverLogEntry entry = new FailoverLogEntry(content.readLong(), content.readLong());
+                failoverLog.add(entry);
             }
             response = new StreamRequestResponse(ResponseStatusConverter.fromBinary(msg.getStatus()),
-                    stream.subject().onBackpressureBuffer().observeOn(scheduler), failoverLog, request,
-                    rollbackToSequenceNumber);
+                    stream.subject().onBackpressureBuffer().observeOn(scheduler), failoverLog, request);
         } else {
             /**
              * FIXME
@@ -199,9 +182,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             } finally {
                 currentRequest(oldRequest);
             }
-        }
-        if (request != null && request.partition() >= 0 && response != null) {
-            response.partition(request.partition());
         }
 
         if (response != null || request == null) {
@@ -335,11 +315,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         DCPStream stream = new DCPStream(streamId, bucket);
         streams.put(streamId, stream);
         return streamId;
-    }
-
-    @Override
-    protected ServiceType serviceType() {
-        return ServiceType.DCP;
     }
 
 }

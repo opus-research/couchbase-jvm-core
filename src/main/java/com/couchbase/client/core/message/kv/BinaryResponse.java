@@ -45,6 +45,4 @@ public interface BinaryResponse extends CouchbaseResponse, ReferenceCounted {
      * @return the bucket name.
      */
     String bucket();
-
-    short serverStatusCode();
 }
