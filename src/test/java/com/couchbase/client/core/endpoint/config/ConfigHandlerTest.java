@@ -48,7 +48,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
-import io.netty.util.ReferenceCountUtil;
 import org.junit.Before;
 import org.junit.Test;
 import rx.Observable;
@@ -289,8 +288,6 @@ public class ConfigHandlerTest {
         assertNotNull(event.configs());
         assertNotNull(event.host());
         assertEquals(0, requestQueue.size());
-        ReferenceCountUtil.releaseLater(event);
-        ReferenceCountUtil.releaseLater(responseHeader);
     }
 
     @Test
@@ -364,9 +361,6 @@ public class ConfigHandlerTest {
         assertNull(event.configs());
         assertNotNull(event.host());
         assertEquals(0, requestQueue.size());
-        ReferenceCountUtil.releaseLater(responseHeader);
-        ReferenceCountUtil.releaseLater(event);
-
     }
 
     @Test
