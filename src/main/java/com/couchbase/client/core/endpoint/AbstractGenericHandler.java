@@ -27,11 +27,9 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -151,8 +149,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     private String remoteHttpHost;
 
-    private final int sentQueueLimit;
-
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
      *
@@ -181,7 +177,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestTimings = new ArrayDeque<Long>();
         this.classNameCache = new IdentityHashMap<Class<? extends CouchbaseRequest>, String>();
         this.moveResponseOut = env() == null || !env().callbacksOnIoPool();
-        this.sentQueueLimit = Integer.parseInt(System.getProperty("com.couchbase.sentRequestQueueLimit", "1024"));
     }
 
     /**
@@ -219,16 +214,10 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
-        if (sentRequestQueue.size() < sentQueueLimit) {
-            ENCODED request = encodeRequest(ctx, msg);
-            sentRequestQueue.offer(msg);
-            out.add(request);
-            sentRequestTimings.offer(System.nanoTime());
-        } else {
-            LOGGER.warn("Rescheduling {} because sentRequestQueueLimit reached.", msg);
-            out.add(Unpooled.EMPTY_BUFFER);
-            RetryHelper.retryOrCancel(env(), msg, responseBuffer);
-        }
+        ENCODED request = encodeRequest(ctx, msg);
+        sentRequestQueue.offer(msg);
+        out.add(request);
+        sentRequestTimings.offer(System.nanoTime());
     }
 
     @Override
