@@ -21,8 +21,6 @@
  */
 package com.couchbase.client.core.env;
 
-import com.couchbase.client.core.message.observe.Observe;
-import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
@@ -59,13 +57,6 @@ public interface CoreEnvironment {
      * @return the scheduler used for internal operations.
      */
     Scheduler scheduler();
-
-    /**
-     * Identifies if DCP should be enabled.
-     *
-     * @return true if DCP is enabled, false otherwise.
-     */
-    boolean dcpEnabled();
 
     /**
      * Identifies if SSL should be enabled.
@@ -123,12 +114,6 @@ public interface CoreEnvironment {
 
     int computationPoolSize();
 
-    /**
-     * Returns the {@link Delay} for {@link Observe} poll operations.
-     *
-     * @return the observe interval delay.
-     */
-    Delay observeIntervalDelay();
 
     /**
      * Returns the size of the request ringbuffer.

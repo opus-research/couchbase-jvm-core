@@ -53,6 +53,11 @@ import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
+import com.lmax.disruptor.EventSink;
+import com.lmax.disruptor.RingBuffer;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
@@ -60,11 +65,6 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultB
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
-import com.lmax.disruptor.EventSink;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
 
 import java.util.Queue;
 
@@ -158,15 +158,16 @@ public class KeyValueHandler
             request.setReserved(msg.partition());
         }
 
-        request.setOpaque(msg.opaque());
-
-        // Retain just the content, since a response could be "Not my Vbucket".
-        // The response handler checks the status and then releases if needed.
-        // Observe has content, but not external, so it should not be retained.
-        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
-            ((FullBinaryMemcacheRequest) request).content().retain();
+        if (request.getExtras() != null) {
+            request.getExtras().retain();
         }
 
+        if (request instanceof FullBinaryMemcacheRequest) {
+            ByteBuf content = ((FullBinaryMemcacheRequest) request).content();
+            if (content != null) {
+                content.retain();
+            }
+        }
         return request;
     }
 
@@ -403,27 +404,7 @@ public class KeyValueHandler
     protected CouchbaseResponse decodeResponse(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg)
         throws Exception {
         BinaryRequest request = currentRequest();
-
-        if (request.opaque() != msg.getOpaque()) {
-            throw new IllegalStateException("Opaque values for " + msg.getClass() + " do not match.");
-        }
-
         ResponseStatus status = convertStatus(msg.getStatus());
-
-        // Release request content from external resources if not retried again.
-        if (!status.equals(ResponseStatus.RETRY)) {
-            ByteBuf content = null;
-            if (request instanceof BinaryStoreRequest) {
-                content = ((BinaryStoreRequest) request).content();
-            } else if (request instanceof AppendRequest) {
-                content = ((AppendRequest) request).content();
-            } else if (request instanceof PrependRequest) {
-                content = ((PrependRequest) request).content();
-            }
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-        }
 
         CouchbaseResponse response;
         ByteBuf content = msg.content().retain();
@@ -451,9 +432,9 @@ public class KeyValueHandler
         } else if (request instanceof RemoveRequest) {
             response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
-            long value = status.isSuccess() ? content.readLong() : 0;
-            if (content != null && content.refCnt() > 0) {
-                content.release();
+            long value = status.isSuccess() ? msg.content().readLong() : 0;
+            if (msg.content() != null) {
+                msg.content().release();
             }
             response = new CounterResponse(status, bucket, value, cas, request);
         } else if (request instanceof UnlockRequest) {
@@ -463,10 +444,8 @@ public class KeyValueHandler
         } else if (request instanceof ObserveRequest) {
             byte observed = status.isSuccess()
                 ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket, request);
+            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket,
+                content, request);
         } else if (request instanceof AppendRequest) {
             response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
@@ -478,24 +457,6 @@ public class KeyValueHandler
 
         finishedDecoding();
         return response;
-    }
-
-    /**
-     * Releasing the content of requests that are to be cancelled.
-     *
-     * @param request the request to side effect on.
-     */
-    @Override
-    protected void sideEffectRequestToCancel(final BinaryRequest request) {
-        super.sideEffectRequestToCancel(request);
-
-        if (request instanceof BinaryStoreRequest) {
-            ((BinaryStoreRequest) request).content().release();
-        } else if (request instanceof AppendRequest) {
-            ((AppendRequest) request).content().release();
-        } else if (request instanceof PrependRequest) {
-            ((PrependRequest) request).content().release();
-        }
     }
 
     /**

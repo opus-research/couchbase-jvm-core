@@ -31,7 +31,6 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
 import com.couchbase.client.core.service.ServiceType;
 import io.netty.util.CharsetUtil;
-import io.netty.util.ReferenceCountUtil;
 import rx.Observable;
 import rx.functions.Func1;
 
@@ -80,14 +79,11 @@ public class CarrierLoader extends AbstractLoader {
                 @Override
                 public String call(GetBucketConfigResponse response) {
                     if (!response.status().isSuccess()) {
-                        response.content().release();
                         throw new IllegalStateException("Bucket config response did not return with success.");
                     }
 
                     LOGGER.debug("Successfully loaded config through carrier.");
-                    String content = response.content().toString(CharsetUtil.UTF_8);
-                    response.content().release();
-                    return replaceHostWildcard(content, hostname);
+                    return replaceHostWildcard(response.content().toString(CharsetUtil.UTF_8), hostname);
                 }
             });
     }
