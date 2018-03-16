@@ -19,45 +19,62 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.message.view;
+package com.couchbase.client.core.message.document;
 
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 import io.netty.buffer.ByteBuf;
-import io.netty.util.CharsetUtil;
 
 /**
- * @author Michael Nitschinger
- * @since 1.0
+ * Core document to transfer content and flags between Couchbase client and Couchbase core io.
+ *
+ * @author David Sondermann
+ * @since 2.0
  */
-public class ViewQueryResponse extends AbstractCouchbaseResponse {
-
+public class CoreDocument {
+    private final String id;
     private final ByteBuf content;
-    private final int totalRows;
+    private final int flags;
+    private final int expiration;
+    private final long cas;
+    private final boolean json;
+    private final ResponseStatus status;
 
-    public ViewQueryResponse(final ResponseStatus status, final int totalRows, final ByteBuf content,
-                             final CouchbaseRequest request) {
-        super(status, request);
+    public CoreDocument(final String id, final ByteBuf content, final int flags, final int expiration, final long cas,
+                        final boolean json, final ResponseStatus status) {
+        this.id = id;
         this.content = content;
-        this.totalRows = totalRows;
+        this.flags = flags;
+        this.expiration = expiration;
+        this.cas = cas;
+        this.json = json;
+        this.status = status;
+    }
+
+    public String id() {
+        return id;
     }
 
     public ByteBuf content() {
         return content;
     }
 
-    public int totalRows() {
-        return totalRows;
+    public int flags() {
+        return flags;
     }
 
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("ViewQueryResponse{");
-        sb.append("content=").append(content.toString(CharsetUtil.UTF_8));
-        sb.append(", totalRows=").append(totalRows);
-        sb.append(", status=").append(status());
-        sb.append('}');
-        return sb.toString();
+    public int expiration() {
+        return expiration;
+    }
+
+    public long cas() {
+        return cas;
+    }
+
+    public boolean isJson() {
+        return json;
+    }
+
+    public ResponseStatus status() {
+        return status;
     }
 }

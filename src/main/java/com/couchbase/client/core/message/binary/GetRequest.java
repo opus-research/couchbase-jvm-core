@@ -29,14 +29,21 @@ package com.couchbase.client.core.message.binary;
  */
 public class GetRequest extends AbstractBinaryRequest {
 
+    private final String key;
+
     /**
      * Create a new {@link GetRequest}.
      *
-     * @param key the key of the document.
+     * @param key    the key of the document.
      * @param bucket the bucket of the document.
      */
     public GetRequest(final String key, final String bucket) {
-        super(key, bucket, null);
+        super(bucket, null);
+        this.key = key;
+    }
+
+    public String key() {
+        return key;
     }
 
 }
