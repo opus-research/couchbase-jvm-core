@@ -29,7 +29,7 @@ import com.lmax.disruptor.RingBuffer;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class ViewService extends PooledService {
+public class ViewService extends AbstractPoolingService {
 
     /**
      * The endpoint selection strategy.
@@ -53,7 +53,8 @@ public class ViewService extends PooledService {
      */
     public ViewService(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.viewServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+        super(hostname, bucket, password, port, env, env.viewEndpoints(), env.viewEndpoints(), STRATEGY, responseBuffer,
+            FACTORY);
     }
 
     @Override

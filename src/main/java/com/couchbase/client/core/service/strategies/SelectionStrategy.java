@@ -18,8 +18,6 @@ package com.couchbase.client.core.service.strategies;
 import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.message.CouchbaseRequest;
 
-import java.util.List;
-
 /**
  * Interface which defines a generic selection strategy to select a {@link Endpoint}.
  *
@@ -38,6 +36,6 @@ public interface SelectionStrategy {
      * @param endpoints all the available endpoints.
      * @return the selected endpoint.
      */
-    Endpoint select(CouchbaseRequest request, List<Endpoint> endpoints);
+    Endpoint select(CouchbaseRequest request, Endpoint[] endpoints);
 
 }
