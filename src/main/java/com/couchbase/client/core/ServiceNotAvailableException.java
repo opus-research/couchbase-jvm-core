@@ -34,7 +34,7 @@ public class ServiceNotAvailableException extends CouchbaseException {
     }
 
     public ServiceNotAvailableException(String message) {
-        super(message );
+        super(message);
     }
 
     public ServiceNotAvailableException(String message, Throwable cause) {
