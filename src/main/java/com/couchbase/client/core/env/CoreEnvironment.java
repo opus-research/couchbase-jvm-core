@@ -211,11 +211,4 @@ public interface CoreEnvironment {
      * @return the maximum request lifetime.
      */
     long maxRequestLifetime();
-
-    /**
-     * The time in seconds after which some service will issue a form of keepalive request.
-     *
-     * @return the keepAlive timer in seconds
-     */
-    int keepAlive();
 }

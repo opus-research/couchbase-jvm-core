@@ -27,7 +27,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpClientCodec;
-import io.netty.handler.timeout.IdleStateHandler;
 
 /**
  * This endpoint defines the pipeline for binary requests and responses.
@@ -48,7 +47,6 @@ public class ViewEndpoint extends AbstractEndpoint {
     @Override
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         pipeline
-            .addLast(new IdleStateHandler(0, 0, environment().keepAlive()))
             .addLast(new HttpClientCodec())
             .addLast(new ViewHandler(this, responseBuffer(), false));
     }
