@@ -165,7 +165,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
         ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
         raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
-        ByteBuf encoded = Base64.encode(raw, false);
+        ByteBuf encoded = Base64.encode(raw);
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
