@@ -57,5 +57,4 @@ public abstract class LatencyMetricsEvent<I extends LatencyMetricsIdentifier> im
     public String toString() {
         return getClass().getSimpleName() + latencies.toString();
     }
-
 }
