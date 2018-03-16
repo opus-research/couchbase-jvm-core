@@ -113,7 +113,7 @@ public class ConfigHandlerTest {
 
         eventSink = new CollectingResponseEventSink();
         requestQueue = new ArrayDeque<ConfigRequest>();
-        handler = new ConfigHandler(endpoint, eventSink, requestQueue, true);
+        handler = new ConfigHandler(endpoint, eventSink, requestQueue);
         channel = new EmbeddedChannel(handler);
     }
 
