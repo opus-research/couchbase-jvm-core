@@ -22,6 +22,7 @@
 package com.couchbase.client.core.node;
 
 import com.couchbase.client.core.ResponseEvent;
+import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -29,7 +30,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceFactory;
 import com.couchbase.client.core.state.AbstractStateMachine;
@@ -111,8 +111,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         } else {
             Service service = serviceRegistry.locate(request);
             if (service == null) {
-                RetryHelper.retryOrCancel(environment.retryStrategy(), request, responseBuffer);
-
+                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             } else {
                 service.send(request);
             }
