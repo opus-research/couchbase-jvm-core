@@ -23,8 +23,6 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultB
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.message.ResponseStatus;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -184,14 +182,6 @@ public class KeyValueAuthHandler
      * @throws Exception if something goes wrong during negotiation.
      */
     private void handleListMechsResponse(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg) throws Exception {
-        // Sasl Auth disabled due to successful cert based authentication
-        if (ResponseStatusConverter.fromBinary(msg.getStatus()) ==
-                ResponseStatus.COMMAND_UNAVAILABLE) {
-            originalPromise.setSuccess();
-            ctx.pipeline().remove(this);
-            ctx.fireChannelActive();
-            return;
-        }
         String remote = ctx.channel().remoteAddress().toString();
         String[] supportedMechanisms = msg.content().toString(CharsetUtil.UTF_8).split(" ");
         if (supportedMechanisms.length == 0) {
