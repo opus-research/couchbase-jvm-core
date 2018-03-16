@@ -33,6 +33,9 @@ public abstract class AbstractKeyValueResponse extends AbstractCouchbaseResponse
 
     protected AbstractKeyValueResponse(ResponseStatus status, String bucket, ByteBuf content, CouchbaseRequest request) {
         super(status, request);
+        if (content == null) {
+            throw new IllegalArgumentException("Content cannot be null. Consider using an empty buffer instead.");
+        }
         this.content = content;
         this.bucket = bucket;
     }
@@ -45,6 +48,33 @@ public abstract class AbstractKeyValueResponse extends AbstractCouchbaseResponse
     @Override
     public String bucket() {
         return bucket;
+    }
+
+    @Override
+    public int refCnt() {
+        return content.refCnt();
+    }
+
+    @Override
+    public BinaryResponse retain() {
+        content.retain();
+        return this;
+    }
+
+    @Override
+    public BinaryResponse retain(int increment) {
+        content.retain(increment);
+        return this;
+    }
+
+    @Override
+    public boolean release() {
+        return content.release();
+    }
+
+    @Override
+    public boolean release(int decrement) {
+        return content.release(decrement);
     }
 
     @Override
