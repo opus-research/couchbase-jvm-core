@@ -472,7 +472,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     public Observable<Service> call(AddServiceRequest request) {
                         return addService(request);
                     }
-                }).last().map(new Func1<Service, Boolean>() {
+                }).lastOrDefault(null).map(new Func1<Service, Boolean>() {
                         @Override
                         public Boolean call(Service service) {
                             return true;
