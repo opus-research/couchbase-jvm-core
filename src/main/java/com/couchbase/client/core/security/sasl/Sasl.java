@@ -46,9 +46,6 @@ public class Sasl {
      */
     public static SaslClient createSaslClient(String[] mechanisms, String authorizationId, String protocol,
         String serverName, Map<String, ?> props, CallbackHandler cbh) throws SaslException {
-
-        boolean enableScram = Boolean.parseBoolean(System.getProperty("com.couchbase.scramEnabled", "false"));
-
         for (String mech : mechanisms) {
             String[] mechs = new String[] { mech };
 
@@ -56,7 +53,7 @@ public class Sasl {
                 mechs, authorizationId, protocol, serverName, props, cbh
             );
 
-            if (client == null && enableScram) {
+            if (client == null) {
                 client = SASL_FACTORY.createSaslClient(
                     mechs, authorizationId, protocol, serverName, props, cbh
                 );
