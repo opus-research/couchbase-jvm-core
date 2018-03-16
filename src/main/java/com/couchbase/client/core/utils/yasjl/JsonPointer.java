@@ -17,71 +17,49 @@ package com.couchbase.client.core.utils.yasjl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import com.couchbase.client.core.utils.yasjl.Callbacks.JsonPointerCB;
 
 /**
- * Represents a pointer in the JSON tree structure.
+ * Represents a pointer
  *
  * @author Subhashni Balakrishnan
  */
 public class JsonPointer {
 
-    private static final int MAX_NESTING_LEVEL = 31;
+    public static final int MAX_NESTING_LEVEL = 31;
     private static final String ROOT_TOKEN = "";
 
-    private final List<String> refTokens;
+    private List<String> refTokens;
     private JsonPointerCB jsonPointerCB;
 
-    /**
-     * Creates a new {@link JsonPointer} with just the {@link #ROOT_TOKEN} as the path.
-     */
-    JsonPointer() {
-        this(Collections.singletonList(ROOT_TOKEN));
+    protected JsonPointer() {
+        this.refTokens = new ArrayList<String>();
+        this.addToken(ROOT_TOKEN);
     }
 
-    /**
-     * Creates a new {@link JsonPointer} with a given list of tokens.
-     *
-     * @param tokens the list of tokens to use directly.
-     */
-    JsonPointer(final List<String> tokens) {
-        this.refTokens = new ArrayList<String>(tokens);
+    public JsonPointer(final List<String> refTokens) {
+        this.refTokens = new ArrayList<String>(refTokens);
     }
 
-    /**
-     * Creates a new {@link JsonPointer} with a path but no callback.
-     *
-     * @param path the path split up into tokens subsequently.
-     */
-    JsonPointer(final String path) {
+    public JsonPointer(final String path) {
         this(path, null);
     }
 
-    /**
-     * Creates a new {@link JsonPointer} with a path and a callback.
-     *
-     * @param path the path split up into tokens subsequently.
-     * @param callback the callback to use for this pointer.
-     */
-    public JsonPointer(final String path, final JsonPointerCB callback) {
-        this.refTokens = new ArrayList<String>();
-        this.jsonPointerCB = callback;
+    public JsonPointer(final String path, final JsonPointerCB jsonPointerCB) {
         parseComponents(path);
+        this.jsonPointerCB = jsonPointerCB;
     }
 
-    /**
-     * Helper method to split up the path into individual components (tokens).
-     *
-     * @param path the path split up into tokens subsequently.
-     */
     private void parseComponents(final String path) {
+        this.refTokens = new ArrayList<String>();
+
+        //split by path each separated by "/"
         String[] tokens = path.split("/");
 
         if (tokens.length > MAX_NESTING_LEVEL) {
-            throw new IllegalArgumentException("Provided path contains too many levels of nesting!");
+            throw new IllegalArgumentException("path contains too many levels of nesting");
         }
 
         //replace ~1 and ~0
@@ -92,60 +70,40 @@ public class JsonPointer {
         this.refTokens.addAll(Arrays.asList(tokens));
     }
 
-    /**
-     * Add a token to the current token list.
-     *
-     * @param token the string token to add.
-     */
-    void addToken(final String token) {
+    protected void addToken(String token) {
         this.refTokens.add(token);
     }
 
-    /**
-     * Removes the last token from the current token list if there is at least one
-     * token left (the root token).
-     */
-    void removeLastToken() {
+    protected void removeToken() {
         if (this.refTokens.size() > 1) {
             this.refTokens.remove(this.refTokens.size() - 1);
         }
     }
 
-    /**
-     * Returns the list of currently stored tokens.
-     *
-     * @return the list of tokens.
-     */
-    protected List<String> tokens() {
+    protected List<String> refTokens() {
         return this.refTokens;
     }
 
-    /**
-     * Returns the current set json pointer callback.
-     *
-     * @return the callback if set, null otherwise.
-     */
-    JsonPointerCB jsonPointerCB() {
+    protected JsonPointerCB jsonPointerCB() {
         return this.jsonPointerCB;
     }
 
-    /**
-     * Allows to set the callback explicitly, can also be set to null to "unset".
-     *
-     * @param callback the callback to store.
-     */
-    void jsonPointerCB(final JsonPointerCB callback) {
-        this.jsonPointerCB = callback;
+    protected void jsonPointerCB(final JsonPointerCB jsonPointerCB) {
+        this.jsonPointerCB = jsonPointerCB;
+    }
+
+    private String path() {
+        StringBuilder sb = new StringBuilder();
+        for(String refToken:this.refTokens) {
+            sb.append("/");
+            sb.append(refToken);
+        }
+        return sb.substring(1);
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        for(String refToken : this.refTokens) {
-            sb.append("/");
-            sb.append(refToken);
-        }
-        return "JsonPointer{path=" + (this.refTokens.isEmpty() ? "" : sb.substring(1)) + "}";
+        return "JsonPointer{path=" + path() + "}";
     }
 
 }

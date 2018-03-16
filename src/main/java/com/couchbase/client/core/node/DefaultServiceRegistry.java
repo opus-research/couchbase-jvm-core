@@ -18,6 +18,7 @@ package com.couchbase.client.core.node;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.analytics.AnalyticsRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
+import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.search.SearchRequest;
@@ -165,6 +166,8 @@ public class DefaultServiceRegistry implements ServiceRegistry {
             return ServiceType.VIEW;
         } else if (request instanceof QueryRequest) {
             return ServiceType.QUERY;
+        } else if (request instanceof DCPRequest) {
+            return ServiceType.DCP;
         } else if (request instanceof SearchRequest) {
             return ServiceType.SEARCH;
         } else if (request instanceof AnalyticsRequest) {

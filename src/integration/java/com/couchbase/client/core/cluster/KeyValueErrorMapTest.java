@@ -21,14 +21,11 @@ import com.couchbase.client.core.endpoint.kv.ErrorMap;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
-import com.couchbase.client.core.util.MockDependentTest;
 import com.couchbase.mock.JsonUtils;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
-import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -36,7 +33,6 @@ import java.util.Map;
 
 import static com.couchbase.client.core.endpoint.kv.KeyValueHandler.OP_UPSERT;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assume.assumeTrue;
 
 /**
  * Basic error map test
@@ -44,19 +40,11 @@ import static org.junit.Assume.assumeTrue;
  * @author Subhashni Balakrishnan
  * @since 1.4.5
  */
-public class KeyValueErrorMapTest extends MockDependentTest {
+public class KeyValueErrorMapTest extends ClusterDependentTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        connect();
-    }
-
-    @Before
-    public void before() throws Exception {
-        assumeTrue(
-            "Ignoring because extended error not enabled",
-            Boolean.parseBoolean(System.getProperty("com.couchbase.xerrorEnabled", "true"))
-        );
+        connect(true);
     }
 
     private static void startRetryVerifyRequest() throws Exception {
@@ -106,7 +94,6 @@ public class KeyValueErrorMapTest extends MockDependentTest {
     }
 
     @Test
-    @Ignore
     public void verifyConstantRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF0", 16),  -1);
         startRetryVerifyRequest();
@@ -118,12 +105,11 @@ public class KeyValueErrorMapTest extends MockDependentTest {
         } catch (Exception ex) {
             //ignore exception
         }
-        checkRetryVerifyRequest(Long.parseLong("7FF0", 16), OP_UPSERT, 25);
+        checkRetryVerifyRequest(Long.parseLong("7FF0", 16), OP_UPSERT, 30);
         opFailRequest(Long.parseLong("7FF0", 16),  0);
     }
 
     @Test
-    @Ignore
     public void verifyLinearRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF1", 16), -1);
         startRetryVerifyRequest();
@@ -135,12 +121,11 @@ public class KeyValueErrorMapTest extends MockDependentTest {
         } catch (Exception ex) {
             //ignore exception
         }
-        checkRetryVerifyRequest(Long.parseLong("7FF1", 16), OP_UPSERT, 25);
+        checkRetryVerifyRequest(Long.parseLong("7FF1", 16), OP_UPSERT, 10);
         opFailRequest(Long.parseLong("7FF1", 16),  0);
     }
 
     @Test
-    @Ignore
     public void verifyExponentialRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF2", 16), -1);
         startRetryVerifyRequest();
@@ -152,7 +137,7 @@ public class KeyValueErrorMapTest extends MockDependentTest {
         } catch (Exception ex) {
             //ignore exception
         }
-        checkRetryVerifyRequest(Long.parseLong("7FF2", 16), OP_UPSERT, 25);
+        checkRetryVerifyRequest(Long.parseLong("7FF2", 16), OP_UPSERT, 10);
         opFailRequest(Long.parseLong("7FF2", 16),  0);
     }
 }

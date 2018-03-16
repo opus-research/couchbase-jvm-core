@@ -71,18 +71,4 @@ public interface BinarySubdocMutationRequest extends BinarySubdocRequest {
      * @return true if accessing extended attribute section
      */
     boolean xattr();
-
-    /**
-     * Create document if it does not exist
-     *
-     * @return true if creating document
-     */
-    boolean createDocument();
-
-    /**
-     * Add document only if it does not exist
-     *
-     * @return true if adding document
-     */
-    boolean insertDocument();
 }

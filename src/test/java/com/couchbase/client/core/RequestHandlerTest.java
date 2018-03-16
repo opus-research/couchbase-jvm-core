@@ -22,7 +22,10 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
+import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
+import com.couchbase.client.core.message.kv.GetRequest;
+import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.retry.FailFastRetryStrategy;
@@ -150,7 +153,6 @@ public class RequestHandlerTest {
 
         RequestEvent mockEvent = mock(RequestEvent.class);
         CouchbaseRequest mockRequest = mock(CouchbaseRequest.class);
-        when(mockRequest.isActive()).thenReturn(true);
         when(mockEvent.getRequest()).thenReturn(mockRequest);
         handler.onEvent(mockEvent, 0, true);
         verify(mockNode).send(mockRequest);
@@ -175,6 +177,49 @@ public class RequestHandlerTest {
         }
     }
 
+    @Test
+    public void shouldPreventFeatureDependentRequestsWhenFeatureDisabled() {
+        String dcpWasEnabled = System.getProperty("com.couchbase.dcpEnabled");
+        try {
+            System.getProperties().remove("com.couchbase.dcpEnabled");
+            DCPRequest mockDcpRequest = mock(DCPRequest.class);
+            CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
+            CoreEnvironment env = DefaultCoreEnvironment.builder()
+                    .dcpEnabled(false)
+                    .build();
+            RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
+
+            assertFeatureForRequest(handler, mockDcpRequest, false);
+            assertFeatureForRequest(handler, mockKeyValueRequest, true);
+        } finally {
+            if (dcpWasEnabled != null) {
+                System.setProperty("com.couchbase.dcpEnabled", dcpWasEnabled);
+            }
+        }
+    }
+
+    @Test
+    public void shouldAllowDcpWhenDcpFeatureEnabled() {
+        String dcpWasEnabled = System.getProperty("com.couchbase.dcpEnabled");
+        try {
+            System.getProperties().remove("com.couchbase.dcpEnabled");
+            DCPRequest mockDcpRequest = mock(DCPRequest.class);
+            CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
+            CoreEnvironment env = DefaultCoreEnvironment
+                    .builder()
+                    .dcpEnabled(true)
+                    .build();
+            RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
+
+            assertFeatureForRequest(handler, mockDcpRequest, true);
+            assertFeatureForRequest(handler, mockKeyValueRequest, true);
+        } finally {
+            if (dcpWasEnabled != null) {
+                System.setProperty("com.couchbase.dcpEnabled", dcpWasEnabled);
+            }
+        }
+    }
+
     @Test(expected = RequestCancelledException.class)
     public void shouldCancelOnRetryPolicyFailFast() throws Exception {
         CoreEnvironment env = mock(CoreEnvironment.class);
@@ -192,7 +237,6 @@ public class RequestHandlerTest {
         RequestEvent mockEvent = mock(RequestEvent.class);
         CouchbaseRequest mockRequest = mock(CouchbaseRequest.class);
         AsyncSubject<CouchbaseResponse> response = AsyncSubject.create();
-        when(mockRequest.isActive()).thenReturn(true);
         when(mockEvent.getRequest()).thenReturn(mockRequest);
         when(mockRequest.observable()).thenReturn(response);
         handler.onEvent(mockEvent, 0, true);

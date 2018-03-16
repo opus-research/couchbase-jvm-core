@@ -15,8 +15,6 @@
  */
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.NetworkAddress;
 
@@ -25,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class AbstractBucketConfig implements BucketConfig {
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(AbstractBucketConfig.class);
 
     private final String name;
     private String username;
@@ -71,13 +68,7 @@ public abstract class AbstractBucketConfig implements BucketConfig {
         for (int i = 0; i < nodesExt.size(); i++) {
             NetworkAddress hostname = nodesExt.get(i).hostname();
             if (hostname == null) {
-                if (nodeInfos.size() == nodesExt.size()) {
-                    hostname = nodeInfos.get(i).hostname();
-                } else {
-                    // If hostname missing, then node configured using localhost
-                    LOGGER.debug("Hostname is for nodesExt[{}] is not available, falling back to localhost.", i);
-                    hostname = NetworkAddress.localhost();
-                }
+                hostname = nodeInfos.get(i).hostname();
             }
             Map<ServiceType, Integer> ports = nodesExt.get(i).ports();
             Map<ServiceType, Integer> sslPorts = nodesExt.get(i).sslPorts();
