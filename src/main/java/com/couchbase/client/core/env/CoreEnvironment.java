@@ -33,8 +33,6 @@ import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * A {@link CoreEnvironment} provides all the core building blocks like environment settings and thread pools so
  * that the application can work with it properly.
@@ -48,31 +46,15 @@ import java.util.concurrent.TimeUnit;
 public interface CoreEnvironment {
 
     /**
-     * Shutdown the {@link CoreEnvironment} with the default timeout.
+     * Shutdown the {@link CoreEnvironment}.
      *
-     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
-     * The async version can still be found at {@link #shutdownAsync()}.
+     * @deprecated This method will be changed in 2.3.0 into a synchronous version. Please migrate
+     * to {@link #shutdownAsync()} right now to avoid breaking your code.
      *
-     * @return returning a boolean, indicating the success of the shutdown.
+     * @return an {@link Observable} eventually returning a boolean, indicating the success of the shutdown.
      */
-    boolean shutdown();
-
-    /**
-     * Shutdown the {@link CoreEnvironment} with a custom timeout.
-     *
-     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
-     * The async version can still be found at {@link #shutdownAsync()}.
-     *
-     * @return returning a boolean, indicating the success of the shutdown.
-     */
-    boolean shutdown(long timeout, TimeUnit timeUnit);
-
-    /**
-     * The default timeout for disconnect operations, set to {@link DefaultCoreEnvironment#DISCONNECT_TIMEOUT}.
-     *
-     * @return the default disconnect timeout.
-     */
-    long disconnectTimeout();
+    @Deprecated
+    Observable<Boolean> shutdown();
 
     /**
      * Shutdown the {@link CoreEnvironment} in an asynchronous fashion.
