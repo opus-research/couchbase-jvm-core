@@ -62,7 +62,8 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The general implementation of a {@link ClusterFacade}.
@@ -112,6 +113,7 @@ public class CouchbaseCore implements ClusterFacade {
 
     private final Disruptor<RequestEvent> requestDisruptor;
     private final Disruptor<ResponseEvent> responseDisruptor;
+    private final ExecutorService disruptorExecutor;
 
     private volatile boolean sharedEnvironment = true;
 
@@ -139,13 +141,14 @@ public class CouchbaseCore implements ClusterFacade {
 
         this.environment = environment;
         configProvider = new DefaultConfigurationProvider(this, environment);
-        ThreadFactory disruptorThreadFactory = new DefaultThreadFactory("cb-core", true);
+        disruptorExecutor = Executors.newFixedThreadPool(2, new DefaultThreadFactory("cb-core", true));
+
         responseDisruptor = new Disruptor<ResponseEvent>(
             new ResponseEventFactory(),
             environment.responseBufferSize(),
-            disruptorThreadFactory
+            disruptorExecutor
         );
-        responseDisruptor.setDefaultExceptionHandler(new ExceptionHandler<ResponseEvent>() {
+        responseDisruptor.handleExceptionsWith(new ExceptionHandler<ResponseEvent>() {
             @Override
             public void handleEventException(Throwable ex, long sequence, ResponseEvent event) {
                 LOGGER.warn("Exception while Handling Response Events {}", event, ex);
@@ -168,12 +171,12 @@ public class CouchbaseCore implements ClusterFacade {
         requestDisruptor = new Disruptor<RequestEvent>(
             new RequestEventFactory(),
             environment.requestBufferSize(),
-            disruptorThreadFactory,
+            disruptorExecutor,
             ProducerType.MULTI,
             environment.requestBufferWaitStrategy().newWaitStrategy()
         );
         requestHandler = new RequestHandler(environment, configProvider.configs(), responseRingBuffer);
-        requestDisruptor.setDefaultExceptionHandler(new ExceptionHandler<RequestEvent>() {
+        requestDisruptor.handleExceptionsWith(new ExceptionHandler<RequestEvent>() {
             @Override
             public void handleEventException(Throwable ex, long sequence, RequestEvent event) {
                 LOGGER.warn("Exception while Handling Request Events {}", event, ex);
@@ -274,6 +277,7 @@ public class CouchbaseCore implements ClusterFacade {
                     public Boolean call(Boolean success) {
                         requestDisruptor.shutdown();
                         responseDisruptor.shutdown();
+                        disruptorExecutor.shutdownNow();
                         return success;
                     }
                 })
