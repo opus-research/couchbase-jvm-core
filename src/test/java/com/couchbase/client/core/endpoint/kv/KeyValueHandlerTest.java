@@ -905,7 +905,7 @@ public class KeyValueHandlerTest {
             }
 
             @Override
-            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
+            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse, CouchbaseRequest request) {
                 assertEquals(2, keepAliveEventCounter.incrementAndGet());
             }
 

@@ -27,6 +27,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
@@ -607,7 +608,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             keepAlive
                 .observable()
                 .timeout(env().keepAliveTimeout(), TimeUnit.MILLISECONDS)
-                .subscribe(new KeepAliveResponseAction(ctx));
+                .subscribe(new KeepAliveResponseAction(ctx, keepAlive));
             onKeepAliveFired(ctx, keepAlive);
 
             Channel channel = ctx.channel();
@@ -665,10 +666,17 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param ctx the channel context.
      * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
      */
-    protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
+    protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse,
+       CouchbaseRequest request) {
         if (traceEnabled) {
+            String opaque = "";
+            if (request instanceof BinaryRequest) {
+                opaque = ", opaque " + ((BinaryRequest) request).opaque();
+            }
+            long start = request.creationTime();
+            long latency = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - start);
             LOGGER.trace(logIdent(ctx, endpoint) + "keepAlive was answered, status "
-                    + keepAliveResponse.status());
+                    + keepAliveResponse.status() + ", latency " + latency + "µs" + opaque);
         }
     }
 
@@ -717,7 +725,11 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     private class KeepAliveResponseAction extends Subscriber<CouchbaseResponse> {
         private final ChannelHandlerContext ctx;
-        KeepAliveResponseAction(ChannelHandlerContext ctx) { this.ctx = ctx; }
+        private final CouchbaseRequest request;
+        KeepAliveResponseAction(ChannelHandlerContext ctx, CouchbaseRequest request) {
+            this.ctx = ctx;
+            this.request = request;
+        }
 
         @Override
         public void onCompleted() {
@@ -750,7 +762,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
         @Override
         public void onNext(CouchbaseResponse couchbaseResponse) {
-            onKeepAliveResponse(this.ctx, couchbaseResponse);
+            onKeepAliveResponse(this.ctx, couchbaseResponse, request);
         }
     }
 
