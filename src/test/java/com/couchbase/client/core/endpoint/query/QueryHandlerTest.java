@@ -151,7 +151,7 @@ public class QueryHandlerTest {
 
     @After
     public void clear() throws Exception {
-        channel.close().awaitUninterruptibly();
+        channel.pipeline().remove(handler);
         responseBuffer.shutdown();
     }
 
@@ -273,7 +273,6 @@ public class QueryHandlerTest {
                         } catch (IOException e) {
                             fail();
                         }
-                        ReferenceCountUtil.releaseLater(buf);
                     }
                 },
                 expectedMetricsCounts(1, 0)
@@ -624,7 +623,6 @@ public class QueryHandlerTest {
                         } catch (IOException e) {
                             assertFalse(true);
                         }
-                        ReferenceCountUtil.releaseLater(buf);
                     }
                 },
                 new Action1<ByteBuf>() {
