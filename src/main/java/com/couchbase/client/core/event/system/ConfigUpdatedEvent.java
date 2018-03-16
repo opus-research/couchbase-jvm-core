@@ -23,7 +23,6 @@ import com.couchbase.client.core.event.EventType;
 import com.couchbase.client.core.utils.Events;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -45,11 +44,7 @@ public class ConfigUpdatedEvent implements CouchbaseEvent {
         Set<InetAddress> nodes = new HashSet<InetAddress>();
         for (Map.Entry<String, BucketConfig> cfg : clusterConfig.bucketConfigs().entrySet()) {
             for (NodeInfo node : cfg.getValue().nodes()) {
-                try {
-                    nodes.add(InetAddress.getByName(node.hostname().address()));
-                } catch (UnknownHostException e) {
-                    throw new IllegalStateException(e);
-                }
+                nodes.add(node.hostname());
             }
         }
         this.clusterNodes = nodes;
