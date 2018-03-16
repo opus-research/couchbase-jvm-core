@@ -24,7 +24,7 @@ package com.couchbase.client.core.endpoint.dcp;
 
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
+import rx.subjects.ReplaySubject;
 
 /**
  * Represents stream of incoming DCP messages.
@@ -35,21 +35,21 @@ import rx.subjects.Subject;
 public class DCPStream {
     public final int id;
     public final String bucket;
-    public final Subject<DCPRequest, DCPRequest> subject;
+    public final PublishSubject<DCPRequest> subject;
 
     /**
      * Creates new {@link DCPStream} instance.
      *
-     * @param id     stream identifier
+     * @param id stream identifier
      * @param bucket name of the bucket
      */
     public DCPStream(int id, String bucket) {
         this.id = id;
         this.bucket = bucket;
-        subject = PublishSubject.<DCPRequest>create().toSerialized();
+        subject = PublishSubject.create();
     }
 
-    public Subject<DCPRequest, DCPRequest> subject() {
+    public PublishSubject<DCPRequest> subject() {
         return subject;
     }
 
