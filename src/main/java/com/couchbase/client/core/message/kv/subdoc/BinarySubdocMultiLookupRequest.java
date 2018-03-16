@@ -33,7 +33,7 @@ import java.util.List;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public interface BinarySubdocMultiLookupRequest extends BinaryRequest {
 
@@ -41,11 +41,6 @@ public interface BinarySubdocMultiLookupRequest extends BinaryRequest {
      * @return a list of the {@link LookupCommand} describing the multiple operations to apply.
      */
     List<LookupCommand> commands();
-
-    /**
-     * @return the document flags for the Request
-     */
-    byte docFlags();
 
     /**
      * The {@link ByteBuf} representing the whole list of {@link #commands()}.

@@ -34,7 +34,7 @@ import io.netty.buffer.ByteBuf;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public interface BinarySubdocMutationRequest extends BinarySubdocRequest {
 
@@ -73,24 +73,9 @@ public interface BinarySubdocMutationRequest extends BinarySubdocRequest {
     boolean xattr();
 
     /**
-     * Create document if it does not exist. It is deprecated, use {@link #upsertDocument()}
+     * Create document if it does not exist
      *
      * @return true if creating document
      */
-    @Deprecated
     boolean createDocument();
-
-    /**
-     * Upsert document if it does not exist
-     *
-     * @return true if creating document
-     */
-    boolean upsertDocument();
-
-    /**
-     * Add document only if it does not exist
-     *
-     * @return true if adding document
-     */
-    boolean insertDocument();
 }

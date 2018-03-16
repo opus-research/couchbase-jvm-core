@@ -24,7 +24,6 @@ import com.couchbase.client.core.message.cluster.OpenBucketRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
-import com.couchbase.client.core.util.ClusterDependentTest;
 import com.couchbase.client.core.util.TestProperties;
 import org.junit.Test;
 import rx.Observable;
@@ -56,21 +55,17 @@ public class ThreadCleanupTest {
 
     private static final String seedNode = TestProperties.seedNode();
     private static final String bucket = TestProperties.bucket();
-    private static String username = TestProperties.username();
-    private static String password = TestProperties.password();
+    private static final String username = TestProperties.username();
+    private static final String password = TestProperties.password();
 
     private CoreEnvironment env;
 
     private ClusterFacade cluster;
 
-    public void connect() throws Exception {
-        if (ClusterDependentTest.minClusterVersion()[0] >= 5) {
-            username = TestProperties.adminUser();
-            password = TestProperties.adminPassword();
-        }
-
+    public void connect() {
         env = DefaultCoreEnvironment
                 .builder()
+                .dcpEnabled(true)
                 .mutationTokensEnabled(true)
                 .build();
         cluster = new CouchbaseCore(env);
@@ -89,7 +84,7 @@ public class ThreadCleanupTest {
     }
 
     @Test
-    public void testSdkNettyRxJavaThreadsShutdownProperly() throws Exception {
+    public void testSdkNettyRxJavaThreadsShutdownProperly() throws InterruptedException {
         //FIXME differently improve the tolerance of this test to threads spawned by others
         Thread.sleep(500);
         ThreadMXBean mx = ManagementFactory.getThreadMXBean();

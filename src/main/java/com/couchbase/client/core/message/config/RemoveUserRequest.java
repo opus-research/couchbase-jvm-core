@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.couchbase.client.core.message.config;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
@@ -23,17 +24,15 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
  */
 public class RemoveUserRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
-    private final String userId;
-    private final String domain;
+    private final String userid;
 
-    public RemoveUserRequest(String username, String password, String domain, String userId) {
+    public RemoveUserRequest(String userid, String username, String password) {
         super(username, password);
-        this.userId = userId;
-        this.domain = domain;
+        this.userid = userid;
     }
 
     @Override
     public String path() {
-        return "/settings/rbac/users/" + domain + "/" + userId;
+        return "/settings/rbac/users/local/" + userid;
     }
 }

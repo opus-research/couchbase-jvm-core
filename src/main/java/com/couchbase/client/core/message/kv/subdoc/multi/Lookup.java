@@ -26,14 +26,13 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public enum Lookup {
 
     GETDOC(KeyValueHandler.OP_GET),
     GET(KeyValueHandler.OP_SUB_GET),
-    EXIST(KeyValueHandler.OP_SUB_EXIST),
-    GET_COUNT(KeyValueHandler.OP_SUB_GET_COUNT);
+    EXIST(KeyValueHandler.OP_SUB_EXIST);
 
     private final byte opCode;
 
