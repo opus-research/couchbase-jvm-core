@@ -34,6 +34,18 @@ import rx.subjects.Subject;
 @InterfaceStability.Experimental
 public interface CouchbaseCoreSendHook {
 
+    /**
+     * Allows to hook in before the send method on core, make sure to return either the original
+     * tuple or the modified ones from the originals.
+     *
+     * This is fairly advanced API, use with care!
+     *
+     * @param originalRequest the original request
+     * @param originalResponse the original response.
+     * @return
+     */
+    @InterfaceAudience.Public
+    @InterfaceStability.Experimental
     Tuple2<CouchbaseRequest, Subject<CouchbaseResponse, CouchbaseResponse>>
         beforeSend(CouchbaseRequest originalRequest, Subject<CouchbaseResponse, CouchbaseResponse> originalResponse);
 }
