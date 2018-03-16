@@ -47,14 +47,7 @@ public class SnapshotMarkerMessage extends AbstractDCPRequest {
     private final long endSequenceNumber;
 
     /**
-     * Specifies binary representation of flags.
-     * <p/>
-     * Note: use boolean accessors for clarity and readability
-     */
-    private final int flags;
-
-    /**
-     * Specifies that the snapshot contains in-memory items only.
+     *  Specifies that the snapshot contains in-memory items only.
      */
     private final boolean memory;
     /**
@@ -62,8 +55,8 @@ public class SnapshotMarkerMessage extends AbstractDCPRequest {
      */
     private final boolean disk;
     /**
-     * An internally used flag for intra-cluster replication to
-     * help to keep in-memory data structures look similar.
+     *  An internally used flag for intra-cluster replication to
+     *  help to keep in-memory data structures look similar.
      */
     private final boolean checkpoint;
     /**
@@ -83,7 +76,6 @@ public class SnapshotMarkerMessage extends AbstractDCPRequest {
         partition(partition);
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
-        this.flags = flags;
         this.memory = (flags & MEMORY) == MEMORY;
         this.disk = (flags & DISK) == DISK;
         this.checkpoint = (flags & CHECKPOINT) == CHECKPOINT;
@@ -96,10 +88,6 @@ public class SnapshotMarkerMessage extends AbstractDCPRequest {
 
     public long endSequenceNumber() {
         return endSequenceNumber;
-    }
-
-    public int flags() {
-        return flags;
     }
 
     public boolean memory() {
