@@ -20,8 +20,9 @@ import com.couchbase.client.core.config.ConfigurationException;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -52,7 +53,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
     /**
      * The list of hostnames/IPs.
      */
-    private Set<NetworkAddress> nodes;
+    private Set<InetAddress> nodes;
 
     /**
      * Creates a {@link SeedNodesRequest} with the default hostname ("localhost").
@@ -81,7 +82,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
         if (nodes == null || nodes.isEmpty()) {
             throw new ConfigurationException("Empty or null bootstrap list provided.");
         }
-        Set<NetworkAddress> parsedNodes = new HashSet<NetworkAddress>();
+        Set<InetAddress> parsedNodes = new HashSet<InetAddress>();
         for (String node : nodes) {
             if (node == null || node.isEmpty()) {
                 LOGGER.info("Empty or null host in bootstrap list.");
@@ -89,8 +90,8 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
             }
 
             try {
-                parsedNodes.add(NetworkAddress.create(node));
-            } catch (Exception e) {
+                parsedNodes.add(InetAddress.getByName(node));
+            } catch (UnknownHostException e) {
                 LOGGER.info("Unknown host " + node + " in bootstrap list.", e);
             }
         }
@@ -107,7 +108,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
      *
      * @return the list of hostnames.
      */
-    public Set<NetworkAddress> nodes() {
+    public Set<InetAddress> nodes() {
         return nodes;
     }
 }

@@ -18,10 +18,8 @@ package com.couchbase.client.core.event.system;
 import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.EventType;
 import com.couchbase.client.core.utils.Events;
-import com.couchbase.client.core.utils.NetworkAddress;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.Map;
 
 /**
@@ -32,9 +30,9 @@ import java.util.Map;
  */
 public class NodeDisconnectedEvent implements CouchbaseEvent {
 
-    private final NetworkAddress host;
+    private final InetAddress host;
 
-    public NodeDisconnectedEvent(NetworkAddress host) {
+    public NodeDisconnectedEvent(InetAddress host) {
         this.host = host;
     }
 
@@ -49,11 +47,7 @@ public class NodeDisconnectedEvent implements CouchbaseEvent {
      * @return the inet address of the disconnected node
      */
     public InetAddress host() {
-        try {
-            return InetAddress.getByName(host.address());
-        } catch (UnknownHostException e) {
-            throw new IllegalStateException(e);
-        }
+        return host;
     }
 
     @Override
