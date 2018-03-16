@@ -15,8 +15,6 @@
  */
 package com.couchbase.client.core.event;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import rx.Observable;
 import rx.Scheduler;
 import rx.subjects.PublishSubject;
@@ -29,8 +27,6 @@ import rx.subjects.Subject;
  * @since 1.1.0
  */
 public class DefaultEventBus implements EventBus {
-
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(DefaultEventBus.class);
 
     private final Subject<CouchbaseEvent, CouchbaseEvent> bus;
     private final Scheduler scheduler;
@@ -48,11 +44,7 @@ public class DefaultEventBus implements EventBus {
     @Override
     public void publish(final CouchbaseEvent event) {
         if (bus.hasObservers()) {
-            try {
-                bus.onNext(event);
-            } catch (Exception ex) {
-                LOGGER.warn("Caught exception during event emission, moving on.", ex);
-            }
+            bus.onNext(event);
         }
     }
 
