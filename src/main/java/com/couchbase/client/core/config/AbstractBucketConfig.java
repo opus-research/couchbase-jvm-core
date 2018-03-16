@@ -20,6 +20,7 @@ import com.couchbase.client.core.service.ServiceType;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public abstract class AbstractBucketConfig implements BucketConfig {
 
@@ -67,7 +68,22 @@ public abstract class AbstractBucketConfig implements BucketConfig {
             if (hostname == null) {
                 hostname = nodeInfos.get(i).hostname();
             }
-            converted.add(new DefaultNodeInfo(hostname, nodesExt.get(i).ports(), nodesExt.get(i).sslPorts()));
+            Map<ServiceType, Integer> ports = nodesExt.get(i).ports();
+            Map<ServiceType, Integer> sslPorts = nodesExt.get(i).sslPorts();
+
+            try {
+                if (!nodeInfos.get(i).services().containsKey(ServiceType.VIEW)) {
+                    ports.remove(ServiceType.VIEW);
+                }
+                if (!nodeInfos.get(i).sslServices().containsKey(ServiceType.VIEW)) {
+                    sslPorts.remove(ServiceType.VIEW);
+                }
+            } catch (IndexOutOfBoundsException ex) {
+                // ignored on purpose, a IOOB can happen if no info is available in the node
+                // infos, then we can't crosscheck.
+            }
+
+            converted.add(new DefaultNodeInfo(hostname, ports, sslPorts));
         }
         return converted;
     }

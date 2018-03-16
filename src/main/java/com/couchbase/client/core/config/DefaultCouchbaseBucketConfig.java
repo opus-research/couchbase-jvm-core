@@ -18,6 +18,8 @@ package com.couchbase.client.core.config;
 import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -41,6 +43,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
 
     private final boolean tainted;
     private final long rev;
+    private final boolean ephemeral;
 
     /**
      * Creates a new {@link CouchbaseBucketConfig}.
@@ -68,6 +71,9 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         this.partitionHosts = buildPartitionHosts(nodeInfos, partitionInfo);
         this.nodesWithPrimaryPartitions = buildNodesWithPrimaryPartitions(nodeInfos, partitionInfo.partitions());
         this.rev = rev;
+        // if we have a kv service but no view service it means that this bucket is an ephemeral one
+        // since in normal couchbase buckets a kv node implicitly has views enabled.
+        this.ephemeral = serviceEnabled(ServiceType.BINARY) && !serviceEnabled(ServiceType.VIEW);
     }
 
     /**
@@ -186,6 +192,11 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     @Override
     public boolean hasFastForwardMap() {
         return partitionInfo.hasFastForwardMap();
+    }
+
+    @Override
+    public boolean ephemeral() {
+        return ephemeral;
     }
 
     @Override
