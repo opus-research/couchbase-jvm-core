@@ -21,40 +21,33 @@
  */
 package com.couchbase.client.core.env.resources;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.ThreadDeathWatcher;
 import rx.Observable;
-
-import java.util.concurrent.TimeUnit;
+import rx.internal.schedulers.SchedulerLifecycle;
 
 /**
- * {@link ShutdownHook} hook for an {@link EventLoopGroup}.
+ * A {@link ShutdownHook} that ties into a RxJava {@link SchedulerLifecycle} (available from 1.0.15+).
  *
  * @author Simon Baslé
- * @since 2.2
+ * @since 1.2
  */
-public class IoPoolShutdownHook implements ShutdownHook {
+public class SchedulerLifecycleShutdownHook implements ShutdownHook {
 
-    private final EventLoopGroup ioPool;
-    private volatile boolean shutdown;
+    private SchedulerLifecycle managed;
+    private volatile boolean isShutdown;
 
-    public IoPoolShutdownHook(EventLoopGroup ioPool) {
-        this.ioPool = ioPool;
-        this.shutdown = false;
+    public SchedulerLifecycleShutdownHook(SchedulerLifecycle managed) {
+        this.managed = managed;
     }
 
+    @Override
     public Observable<Boolean> shutdown() {
-        try {
-            ioPool.shutdownGracefully(0, 100, TimeUnit.MILLISECONDS);
-            ThreadDeathWatcher.awaitInactivity(5, TimeUnit.SECONDS);
-            return Observable.just(true);
-        } catch (Throwable e) {
-            return Observable.error(e);
-        }
+        managed.shutdown();
+        isShutdown = true;
+        return Observable.just(true);
     }
 
     @Override
     public boolean isShutdown() {
-        return shutdown;
+        return isShutdown;
     }
 }

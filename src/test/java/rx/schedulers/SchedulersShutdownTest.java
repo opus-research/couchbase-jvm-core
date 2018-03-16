@@ -19,42 +19,15 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.env.resources;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.ThreadDeathWatcher;
-import rx.Observable;
+package rx.schedulers;
 
-import java.util.concurrent.TimeUnit;
+import org.junit.Test;
 
-/**
- * {@link ShutdownHook} hook for an {@link EventLoopGroup}.
- *
- * @author Simon Baslé
- * @since 2.2
- */
-public class IoPoolShutdownHook implements ShutdownHook {
+public class SchedulersShutdownTest {
 
-    private final EventLoopGroup ioPool;
-    private volatile boolean shutdown;
-
-    public IoPoolShutdownHook(EventLoopGroup ioPool) {
-        this.ioPool = ioPool;
-        this.shutdown = false;
-    }
-
-    public Observable<Boolean> shutdown() {
-        try {
-            ioPool.shutdownGracefully(0, 100, TimeUnit.MILLISECONDS);
-            ThreadDeathWatcher.awaitInactivity(5, TimeUnit.SECONDS);
-            return Observable.just(true);
-        } catch (Throwable e) {
-            return Observable.error(e);
-        }
-    }
-
-    @Override
-    public boolean isShutdown() {
-        return shutdown;
+    @Test
+    public void test() {
+        Schedulers.start();
     }
 }

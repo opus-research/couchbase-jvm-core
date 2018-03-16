@@ -24,6 +24,7 @@ package com.couchbase.client.core.env;
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
 import com.couchbase.client.core.env.resources.NoOpShutdownHook;
+import com.couchbase.client.core.env.resources.SchedulerLifecycleShutdownHook;
 import com.couchbase.client.core.env.resources.ShutdownHook;
 import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.DefaultEventBus;
@@ -262,8 +263,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         if (builder.scheduler == null) {
             CoreScheduler managed = new CoreScheduler(computationPoolSize());
             this.coreScheduler = managed;
-            this.coreSchedulerShutdownHook = managed
-            ;
+            this.coreSchedulerShutdownHook = new SchedulerLifecycleShutdownHook(managed);
         } else {
             this.coreScheduler = builder.scheduler;
             this.coreSchedulerShutdownHook = builder.schedulerShutdownHook == null
