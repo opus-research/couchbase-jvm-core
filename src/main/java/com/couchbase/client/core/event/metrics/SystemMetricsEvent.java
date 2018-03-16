@@ -19,38 +19,49 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.metrics;
+package com.couchbase.client.core.event.metrics;
 
-import com.couchbase.client.core.env.Diagnostics;
 import com.couchbase.client.core.event.CouchbaseEvent;
-import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.event.metrics.RuntimeMetricsEvent;
-import rx.Scheduler;
+import com.couchbase.client.core.event.EventType;
+import com.couchbase.client.core.utils.Events;
 
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
- * A {@link MetricsCollector} which collects and emits system information like gc, memory or thread usage.
+ * This event contains collected system stats, like GC, Thread and Memory usage.
  *
  * @author Michael Nitschinger
  * @since 1.2.0
  */
-public class RuntimeMetricsCollector extends AbstractMetricsCollector {
+public class SystemMetricsEvent implements CouchbaseEvent {
 
-    public RuntimeMetricsCollector(final EventBus eventBus, Scheduler scheduler, MetricsCollectorConfig config) {
-        super(eventBus, scheduler, config);
+    private final Map<String, Object> info;
+
+    public SystemMetricsEvent(Map<String, Object> info) {
+        this.info = info;
+    }
+
+    public Map<String, Object> all() {
+        return info;
     }
 
     @Override
-    protected CouchbaseEvent generateCouchbaseEvent() {
-        Map<String, Object> metrics = new TreeMap<String, Object>();
+    public EventType type() {
+        return EventType.METRIC;
+    }
 
-        Diagnostics.gcInfo(metrics);
-        Diagnostics.memInfo(metrics);
-        Diagnostics.threadInfo(metrics);
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("SystemMetricEvent");
+        sb.append(info);
+        return sb.toString();
+    }
 
-        return new RuntimeMetricsEvent(metrics);
+    @Override
+    public Map<String, Object> toMap() {
+        Map<String, Object> result = Events.identityMap(this);
+        result.putAll(all());
+        return result;
     }
 
 }
