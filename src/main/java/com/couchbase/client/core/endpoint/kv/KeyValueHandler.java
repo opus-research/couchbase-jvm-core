@@ -75,8 +75,6 @@ import com.couchbase.client.core.message.kv.subdoc.multi.MultiResult;
 import com.couchbase.client.core.message.kv.subdoc.multi.Mutation;
 import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommand;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
-import com.couchbase.client.core.message.kv.subdoc.simple.SubExistRequest;
-import com.couchbase.client.core.message.kv.subdoc.simple.SubGetRequest;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
@@ -154,16 +152,6 @@ public class KeyValueHandler
      * creation of missing intermediate nodes in the JSON path.
      */
     public static final byte SUBDOC_BITMASK_MKDIR_P = 1;
-
-    /**
-     * The bitmask for sub-document xattr/hidden section of the document
-     */
-    public static final byte SUBDOC_FLAG_XATTR_PATH = (byte) 0x04;
-
-    /**
-     * The bitmask for sub-document xattr/hidden section of the document with macros in values
-     */
-    public static final byte SUBDOC_FLAG_EXPAND_MACROS = (byte) 0x010;
 
     boolean seqOnMutation = false;
 
@@ -567,41 +555,21 @@ public class KeyValueHandler
         extras.writeShort(msg.pathLength());
 
         long cas = 0L;
+
         if (msg instanceof BinarySubdocMutationRequest) {
             BinarySubdocMutationRequest mut = (BinarySubdocMutationRequest) msg;
             //for now only possible command flag is MKDIR_P (and it makes sense in mutations only)
-            byte flags = 0;
             if (mut.createIntermediaryPath()) {
-                flags |= SUBDOC_BITMASK_MKDIR_P;
+                extras.writeByte(0 | SUBDOC_BITMASK_MKDIR_P);
+            } else {
+                extras.writeByte(0);
             }
-            if (mut.attributeAccess()) {
-                flags |= SUBDOC_FLAG_XATTR_PATH;
-            }
-            if (mut.expandMacros()) {
-                flags |= SUBDOC_FLAG_EXPAND_MACROS;
-            }
-            extras.writeByte(flags);
-
             if (mut.expiration() != 0L) {
                 extrasLength = 7;
                 extras.writeInt(mut.expiration());
             }
 
             cas = mut.cas();
-        } else if (msg instanceof SubGetRequest) {
-            SubGetRequest req =  (SubGetRequest)msg;
-            if (req.attributeAccess()) {
-                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
-            } else {
-                extras.writeByte(0);
-            }
-        } else if (msg instanceof SubExistRequest) {
-            SubExistRequest req =  (SubExistRequest)msg;
-            if (req.attributeAccess()) {
-                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
-            } else {
-                extras.writeByte(0);
-            }
         } else {
             extras.writeByte(0);
         }
