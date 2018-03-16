@@ -24,6 +24,7 @@ package com.couchbase.client.core.endpoint.view;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
+import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.util.Resources;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -45,6 +46,7 @@ import java.util.Queue;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * Verifies the functionality of the {@link ViewCodec}.
@@ -54,12 +56,12 @@ import static org.junit.Assert.assertTrue;
  */
 public class ViewCodecTest {
 
-    private Queue<Class<?>> queue;
+    private Queue<ViewRequest> queue;
     private EmbeddedChannel channel;
 
     @Before
     public void setup() {
-        queue = new ArrayDeque<Class<?>>();
+        queue = new ArrayDeque<ViewRequest>();
         channel = new EmbeddedChannel(new ViewCodec(queue));
     }
 
@@ -85,7 +87,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeNonReducedResponseWithoutValue() throws Exception {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("non-reduced-without-value.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -103,7 +105,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeNonReducedResponseWithValue() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("non-reduced-with-value.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -121,7 +123,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeReducedResponse() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("reduced.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -139,7 +141,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeEmptyNonReducedResponse() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("non-reduced-empty.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -155,7 +157,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeEmptyReducedResponse() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("reduced-empty.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -171,7 +173,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldDecodeMissingViewResponse() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("not-found.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
@@ -186,7 +188,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldCopeWithBracesInStrings() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("with-braces.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -204,7 +206,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldSupportContentChunks() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("non-reduced-with-value.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -225,7 +227,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldSupportContentChunksWitBraces() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("with-braces.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
@@ -255,7 +257,7 @@ public class ViewCodecTest {
 
     @Test
     public void shouldSupportChunkSplitInString() {
-        queue.add(ViewQueryRequest.class);
+        queue.add(mock(ViewQueryRequest.class));
 
         String json = Resources.read("with-braces.json", this.getClass());
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);

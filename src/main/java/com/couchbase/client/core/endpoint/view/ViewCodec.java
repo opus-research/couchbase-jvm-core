@@ -22,6 +22,8 @@
 package com.couchbase.client.core.endpoint.view;
 
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
+import com.couchbase.client.core.message.view.GetDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.message.view.ViewRequest;
@@ -52,12 +54,12 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
     /**
      * The Queue which holds the request types so that proper decoding can happen async.
      */
-    private final Queue<Class<?>> queue;
+    private final Queue<ViewRequest> queue;
 
     /**
      * The current request class.
      */
-    private Class<?> currentRequest;
+    private ViewRequest currentRequest;
 
     /**
      * The current chunked up buffer.
@@ -79,11 +81,13 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      */
     private int currentCode;
 
+    private HttpResponse currentResponse;
+
     /**
      * Creates a new {@link ViewCodec} with the default dequeue.
      */
     public ViewCodec() {
-        this(new ArrayDeque<Class<?>>());
+        this(new ArrayDeque<ViewRequest>());
     }
 
     /**
@@ -91,7 +95,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      *
      * @param queue a custom queue to test encoding/decoding.
      */
-    ViewCodec(final Queue<Class<?>> queue) {
+    ViewCodec(final Queue<ViewRequest> queue) {
         this.queue = queue;
     }
 
@@ -100,6 +104,8 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
         HttpRequest request;
         if (msg instanceof ViewQueryRequest) {
             request = handleViewQueryRequest((ViewQueryRequest) msg);
+        } else if (msg instanceof GetDesignDocumentRequest) {
+            request = handleGetDesignDocumentRequest((GetDesignDocumentRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown Message to encode: " + msg);
         }
@@ -111,7 +117,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
         raw.release();
 
         out.add(request);
-        queue.offer(msg.getClass());
+        queue.offer(msg);
     }
 
     @Override
@@ -121,8 +127,10 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
             currentChunk = ctx.alloc().buffer();
         }
 
-        if (currentRequest.equals(ViewQueryRequest.class)) {
+        if (currentRequest instanceof ViewQueryRequest) {
             handleViewQueryResponse(msg, in);
+        } else if (currentRequest instanceof  GetDesignDocumentRequest) {
+            handleGetDesignDocumentResponse(msg, in);
         } else {
             throw new IllegalStateException("Got a response message for a request that was not sent." + msg);
         }
@@ -143,6 +151,49 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
             requestBuilder.append("?").append(msg.query());
         }
         return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, requestBuilder.toString());
+    }
+
+    private HttpRequest handleGetDesignDocumentRequest(final GetDesignDocumentRequest msg) {
+        StringBuilder requestBuilder = new StringBuilder();
+        requestBuilder.append("/").append(msg.bucket()).append("/_design/");
+        requestBuilder.append(msg.development() ? "dev_" + msg.name() : msg.name());
+        return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, requestBuilder.toString());
+    }
+
+    private void handleGetDesignDocumentResponse(HttpObject msg, List<Object> in) {
+        if (msg instanceof HttpResponse) {
+            currentResponse = (HttpResponse) msg;
+        }
+
+        if (msg instanceof HttpContent) {
+            HttpContent content = (HttpContent) msg;
+            if (content.content().readableBytes() > 0) {
+                currentChunk.writeBytes(content.content());
+                content.content().clear();
+            }
+
+            if (msg instanceof LastHttpContent) {
+
+                String name = ((GetDesignDocumentRequest) currentRequest).name();
+                boolean development = ((GetDesignDocumentRequest) currentRequest).development();
+
+                ResponseStatus status;
+                switch (currentResponse.getStatus().code()) {
+                    case 200:
+                        status = ResponseStatus.SUCCESS;
+                        break;
+                    case 404:
+                        status = ResponseStatus.NOT_EXISTS;
+                        break;
+                    default:
+                        status = ResponseStatus.FAILURE;
+                }
+
+                in.add(new GetDesignDocumentResponse(name, development, currentChunk.copy(), status, currentRequest));
+                reset();
+            }
+
+        }
     }
 
     /**
@@ -172,7 +223,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
 
                     if (msg instanceof LastHttpContent) {
                         ResponseStatus status = currentCode == 404 ? ResponseStatus.NOT_EXISTS : ResponseStatus.FAILURE;
-                        in.add(new ViewQueryResponse(status, currentTotalRows, currentChunk.copy(), null));
+                        in.add(new ViewQueryResponse(status, currentTotalRows, currentChunk.copy(), currentRequest));
                         reset();
 
                     }
@@ -235,6 +286,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      * Reset the response objects to a fresh state.
      */
     private void reset() {
+        currentResponse = null;
         currentRequest = null;
         currentChunk.release();
         currentChunk = null;
