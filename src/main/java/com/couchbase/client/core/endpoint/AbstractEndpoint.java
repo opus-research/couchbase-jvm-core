@@ -181,7 +181,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                         pipeline.addLast(LOGGING_HANDLER_INSTANCE);
                     }
                     customEndpointHandlers(pipeline);
-                    pipeline.addLast(new GenericEndpointHandler(AbstractEndpoint.this, responseBuffer));
                 }
             }));
     }
@@ -347,4 +346,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         return env;
     }
 
+    public RingBuffer<ResponseEvent> responseBuffer() {
+        return responseBuffer;
+    }
 }
