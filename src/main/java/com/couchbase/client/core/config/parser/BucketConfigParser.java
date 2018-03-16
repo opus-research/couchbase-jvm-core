@@ -17,7 +17,7 @@ package com.couchbase.client.core.config.parser;
 
 import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.config.BucketConfig;
-import com.couchbase.client.core.env.CoreEnvironment;
+import com.couchbase.client.core.env.BootstrapEnvironment;
 import com.fasterxml.jackson.databind.InjectableValues;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,7 +43,7 @@ public final class BucketConfigParser {
      * @param input the raw string input.
      * @return the parsed bucket configuration.
      */
-    public static BucketConfig parse(final String input, final CoreEnvironment env) {
+    public static BucketConfig parse(final String input, final BootstrapEnvironment env) {
         try {
             InjectableValues inject = new InjectableValues.Std()
                     .addValue("env", env);
