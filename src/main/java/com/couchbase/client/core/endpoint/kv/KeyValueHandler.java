@@ -179,17 +179,8 @@ public class KeyValueHandler
     /**
      * The bitmask for sub-document create document
      */
-    public static final byte SUBDOC_DOCFLAG_MKDOC = (byte) 0x1;
+    public static final byte SUBDOC_FLAG_MKDOC = (byte) 0x1;
 
-    /**
-     * The bitmask for sub-document add document
-     */
-    public static final byte SUBDOC_DOCFLAG_ADD = (byte) 0x2;
-
-    /**
-     * The bitmask for sub-document access deleted
-     */
-    public static final byte SUBDOC_DOCFLAG_ACCESS_DELETED = (byte) 0x3;
 
     boolean seqOnMutation = false;
 
@@ -600,7 +591,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        ByteBuf extras = ctx.alloc().buffer(3, 8); //extras can be 8 bytes if there is an expiry
+        ByteBuf extras = ctx.alloc().buffer(3, 7); //extras can be 7 bytes if there is an expiry
         byte extrasLength = 3; //by default 2 bytes for pathLength + 1 byte for "command" flags
         extras.writeShort(msg.pathLength());
 
@@ -622,18 +613,6 @@ public class KeyValueHandler
                 extras.writeInt(mut.expiration());
             }
 
-            byte docFlags = 0;
-            if (mut.createDocument()) {
-                docFlags |= SUBDOC_DOCFLAG_MKDOC;
-            }
-            if (mut.addDocument()) {
-                docFlags |= SUBDOC_DOCFLAG_ADD;
-            }
-            if (docFlags != 0) {
-                extrasLength += 1;
-                extras.writeByte(docFlags);
-            }
-
             cas = mut.cas();
         } else if (msg instanceof SubGetRequest) {
             SubGetRequest req =  (SubGetRequest)msg;
@@ -642,20 +621,12 @@ public class KeyValueHandler
             } else {
                 extras.writeByte(0);
             }
-            if (req.accessDeleted()) {
-                extrasLength += 1;
-                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
-            }
         } else if (msg instanceof SubExistRequest) {
             SubExistRequest req =  (SubExistRequest)msg;
             if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
                 extras.writeByte(0);
-            }
-            if (req.accessDeleted()) {
-                extrasLength += 1;
-                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
             }
         } else {
             extras.writeByte(0);
@@ -676,20 +647,10 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        byte extrasLength = 0;
-
-        ByteBuf extras = Unpooled.EMPTY_BUFFER;
-
-        if (msg.docFlags() != 0) {
-            extrasLength = 1;
-            extras = ctx.alloc().buffer(extrasLength, extrasLength);
-            extras.writeByte(msg.docFlags());
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
         request.setOpcode(OP_SUB_MULTI_LOOKUP)
                 .setKeyLength(keyLength)
-                .setExtrasLength(extrasLength)
+                .setExtrasLength((byte) 0)
                 .setTotalBodyLength(keyLength + msg.content().readableBytes());
 
         return request;
