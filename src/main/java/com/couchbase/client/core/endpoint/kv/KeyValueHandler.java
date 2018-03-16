@@ -68,6 +68,7 @@ import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 
 import java.util.Queue;
@@ -601,6 +602,14 @@ public class KeyValueHandler
         } else if (request instanceof PrependRequest) {
             ((PrependRequest) request).content().release();
         }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            endpoint().signalConfigReload();
+        }
+        super.userEventTriggered(ctx, evt);
     }
 
     @Override
