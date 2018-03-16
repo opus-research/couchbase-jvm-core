@@ -31,7 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -84,15 +83,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     private final Queue<REQUEST> sentRequestQueue;
 
-    /**
-     * If this handler is transient (will close after one request).
-     */
     private final boolean isTransient;
-
-    /**
-     * If TRACE level logging has been enabled at startup.
-     */
-    private final boolean traceEnabled;
 
     /**
      * The request which is expected to return next.
@@ -125,7 +116,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestQueue = queue;
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
-        this.traceEnabled = LOGGER.isTraceEnabled();
     }
 
     /**
@@ -154,13 +144,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected abstract CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, RESPONSE msg) throws Exception;
 
-    /**
-     * Returns the {@link ServiceType} associated with this handler.
-     *
-     * @return the service type.
-     */
-    protected abstract ServiceType serviceType();
-
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
         ENCODED request = encodeRequest(ctx, msg);
@@ -173,8 +156,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
-            if (traceEnabled) {
-                LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Started decoding of " + currentRequest);
             }
         }
 
@@ -190,8 +173,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
-            if (traceEnabled) {
-                LOGGER.trace("{}Finished decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Finished decoding of " + currentRequest);
             }
             currentRequest = null;
             currentDecodingState = DecodingState.INITIAL;
@@ -368,7 +351,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
      */
     protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
-        if (traceEnabled) {
+        if (LOGGER.isTraceEnabled()) {
             LOGGER.trace(logIdent(ctx, endpoint) + "keepAlive was answered, status "
                     + keepAliveResponse.status());
         }
