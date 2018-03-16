@@ -1,17 +1,23 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (c) 2015 Couchbase, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
+ * IN THE SOFTWARE.
  */
 package com.couchbase.client.core.endpoint.util;
 
@@ -98,8 +104,11 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
         return true;
     }
 
-    /** previous byte inspected by string detection (useful to detect escaped quotes) */
+    /** previous bytes (current - 1) inspected by string detection (useful to detect escaped quotes) */
     private byte lastByte = 0;
+
+    /** previous bytes (current - 2) inspected by string detection (useful to detect escaped quotes) */
+    private byte beforeLastByte = 0;
 
     /** flag to indicate that we are currently reading a JSON string */
     private boolean inString = false;
@@ -117,9 +126,11 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
     private boolean isEscaped(byte nextByte) {
         boolean result = false;
         if (inString) {
-            if (nextByte == '\"'
-                    && lastByte != '\\') {
-                inString = false;
+            if (nextByte == '\"') { //detected a potential closing quote
+                //is it escaped? we're in string, so that'd mean previous char is a backslash that is itself not escaped
+                boolean escaped = lastByte == '\\' && beforeLastByte != '\\';
+                //we're still in string if the potential closing quote was in fact escaped
+                inString = escaped;
             }
             result = true;
         } else {
@@ -128,6 +139,7 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
                 result = true;
             }
         }
+        beforeLastByte = lastByte;
         lastByte = nextByte;
         return result;
     }
