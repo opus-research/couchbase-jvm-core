@@ -23,7 +23,6 @@ package com.couchbase.client.core.endpoint.query;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
@@ -70,7 +69,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Verifies the correct functionality of the {@link QueryHandler}.
@@ -108,13 +106,8 @@ public class QueryHandlerTest {
             }
         });
 
-        CoreEnvironment environment = mock(CoreEnvironment.class);
-        AbstractEndpoint endpoint = mock(AbstractEndpoint.class);
-        when(endpoint.environment()).thenReturn(environment);
-        when(environment.userAgent()).thenReturn("Couchbase Client Mock");
-
         queue = new ArrayDeque<QueryRequest>();
-        handler = new QueryHandler(endpoint, responseBuffer.start(), queue);
+        handler = new QueryHandler(mock(AbstractEndpoint.class), responseBuffer.start(), queue);
         channel = new EmbeddedChannel(handler);
     }
 
@@ -134,7 +127,6 @@ public class QueryHandlerTest {
         assertEquals(HttpVersion.HTTP_1_1, outbound.getProtocolVersion());
         assertEquals("/query", outbound.getUri());
         assertFalse(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
-        assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
     }
 
     @Test
