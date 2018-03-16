@@ -262,8 +262,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         if (builder.scheduler == null) {
             CoreScheduler managed = new CoreScheduler(computationPoolSize());
             this.coreScheduler = managed;
-            this.coreSchedulerShutdownHook = managed
-            ;
+            this.coreSchedulerShutdownHook = managed;
         } else {
             this.coreScheduler = builder.scheduler;
             this.coreSchedulerShutdownHook = builder.schedulerShutdownHook == null
