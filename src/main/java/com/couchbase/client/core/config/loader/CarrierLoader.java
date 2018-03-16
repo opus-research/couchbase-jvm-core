@@ -32,29 +32,22 @@ import rx.functions.Func1;
 
 import java.net.InetAddress;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Loads a raw bucket configuration through the carrier mechanism (also commonly referred to as CCCP).
- *
- * @author Michael Nitschinger
- * @since 1.0
- */
 public class CarrierLoader extends AbstractLoader {
 
-    /**
-     * Creates a new {@link CarrierLoader}.
-     *
-     * @param cluster the cluster reference.
-     * @param environment the environment to use.
-     */
-    public CarrierLoader(Cluster cluster, Environment environment) {
-        super(ServiceType.BINARY, cluster, environment);
+    public CarrierLoader(Cluster cluster, Environment environment, AtomicReference<List<InetAddress>> seedNodes) {
+        super(cluster, environment, seedNodes);
     }
 
     @Override
-    protected int port(Environment env) {
+    protected ServiceType serviceType() {
+        return ServiceType.BINARY;
+    }
+
+    @Override
+    protected int port() {
+        Environment env = environment();
         return env.sslEnabled() ? env.bootstrapCarrierSslPort() : env.bootstrapCarrierDirectPort();
     }
 
@@ -65,10 +58,7 @@ public class CarrierLoader extends AbstractLoader {
             .map(new Func1<GetBucketConfigResponse, String>() {
                 @Override
                 public String call(GetBucketConfigResponse response) {
-                    if (!response.status().isSuccess()) {
-                        throw new IllegalStateException("Bucket config response did not return with success.");
-                    }
-                    return replaceHostWildcard(response.content().toString(CharsetUtil.UTF_8), hostname);
+                   return response.content().toString(CharsetUtil.UTF_8).replace("$HOST", hostname);
                 }
             });
     }

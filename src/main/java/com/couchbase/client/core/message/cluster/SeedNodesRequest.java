@@ -21,15 +21,18 @@
  */
 package com.couchbase.client.core.message.cluster;
 
+import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.cluster.Cluster;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
- * **Set up the bootstrap nodes for a {@link Cluster}.**
+ * Sets the nodes to bootstrap from in the {@link Cluster}.
  *
  * For stability reasons, it is advised to always provide more than one seed node (but not necessarily all nodes from
  * the cluster) so that the cluster can correctly bootstrap the bucket, even if one of the hosts in the list is
@@ -48,7 +51,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
     /**
      * The list of hostnames/IPs.
      */
-    private Set<InetAddress> nodes;
+    private List<InetAddress> nodes;
 
     /**
      * Creates a {@link SeedNodesRequest} with the default hostname ("localhost").
@@ -73,19 +76,15 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
      */
     public SeedNodesRequest(final List<String> nodes) {
         super(null, null);
-
         if (nodes == null || nodes.isEmpty()) {
-            throw new IllegalArgumentException("Empty or null bootstrap list provided.");
+            throw new IllegalArgumentException("At least one hostname needs to be provided.");
         }
-        Set<InetAddress> parsedNodes = new HashSet<InetAddress>();
+        List<InetAddress> parsedNodes = new ArrayList<InetAddress>();
         for (String node : nodes) {
-            if (node == null || node.isEmpty()) {
-                throw new IllegalArgumentException("Empty or null host in bootstrap list.");
-            }
             try {
                 parsedNodes.add(InetAddress.getByName(node));
             } catch (UnknownHostException e) {
-                throw new IllegalArgumentException("Unknown host " + node + " in bootstrap list.", e);
+                throw new CouchbaseException("Unknown host " + node + " in bootstrap list.", e);
             }
         }
         this.nodes = parsedNodes;
@@ -96,7 +95,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
      *
      * @return the list of hostnames.
      */
-    public Set<InetAddress> nodes() {
+    public List<InetAddress> nodes() {
         return nodes;
     }
 }

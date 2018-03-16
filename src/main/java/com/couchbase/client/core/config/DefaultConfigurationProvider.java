@@ -34,7 +34,7 @@ import rx.functions.Func1;
 import rx.subjects.PublishSubject;
 
 import java.net.InetAddress;
-import java.util.Set;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -68,7 +68,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     /**
      * List of initial bootstrap seed hostnames.
      */
-    private final AtomicReference<Set<InetAddress>> seedHosts;
+    private final AtomicReference<List<InetAddress>> seedHosts;
 
     private final CarrierLoader carrierLoader;
     private final HttpLoader httpLoader;
@@ -87,11 +87,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     public DefaultConfigurationProvider(final Cluster cluster, final Environment environment) {
         this.cluster = cluster;
         configObservable = PublishSubject.create();
-        seedHosts = new AtomicReference<Set<InetAddress>>();
+        seedHosts = new AtomicReference<List<InetAddress>>();
         bootstrapped = false;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
-        carrierLoader = new CarrierLoader(cluster, environment);
-        httpLoader = new HttpLoader(cluster, environment);
+        carrierLoader = new CarrierLoader(cluster, environment, seedHosts);
+        httpLoader = new HttpLoader(cluster, environment, seedHosts);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     }
 
     @Override
-    public boolean seedHosts(final Set<InetAddress> hosts) {
+    public boolean seedHosts(final List<InetAddress> hosts) {
         if (bootstrapped) {
             LOGGER.debug("Seed hosts called with {}, but already bootstrapped.", hosts);
             return false;
@@ -117,8 +117,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         }
 
         return carrierLoader
-            .loadConfig(seedHosts.get(), bucket, password)
-            .onExceptionResumeNext(httpLoader.loadConfig(seedHosts.get(), bucket, password))
+            .loadConfig(bucket, password)
+            .onExceptionResumeNext(httpLoader.loadConfig(bucket, password))
             .map(new Func1<BucketConfig, ClusterConfig>() {
                 @Override
                 public ClusterConfig call(BucketConfig bucketConfig) {

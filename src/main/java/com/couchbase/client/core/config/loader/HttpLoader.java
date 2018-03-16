@@ -33,29 +33,23 @@ import rx.functions.Func1;
 
 import java.net.InetAddress;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Loads a raw bucket configuration through the Couchbase Server HTTP config interface.
- *
- * @author Michael Nitschinger
- * @since 1.0
- */
-public class HttpLoader extends AbstractLoader {
+public class HttpLoader extends AbstractLoader{
 
-    /**
-     * Creates a new {@link HttpLoader}.
-     *
-     * @param cluster the cluster reference.
-     * @param environment the environment to use.
-     */
-    public HttpLoader(Cluster cluster, Environment environment) {
-        super(ServiceType.CONFIG, cluster, environment);
+
+    public HttpLoader(Cluster cluster, Environment environment, AtomicReference<List<InetAddress>> seedNodes) {
+        super(cluster, environment, seedNodes);
     }
 
     @Override
-    protected int port(Environment env) {
+    protected ServiceType serviceType() {
+        return ServiceType.CONFIG;
+    }
+
+    @Override
+    protected int port() {
+        Environment env = environment();
         return env.sslEnabled() ? env.bootstrapHttpSslPort() : env.bootstrapHttpDirectPort();
     }
 
@@ -66,7 +60,7 @@ public class HttpLoader extends AbstractLoader {
             .flatMap(new Func1<BucketConfigResponse, Observable<BucketConfigResponse>>() {
                 @Override
                 public Observable<BucketConfigResponse> call(BucketConfigResponse response) {
-                    if (response.status().isSuccess()) {
+                    if (response.status() == ResponseStatus.SUCCESS) {
                         return Observable.just(response);
                     }
                     return cluster().send(new VerboseBucketConfigRequest(hostname, bucket, password));
@@ -74,10 +68,7 @@ public class HttpLoader extends AbstractLoader {
             }).map(new Func1<BucketConfigResponse, String>() {
                 @Override
                 public String call(BucketConfigResponse response) {
-                    if (!response.status().isSuccess()) {
-                        throw new IllegalStateException("Bucket config response did not return with success.");
-                    }
-                    return replaceHostWildcard(response.config(), hostname);
+                    return response.config().replace("$HOST", hostname);
                 }
             });
     }
