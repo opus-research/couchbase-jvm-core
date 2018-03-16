@@ -71,6 +71,8 @@ import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static com.couchbase.client.core.utils.Observable.failSafe;
+
 /**
  * The common parent implementation for all {@link Endpoint}s.
  *
@@ -486,7 +488,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             if (request instanceof SignalFlush) {
                 return;
             }
-            request.observable().onError(NOT_CONNECTED_EXCEPTION);
+            failSafe(env.scheduler(), true, request.observable(), NOT_CONNECTED_EXCEPTION);
         }
     }
 
