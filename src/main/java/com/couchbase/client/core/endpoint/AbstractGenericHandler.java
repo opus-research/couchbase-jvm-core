@@ -34,12 +34,9 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
-import io.netty.handler.timeout.IdleState;
-import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.functions.Action0;
-import rx.functions.Action1;
 import rx.subjects.Subject;
 
 import java.io.IOException;
@@ -295,66 +292,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected void sideEffectRequestToCancel(final REQUEST request) {
         // Nothing to do in the generic implementation.
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent) {
-            IdleStateEvent e = (IdleStateEvent) evt;
-            if (e.state() == IdleState.ALL_IDLE) {
-                CouchbaseRequest keepAlive = createKeepAliveRequest();
-                if (keepAlive != null) {
-                    keepAlive.observable().subscribe(
-                            new Action1<CouchbaseResponse>() {
-                                @Override
-                                public void call(CouchbaseResponse couchbaseResponse) {
-                                    onKeepAliveResponse(couchbaseResponse);
-                                }
-                            });
-                    onKeepAliveFired(keepAlive);
-                    ctx.pipeline().writeAndFlush(keepAlive);
-                }
-                return;
-            }
-        } else {
-            super.userEventTriggered(ctx, evt);
-        }
-    }
-
-    /**
-     * Override to return a non-null request to be fired in the pipeline in case a keep alive is triggered.
-     *
-     * @return a CouchbaseRequest to be fired in case of keep alive (null by default).
-     */
-    protected CouchbaseRequest createKeepAliveRequest() {
-        return null;
-    }
-
-    /**
-     * Override to customize the behavior when a keep alive has been triggered and a keep alive request sent.
-     *
-     * The default behavior is to log the event at trace level.
-     *
-     * @param keepAliveRequest the keep alive request that was sent when keep alive was triggered
-     */
-    protected void onKeepAliveFired(CouchbaseRequest keepAliveRequest) {
-        if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("[][" + endpoint.getClass().getSimpleName() + "]: KeepAlive fired");
-        }
-    }
-
-    /**
-     * Override to customize the behavior when a keep alive has been responded to.
-     *
-     * The default behavior is to log the event and the response status at trace level.
-     *
-     * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
-     */
-    protected void onKeepAliveResponse(CouchbaseResponse keepAliveResponse) {
-        if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace("[][" + endpoint.getClass().getSimpleName() + "]: KeepAlive was answered, status "
-                    + keepAliveResponse.status());
-        }
     }
 
     /**
