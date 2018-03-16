@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,24 +20,23 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.dcp;
+package com.couchbase.client.core.dcp;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 
 /**
- * Stream request.
- *
- * Sent by the consumer side to the producer specifying that the consumer
- * wants to create a vBucket stream. In order to initiate multiple stream
- * the consumer needs to send multiple commands.
- *
  * @author Sergey Avseyev
- * @since 1.1.0
+ * @since 1.2.0
  */
 @InterfaceStability.Experimental
-@InterfaceAudience.Private
-public class StreamRequestRequest extends AbstractDCPRequest {
+@InterfaceAudience.Public
+public class BucketStreamState {
+    /**
+     * The partition number (vBucket), to which this state belongs.
+     */
+    private final short partition;
+
     /**
      * A unique identifier that is generated that is assigned to each VBucket.
      * This number is generated on an unclean shutdown or when a VBucket becomes
@@ -68,27 +67,48 @@ public class StreamRequestRequest extends AbstractDCPRequest {
     private final long snapshotEndSequenceNumber;
 
 
-    public StreamRequestRequest(short partition, String bucket) {
-        this(partition, 0, 0, 0xffffffff, 0, 0, bucket, null);
-    }
-
-    public StreamRequestRequest(short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
-                                long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
-                                String bucket) {
-        this(partition, vbucketUUID, startSequenceNumber, endSequenceNumber,
-                snapshotStartSequenceNumber, snapshotEndSequenceNumber, bucket, null);
-    }
-
-    public StreamRequestRequest(short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
-                                long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
-                                String bucket, String password) {
-        super(bucket, password);
-        this.partition(partition);
+    /**
+     * Initialize BucketStreamState
+     *
+     * @param partition
+     * @param vbucketUUID
+     * @param startSequenceNumber
+     * @param endSequenceNumber
+     * @param snapshotStartSequenceNumber
+     * @param snapshotEndSequenceNumber
+     */
+    public BucketStreamState(short partition, long vbucketUUID,
+                             long startSequenceNumber, long endSequenceNumber,
+                             long snapshotStartSequenceNumber, long snapshotEndSequenceNumber) {
+        this.partition = partition;
         this.vbucketUUID = vbucketUUID;
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
         this.snapshotStartSequenceNumber = snapshotStartSequenceNumber;
         this.snapshotEndSequenceNumber = snapshotEndSequenceNumber;
+    }
+
+    /**
+     * Initialize BucketStreamState
+     *
+     * This constructor is shortcut for immediate state representation, when start and
+     * end boundaries have the same sequence number.
+     *
+     * @param partition
+     * @param vbucketUUID
+     * @param sequenceNumber
+     */
+    public BucketStreamState(short partition, long vbucketUUID, long sequenceNumber) {
+        this.partition = partition;
+        this.vbucketUUID = vbucketUUID;
+        this.startSequenceNumber = sequenceNumber;
+        this.endSequenceNumber = sequenceNumber;
+        this.snapshotStartSequenceNumber = sequenceNumber;
+        this.snapshotEndSequenceNumber = sequenceNumber;
+    }
+
+    public short partition() {
+        return partition;
     }
 
     public long vbucketUUID() {
@@ -109,5 +129,17 @@ public class StreamRequestRequest extends AbstractDCPRequest {
 
     public long snapshotEndSequenceNumber() {
         return snapshotEndSequenceNumber;
+    }
+
+    public String toString() {
+        return "BucketStreamState{"
+                + "partition=" + partition
+                + ", vbucketUUID=" + vbucketUUID
+                + ", startSequenceNumber=" + startSequenceNumber
+                + ", endSequenceNumber=" + endSequenceNumber
+                + ", snapshotStartSequenceNumber=" + snapshotStartSequenceNumber
+                + ", snapshotEndSequenceNumber=" + snapshotEndSequenceNumber
+                + '}';
+
     }
 }
