@@ -213,7 +213,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int socketConnectTimeout;
     private final boolean callbacksOnIoPool;
     private final long disconnectTimeout;
-    private final WaitStrategy waitStrategy;
+    private final WaitStrategy requestBufferWaitStrategy;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -271,7 +271,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
-        waitStrategy = builder.waitStrategy;
         sslKeystore = builder.sslKeystore;
 
         if (ioPoolSize < MIN_POOL_SIZE) {
@@ -344,6 +343,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         } else {
             metricsCollectorSubscription = null;
         }
+        requestBufferWaitStrategy = builder.requestBufferWaitStrategy == null ? new BlockingWaitStrategy() : builder.requestBufferWaitStrategy;
     }
 
     public static DefaultCoreEnvironment create() {
@@ -700,8 +700,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public WaitStrategy waitStrategy() {
-        return waitStrategy;
+    public WaitStrategy requestBufferWaitStrategy() {
+        return requestBufferWaitStrategy;
     }
 
     public static class Builder {
@@ -748,10 +748,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
         private boolean callbacksOnIoPool = CALLBACKS_ON_IO_POOL;
         private long disconnectTimeout = DISCONNECT_TIMEOUT;
-        private WaitStrategy waitStrategy = new BlockingWaitStrategy();
+        private WaitStrategy requestBufferWaitStrategy;
 
-        private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
-        private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
+        private MetricsCollectorConfig runtimeMetricsCollectorConfig;
+        private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
         private LoggingConsumer defaultMetricsLoggingConsumer = LoggingConsumer.create();
 
         protected Builder() {
@@ -1225,12 +1225,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
-         * Sets a custom waiting strategy. Default is {@link BlockingWaitStrategy}.
+         * Sets a custom waiting strategy for requests. Default is {@link BlockingWaitStrategy}.
          *
          * @param waitStrategy waiting strategy
          */
-        public Builder waitStrategy(WaitStrategy waitStrategy) {
-            this.waitStrategy = waitStrategy;
+        public Builder requestBufferWaitStrategy(WaitStrategy waitStrategy) {
+            this.requestBufferWaitStrategy = waitStrategy;
             return this;
         }
 
@@ -1292,7 +1292,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
         sb.append(", disconnectTimeout=").append(disconnectTimeout);
-        sb.append(", waitStrategy=").append(waitStrategy);
+        sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
 
         return sb;
     }

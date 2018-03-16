@@ -412,9 +412,9 @@ public interface CoreEnvironment {
     String dcpConnectionName();
 
     /**
-     * Waiting strategy used by {@link com.lmax.disruptor.EventProcessor}s to wait for data from {@link com.lmax.disruptor.RingBuffer}
+     * Waiting strategy used by request {@link com.lmax.disruptor.EventProcessor}s to wait for data from {@link com.lmax.disruptor.RingBuffer}
      *
      * @return waiting strategy
      */
-    WaitStrategy waitStrategy();
+    WaitStrategy requestBufferWaitStrategy();
 }
