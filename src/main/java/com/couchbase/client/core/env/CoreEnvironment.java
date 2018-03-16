@@ -253,13 +253,6 @@ public interface CoreEnvironment {
     int queryEndpoints();
 
     /**
-     * The number of search service endpoints.
-     *
-     * @return amount of endpoints per service.
-     */
-    int searchEndpoints();
-
-    /**
      * Library identification string, which can be used as User-Agent header in HTTP requests.
      *
      * @return identification string
