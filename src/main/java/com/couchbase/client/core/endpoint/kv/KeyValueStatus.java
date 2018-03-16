@@ -29,8 +29,6 @@ package com.couchbase.client.core.endpoint.kv;
  * @author Sergey Avseyev
  * @author Michael Nitschinger
  * @since 1.2.0
- * @see com.couchbase.client.core.message.ResponseStatus
- * @see com.couchbase.client.core.endpoint.ResponseStatusConverter
  */
 public enum KeyValueStatus {
 
