@@ -627,7 +627,7 @@ public class KeyValueHandler
             }
 
             byte docFlags = 0;
-            if (mut.upsertDocument()) {
+            if (mut.createDocument()) {
                 docFlags |= SUBDOC_DOCFLAG_MKDOC;
             }
             if (mut.insertDocument()) {
