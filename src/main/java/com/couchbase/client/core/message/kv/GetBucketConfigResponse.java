@@ -36,9 +36,8 @@ public class GetBucketConfigResponse extends AbstractKeyValueResponse {
 
     private InetAddress hostname;
 
-    public GetBucketConfigResponse(final ResponseStatus status, final short serverStatusCode, final String bucket,
-                                   final ByteBuf content, final InetAddress hostname) {
-        super(status, serverStatusCode, bucket, content, null);
+    public GetBucketConfigResponse(final ResponseStatus status, final String bucket, final ByteBuf content, final InetAddress hostname) {
+        super(status, bucket, content, null);
         this.hostname = hostname;
     }
 
