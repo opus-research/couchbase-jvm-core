@@ -31,7 +31,6 @@ import com.couchbase.client.core.message.config.GetDesignDocumentsRequest;
 import com.couchbase.client.core.message.config.GetDesignDocumentsResponse;
 import com.couchbase.client.core.retry.FailFastRetryStrategy;
 import com.couchbase.client.core.util.CollectingResponseEventSink;
-import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -58,6 +57,7 @@ import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
+import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -127,7 +127,7 @@ public class ConfigHandlerTest {
 
     @Test
     public void shouldEncodeBucketConfigRequest() throws Exception {
-        BucketConfigRequest request = new BucketConfigRequest("/path/", NetworkAddress.localhost(), "bucket", "password");
+        BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket", "password");
 
         channel.writeOutbound(request);
         HttpRequest outbound = (HttpRequest) channel.readOutbound();
@@ -174,7 +174,7 @@ public class ConfigHandlerTest {
         assertEquals(1, eventSink.responseEvents().size());
         BucketConfigResponse event = (BucketConfigResponse) eventSink.responseEvents().get(0).getMessage();
 
-        assertEquals(ResponseStatus.ACCESS_ERROR, event.status());
+        assertEquals(ResponseStatus.FAILURE, event.status());
         assertEquals("Unauthorized", event.config());
         assertTrue(requestQueue.isEmpty());
     }
@@ -469,7 +469,7 @@ public class ConfigHandlerTest {
     public void shouldNotBreakLinesOnLongAuth() throws Exception {
         String longPassword = "thisIsAveryLongPasswordWhichShouldNotContainLineBreaksAfterEncodingOtherwise"
             + "itWillBreakTheRequestResponseFlowWithTheServer";
-        BucketConfigRequest request = new BucketConfigRequest("/path/", NetworkAddress.localhost(), "bucket",
+        BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket",
             longPassword);
 
         channel.writeOutbound(request);

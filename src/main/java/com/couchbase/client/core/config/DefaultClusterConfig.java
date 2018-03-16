@@ -15,8 +15,7 @@
  */
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.utils.NetworkAddress;
-
+import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -68,8 +67,8 @@ public class DefaultClusterConfig implements ClusterConfig {
     }
 
     @Override
-    public Set<NetworkAddress> allNodeAddresses() {
-        Set<NetworkAddress> nodes = new HashSet<NetworkAddress>();
+    public Set<InetAddress> allNodeAddresses() {
+        Set<InetAddress> nodes = new HashSet<InetAddress>();
         for (BucketConfig bc : bucketConfigs().values()) {
             for (NodeInfo ni : bc.nodes()) {
                 nodes.add(ni.hostname());

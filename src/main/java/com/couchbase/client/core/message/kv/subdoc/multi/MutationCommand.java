@@ -35,7 +35,7 @@ public class MutationCommand {
     private final String path;
     private final ByteBuf fragment;
     private boolean createIntermediaryPath;
-    private boolean xattr;
+    private boolean attributeAccess;
 
     /**
      * Create a multi-mutation command.
@@ -89,7 +89,7 @@ public class MutationCommand {
         this.path = builder.path();
         this.fragment = builder.fragment();
         this.createIntermediaryPath = builder.createIntermediaryPath();
-        this.xattr = builder.xattr();
+        this.attributeAccess = builder.attributeAccess();
     }
 
     public Mutation mutation() {
@@ -112,8 +112,8 @@ public class MutationCommand {
         return createIntermediaryPath;
     }
 
-    public boolean xattr() {
-        return this.xattr;
+    public boolean attributeAccess() {
+        return this.attributeAccess;
     }
 
 }

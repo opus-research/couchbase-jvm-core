@@ -30,7 +30,6 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 @InterfaceAudience.Public
 public enum Lookup {
 
-    GETDOC(KeyValueHandler.OP_GET),
     GET(KeyValueHandler.OP_SUB_GET),
     EXIST(KeyValueHandler.OP_SUB_EXIST);
 
