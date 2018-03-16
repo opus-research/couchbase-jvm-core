@@ -81,7 +81,7 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
     public QueryHandlerV2(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
                         final boolean pipeline) {
         super(endpoint, responseBuffer, isTransient, pipeline);
-        parser = new YasjlQueryResponseParser(env().scheduler(), env().autoreleaseAfter(), env().callbacksOnIoPool());
+        parser = new YasjlQueryResponseParser(env().scheduler(), env().autoreleaseAfter());
     }
 
     /**
@@ -94,7 +94,7 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
     QueryHandlerV2(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<QueryRequest> queue,
                  boolean isTransient, final boolean pipeline) {
         super(endpoint, responseBuffer, queue, isTransient, pipeline);
-        parser = new YasjlQueryResponseParser(env().scheduler(), env().autoreleaseAfter(), env().callbacksOnIoPool());
+        parser = new YasjlQueryResponseParser(env().scheduler(), env().autoreleaseAfter());
     }
 
 
@@ -155,14 +155,14 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
 
             //initialize parser for current response
             if (!parser.isInitialized()) {
-                parser.initialize(responseContent, ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()));
+                parser.initialize(responseContent, ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()), currentRequest());
             }
 
             //important to place the RawQueryRequest test before, as it extends GenericQueryRequest
             if (currentRequest() instanceof RawQueryRequest) {
                 response = handleRawQueryResponse(lastChunk, ctx);
             } else if (currentRequest() instanceof GenericQueryRequest) {
-                response = parser.parse(lastChunk);
+                response = parser.parse();
                 if (lastChunk) {
                     parser.finishParsingAndReset();
                     finishedDecoding();
