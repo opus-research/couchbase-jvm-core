@@ -16,6 +16,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     };
 
     private final PartitionInfo partitionInfo;
+    private final boolean tainted;
 
     @JsonCreator
     public DefaultCouchbaseBucketConfig(
@@ -28,6 +29,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         @JsonProperty("nodesExt") List<PortInfo> portInfos) {
         super(name, locator, uri, streamingUri, nodeInfos, portInfos);
         this.partitionInfo = partitionInfo;
+        this.tainted = false;
     }
 
     @Override
@@ -43,6 +45,11 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     @Override
     public int numberOfReplicas() {
         return partitionInfo.numberOfReplicas();
+    }
+
+    @Override
+    public boolean tainted() {
+        return tainted;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

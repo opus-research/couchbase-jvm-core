@@ -164,17 +164,19 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         bootstrapped = false;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
 
-        Observable.from(refreshers.values()).flatMap(new Func1<Refresher, Observable<BucketConfig>>() {
-            @Override
-            public Observable<BucketConfig> call(Refresher refresher) {
-                return refresher.configs();
-            }
-        }).subscribe(new Action1<BucketConfig>() {
-            @Override
-            public void call(BucketConfig bucketConfig) {
-                upsertBucketConfig(bucketConfig);
-            }
-        });
+        Observable
+            .from(refreshers.values())
+            .flatMap(new Func1<Refresher, Observable<BucketConfig>>() {
+                @Override
+                public Observable<BucketConfig> call(Refresher refresher) {
+                    return refresher.configs();
+                }
+            }).subscribe(new Action1<BucketConfig>() {
+                @Override
+                public void call(BucketConfig bucketConfig) {
+                    upsertBucketConfig(bucketConfig);
+                }
+            });
     }
 
     @Override
@@ -289,7 +291,18 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     private void upsertBucketConfig(final BucketConfig config) {
         ClusterConfig cluster = currentConfig.get();
         cluster.setBucketConfig(config.name(), config);
+        LOGGER.debug("Applying new configuration {}", config);
         currentConfig.set(cluster);
+
+        boolean tainted = config.tainted();
+        for (Refresher refresher : refreshers.values()) {
+            if (tainted) {
+                refresher.markTainted(config);
+            } else {
+                refresher.markUntainted(config);
+            }
+        }
+
         configObservable.onNext(currentConfig.get());
     }
 
