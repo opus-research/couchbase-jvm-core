@@ -20,12 +20,29 @@
  * IN THE SOFTWARE.
  */
 
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
-apply plugin: 'maven-publish'
-apply plugin: 'checkstyle'
-apply plugin: 'com.github.johnrengelman.shadow'
+import org.apache.tools.ant.filters.ReplaceTokens
+
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+buildscript {
+    repositories {
+        maven { url 'http://repo.spring.io/plugins-release' }
+    }
+    dependencies {
+        classpath 'org.springframework.build.gradle:propdeps-plugin:0.0.7'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'com.github.johnrengelman.shadow' version '1.2.0'
+
+    id 'checkstyle'
+}
 
 apply plugin: 'propdeps'
 apply plugin: 'propdeps-maven'
@@ -38,20 +55,13 @@ description = 'Official Couchbase JVM Core Library'
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
 
-buildscript {
-    repositories {
-        maven { url 'http://repo.spring.io/plugins-release' }
-        jcenter()
-    }
-    dependencies {
-        classpath 'org.springframework.build.gradle:propdeps-plugin:0.0.6'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:1.0.3'
-    }
-}
-
 repositories {
     mavenCentral()
     jcenter()
+}
+
+checkstyle {
+    toolVersion = "6.0"
 }
 
 def getVersionName() {
@@ -63,13 +73,15 @@ def getVersionName() {
         }
         return stdout.toString().trim()
     } catch (e) {
-        return "unknown"
+        //in case git command is not accessible...
+        //put the date in there to have at least a reference point
+        return "unknown" + new Date().format("yyyyMMdd");
     }
 }
 
 ext {
-    nettyVersion = '4.0.23.Final'
-    rxVersion = '1.0.0-rc.3'
+    nettyVersion = '4.0.25.Final'
+    rxVersion = '1.0.4'
     disruptorVersion = '3.3.0'
     jacksonVersion = '2.4.2'
 
@@ -115,12 +127,6 @@ dependencies {
     markdownDoclet 'ch.raffael.pegdown-doclet:pegdown-doclet:1.1.1'
 }
 
-idea {
-    module {
-        scopes.PROVIDED.minus += configurations.compile
-    }
-}
-
 javadoc {
     doLast {
         copy {
@@ -133,6 +139,17 @@ javadoc.options {
     docletpath = configurations.markdownDoclet.files.asType(List)
     doclet = "ch.raffael.doclets.pegdown.PegdownDoclet"
     addStringOption("parse-timeout", "10")
+
+    windowTitle = "Couchbase Java SDK Core IO"
+    docTitle = "Couchbase Java SDK Core IO ($project.version)"
+    bottom = "Copyright &copy; 2014 Couchbase, Inc."
+    links = [
+        "http://download.oracle.com/javase/6/docs/api/",
+        "http://netty.io/4.0/api/",
+        "http://fasterxml.github.io/jackson-databind/javadoc/2.4/",
+        "http://reactivex.io/RxJava/javadoc/"
+    ]
+    overview = "docs/teaser.html"
 }
 
 task integrationTest(type: Test) {
@@ -141,12 +158,14 @@ task integrationTest(type: Test) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '1.12'
+    gradleVersion = '2.2'
 }
 
-task sourcesJar(type: Jar) {
+task sourcesJar(type: Jar, dependsOn: ':shadowSources') {
     classifier = 'sources'
-    from sourceSets.main.allSource
+    //includes all project sources with rewritten imports of relocated shadowed libraries
+    //includes rewritten sources for relocated shadowed libraries
+    from files("build/shadow/src")
 }
 
 task javadocJar(type: Jar) {
@@ -157,10 +176,6 @@ task javadocJar(type: Jar) {
 artifacts {
     archives sourcesJar
     archives javadocJar
-}
-
-checkstyle {
-    configFile = new File(rootDir, "checkstyle.xml")
 }
 
 shadowJar {
@@ -179,6 +194,7 @@ shadowJar {
 }
 
 def pomConfig = {
+    name 'Couchbase JVM Core IO'
     url 'http://couchbase.com'
     organization {
         name 'Couchbase, Inc.'
@@ -206,6 +222,16 @@ def pomConfig = {
             name 'Michael Nitschinger'
             email 'michael.nitschinger@couchbase.com'
         }
+        developer {
+            id 'simonbasle'
+            name 'Simon Baslé'
+            email 'simon@couchbase.com'
+        }
+        developer {
+            id 'avsej'
+            name 'Sergey Avseyev'
+            email 'sergey@couchbase.com'
+        }
     }
 }
 
@@ -230,6 +256,8 @@ publishing  {
                         it.appendNode('optional', 'true')
                     }
                 }
+                // For some weird reason description does not work in pomConfig, so doing it manually here.
+                root.appendNode('description', 'The official Couchbase JVM Core IO Library');
                 root.children().last() + pomConfig
             }
         }
@@ -250,3 +278,121 @@ jar.manifest.mainAttributes(
         'Specification-Version': version,
         'Specification-Vendor': 'Couchbase, Inc.'
 )
+
+afterEvaluate {
+    //resources in src/main/resources will have @tokens@ replaced
+    configure(processResources) {
+        filter(ReplaceTokens,
+                tokens: [specVersion: version, implVersion: getVersionName()])
+    }
+}
+
+//utility method for shadowSources
+void withFileSystem(URI uri, callback) {
+    java.nio.file.FileSystem fileSystem = null
+    try {
+        fileSystem = java.nio.file.FileSystems.newFileSystem(uri, [:])
+        callback(fileSystem)
+    } catch (java.nio.file.FileSystemAlreadyExistsException e) {
+        fileSystem = java.nio.file.FileSystems.getFileSystem(uri)
+        callback(fileSystem)
+    } finally {
+        if (fileSystem != null) {
+            fileSystem.close();
+        }
+    }
+}
+
+//a task that extracts the sources for relocated dependencies and rewrite them
+// with corrected packages.
+task shadowSources << {
+    def componentIds = configurations.compile.incoming.resolutionResult.allDependencies
+            .findAll {
+                (it.selected.id.toString().startsWith('io.netty')
+                || it.selected.id.toString().startsWith('com.fasterxml')
+                || it.selected.id.toString().startsWith('com.lmax'))
+    }
+    .collect { it.selected.id }
+
+    String jacksonPackage = "com.fasterxml.jackson"
+    String disruptorPackage = "com.lmax.disruptor"
+    String nettyPackage = "io.netty"
+
+    String shadowedPackage = "com.couchbase.client.deps."
+    String shadowedPath = shadowedPackage.replace('.', '/')
+
+    java.nio.charset.Charset sourceCharset = java.nio.charset.StandardCharsets.UTF_8
+    java.nio.file.Path shadowedSourceDir = file("build/shadow/src").toPath()
+
+    def result = dependencies.createArtifactResolutionQuery()
+            .forComponents(componentIds)
+            .withArtifacts(JvmLibrary, SourcesArtifact)
+            .execute()
+
+    for (component in result.resolvedComponents) {
+        component.getArtifacts(SourcesArtifact).each {
+            int sourceFileCounter = 0
+
+            withFileSystem(new URI("jar:file:" + it.file.absolutePath)) { sourceJarFileSystem ->
+
+                zipTree(it.file).visit { element ->
+                    String relativePath = element.relativePath.toString()
+                    if (relativePath.startsWith("META-INF") || element.file.isDirectory() ||
+                            !element.file.getName().endsWith(".java")) {
+                        return
+                    }
+                    java.nio.file.Path shadowedFile = shadowedSourceDir.resolve(shadowedPath + relativePath)
+                    if (Files.exists(shadowedFile)) {
+                        return
+                    }
+                    if (!Files.exists(shadowedFile.getParent())) {
+                        Files.createDirectories(shadowedFile.getParent())
+                    }
+                    sourceFileCounter++
+
+                    java.nio.file.Path originalFile = sourceJarFileSystem.getPath(element.relativePath.toString())
+                    String content = new String(Files.readAllBytes(originalFile), sourceCharset);
+
+                    content = content.replaceAll(jacksonPackage, shadowedPackage + jacksonPackage)
+                    content = content.replaceAll(disruptorPackage, shadowedPackage +  disruptorPackage)
+                    content = content.replaceAll("([^.])" + nettyPackage, "\$1" + shadowedPackage + nettyPackage);
+                    java.nio.file.Files.write(shadowedFile, content.getBytes(sourceCharset));
+                }
+            }
+
+            if (sourceFileCounter > 0)
+                println "Processing ${sourceFileCounter} sources for ${component.id} shadow sourceJar"
+            else
+                println "Nothing to do for ${component.id}"
+        }
+    }
+
+    int totalProjectSource = 0
+    int rewrittenProjectSource = 0
+    sourceSets.main.allSource.visit { element ->
+        totalProjectSource++
+        String relativePath = element.relativePath.toString()
+        java.nio.file.Path shadowedFile = shadowedSourceDir.resolve(relativePath)
+        if (Files.exists(shadowedFile)) {
+            return
+        }
+        if (!Files.exists(shadowedFile.getParent())) {
+            Files.createDirectories(shadowedFile.getParent())
+        }
+
+        java.nio.file.Path originalFile = element.file.toPath()
+
+        if (relativePath.startsWith("META-INF") || element.file.isDirectory() ||
+                !element.file.getName().endsWith(".java")) {
+            Files.copy(originalFile, shadowedFile, StandardCopyOption.COPY_ATTRIBUTES)
+        } else {
+            rewrittenProjectSource++
+            String content = new String(Files.readAllBytes(originalFile), sourceCharset);
+            content = content.replaceAll(jacksonPackage, shadowedPackage + jacksonPackage)
+            content = content.replaceAll(disruptorPackage, shadowedPackage +  disruptorPackage)
+            content = content.replaceAll("([^.])" + nettyPackage, "\$1" + shadowedPackage + nettyPackage);
+            Files.write(shadowedFile, content.getBytes(sourceCharset));
+        }
+    }
+    println "Rewritten ${totalProjectSource} sources out of ${totalProjectSource} source files for project sources."
+}

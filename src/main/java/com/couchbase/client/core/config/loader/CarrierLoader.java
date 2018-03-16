@@ -31,6 +31,7 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
 import com.couchbase.client.core.service.ServiceType;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import rx.Observable;
 import rx.functions.Func1;
 
@@ -65,22 +66,28 @@ public class CarrierLoader extends AbstractLoader {
     }
 
     @Override
-    protected Observable<String> discoverConfig(final String bucket, final String password, final InetAddress hostname) {
+    protected Observable<String> discoverConfig(final String bucket, final String password,
+        final InetAddress hostname) {
         if (!env().bootstrapCarrierEnabled()) {
             LOGGER.info("Carrier Bootstrap manually disabled.");
             return Observable.error(new ConfigurationException("Carrier Bootstrap disabled through configuration."));
         }
+        LOGGER.debug("Starting to discover config through Carrier Bootstrap");
+
         return cluster()
             .<GetBucketConfigResponse>send(new GetBucketConfigRequest(bucket, hostname))
             .map(new Func1<GetBucketConfigResponse, String>() {
                 @Override
                 public String call(GetBucketConfigResponse response) {
                     if (!response.status().isSuccess()) {
+                        response.content().release();
                         throw new IllegalStateException("Bucket config response did not return with success.");
                     }
 
                     LOGGER.debug("Successfully loaded config through carrier.");
-                    return replaceHostWildcard(response.content().toString(CharsetUtil.UTF_8), hostname);
+                    String content = response.content().toString(CharsetUtil.UTF_8);
+                    response.content().release();
+                    return replaceHostWildcard(content, hostname);
                 }
             });
     }

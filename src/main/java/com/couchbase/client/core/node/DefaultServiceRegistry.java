@@ -22,8 +22,9 @@
 package com.couchbase.client.core.node;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
+import com.couchbase.client.core.message.dcp.DCPRequest;
+import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.service.BucketServiceMapping;
@@ -115,7 +116,11 @@ public class DefaultServiceRegistry implements ServiceRegistry {
     public Service locate(final CouchbaseRequest request) {
         ServiceType type = serviceTypeFor(request);
         if (type.mapping() == BucketServiceMapping.ONE_BY_ONE) {
-            return localServices.get(request.bucket()).get(type);
+            Map<ServiceType, Service> services = localServices.get(request.bucket());
+            if (services == null) {
+                return null;
+            }
+            return services.get(type);
         } else {
             return globalServices.get(type);
         }
@@ -166,6 +171,8 @@ public class DefaultServiceRegistry implements ServiceRegistry {
             return ServiceType.VIEW;
         } else if (request instanceof QueryRequest) {
             return ServiceType.QUERY;
+        } else if (request instanceof DCPRequest) {
+            return ServiceType.DCP;
         } else {
             throw new IllegalStateException("Unknown Request: " + request);
         }
@@ -173,10 +180,10 @@ public class DefaultServiceRegistry implements ServiceRegistry {
 
     @Override
     public String toString() {
-        return "DefaultServiceRegistry{" +
-            "globalServices=" + globalServices +
-            ", localServices=" + localServices +
-            ", serviceCache=" + serviceCache +
-            '}';
+        return "DefaultServiceRegistry{"
+            + "globalServices=" + globalServices
+            + ", localServices=" + localServices
+            + ", serviceCache=" + serviceCache
+            + '}';
     }
 }

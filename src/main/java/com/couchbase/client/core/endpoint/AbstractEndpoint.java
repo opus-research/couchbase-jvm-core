@@ -51,6 +51,8 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
@@ -61,10 +63,10 @@ import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The default implementation of a {@link Endpoint}.
+ * The common parent implementation for all {@link Endpoint}s.
  *
- * This implementation provides all the common functionality across endpoints, including connection management and
- * writing data into the channel.
+ * This parent implementation provides common functionality that all {@link Endpoint}s need, most notably
+ * bootstrapping, connecting and reconnecting.
  *
  * @author Michael Nitschinger
  * @since 1.0
@@ -87,6 +89,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
 
     /**
+     * A static listener which logs failed writes.
+     */
+    private static final WriteLogListener WRITE_LOG_LISTENER = new WriteLogListener();
+
+    /**
      * The netty bootstrap adapter.
      */
     private final BootstrapAdapter bootstrap;
@@ -101,9 +108,20 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private final String password;
 
+    /**
+     * The reference to the response buffer to publish response events.
+     */
     private final RingBuffer<ResponseEvent> responseBuffer;
 
+    /**
+     * Reference to the overall {@link CoreEnvironment}.
+     */
     private final CoreEnvironment env;
+
+    /**
+     * Defines if the endpoint should destroy itself after one successful msg.
+     */
+    private final boolean isTransient;
 
     /**
      * Factory which handles {@link SSLEngine} creation.
@@ -136,19 +154,22 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Constructor to which allows to pass in an artificial bootstrap adapter.
      *
      * This method should not be used outside of tests. Please use the
-     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer)} constructor instead.
+     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean)} constructor
+     * instead.
      *
      * @param bucket the name of the bucket.
      * @param password the password of the bucket.
      * @param adapter the bootstrap adapter.
      */
-    protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter) {
+    protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
+        final boolean isTransient) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = null;
         this.env = null;
+        this.isTransient = isTransient;
     }
 
     /**
@@ -162,12 +183,13 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param responseBuffer the response buffer for passing responses up the stack.
      */
     protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
-        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer) {
+        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = responseBuffer;
         this.env = environment;
+        this.isTransient = isTransient;
         if (environment.sslEnabled()) {
             this.sslEngineFactory = new SSLEngineFactory(environment);
         }
@@ -224,15 +246,16 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     /**
      * Helper method to perform the actual connect and reconnect.
      *
-     * @param observable
+     * @param observable the {@link Subject} which is eventually notified if the connect process
+     *                   succeeded or failed.
      */
     protected void doConnect(final Subject<LifecycleState, LifecycleState> observable) {
         bootstrap.connect().addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(final ChannelFuture future) throws Exception {
                 if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
-                    LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, " +
-                        "but got instructed to disconnect in the meantime.");
+                    LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
+                        + "but got instructed to disconnect in the meantime.");
                     transitionState(LifecycleState.DISCONNECTED);
                     channel = null;
                 } else {
@@ -241,7 +264,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                         LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Connected Endpoint.");
                         transitionState(LifecycleState.CONNECTED);
                     } else {
-                        if(future.cause() instanceof AuthenticationException) {
+                        if (future.cause() instanceof AuthenticationException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
                                 + "Authentication Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
@@ -250,21 +273,25 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
                                 + "Generic Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
+                            LOGGER.warn(future.cause().getMessage());
+                            observable.onError(future.cause());
+                        } else if (isTransient) {
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
                         } else {
-                            long delay = reconnectDelay();
+                            long delay = env.reconnectDelay().calculate(reconnectAttempt++);
+                            TimeUnit delayUnit = env.reconnectDelay().unit();
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                    + "Could not connect to endpoint, retrying with delay " + delay + "ms: ",
-                                future.cause());
+                                    + "Could not connect to endpoint, retrying with delay " + delay + " "
+                                    + delayUnit + ": ", future.cause());
                             transitionState(LifecycleState.CONNECTING);
                             future.channel().eventLoop().schedule(new Runnable() {
                                 @Override
                                 public void run() {
                                     doConnect(observable);
                                 }
-                            }, delay, TimeUnit.MILLISECONDS);
+                            }, delay, delayUnit);
                         }
                     }
                 }
@@ -294,8 +321,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 if (future.isSuccess()) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Disconnected Endpoint.");
                 } else {
-                    LOGGER.warn(logIdent(channel, AbstractEndpoint.this) + "Received an error " +
-                        "during disconnect.", future.cause());
+                    LOGGER.warn(logIdent(channel, AbstractEndpoint.this) + "Received an error "
+                        + "during disconnect.", future.cause());
                 }
                 transitionState(LifecycleState.DISCONNECTED);
                 observable.onNext(state());
@@ -315,8 +342,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     hasWritten = false;
                 }
             } else {
-                if (channel.isWritable()) {
-                    channel.write(request, channel.voidPromise());
+                if (channel.isActive() && channel.isWritable()) {
+                    channel.write(request).addListener(WRITE_LOG_LISTENER);
                     hasWritten = true;
                 } else {
                     responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
@@ -340,23 +367,15 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     public void notifyChannelInactive() {
         LOGGER.debug(logIdent(channel, this) + "Got notified from Channel as inactive.");
+        if (isTransient) {
+            return;
+        }
 
         responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
         if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
             transitionState(LifecycleState.DISCONNECTED);
             connect();
         }
-    }
-
-    /**
-     * Returns the reconnect retry delay in  milliseconds.
-     *
-     * For now just use linear backoff.
-     *
-     * @return the retry delay.
-     */
-    private long reconnectDelay() {
-        return 1 << (reconnectAttempt++);
     }
 
     /**
@@ -377,10 +396,20 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         return password;
     }
 
+    /**
+     * The {@link CoreEnvironment} reference.
+     *
+     * @return the environment.
+     */
     public CoreEnvironment environment() {
         return env;
     }
 
+    /**
+     * The {@link RingBuffer} response buffer reference.
+     *
+     * @return the response buffer.
+     */
     public RingBuffer<ResponseEvent> responseBuffer() {
         return responseBuffer;
     }
@@ -394,6 +423,24 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     protected static String logIdent(final Channel chan, final Endpoint endpoint) {
         SocketAddress addr = chan != null ? chan.remoteAddress() : null;
-        return "["+addr+"][" + endpoint.getClass().getSimpleName()+"]: ";
+        return "[" + addr + "][" + endpoint.getClass().getSimpleName() + "]: ";
     }
+
+    /**
+     * A generic future listener which logs unsuccessful writes.
+     *
+     * Note that {@link ClosedChannelException}s are ignored because they are handled
+     * gracefully by the {@link AbstractGenericHandler}.
+     */
+    static class WriteLogListener implements GenericFutureListener<Future<Void>> {
+
+        @Override
+        public void operationComplete(Future<Void> future) throws Exception {
+            if (!future.isSuccess() && !(future.cause() instanceof ClosedChannelException)) {
+                LOGGER.warn("Error during IO write phase.", future.cause());
+            }
+        }
+
+    }
+
 }

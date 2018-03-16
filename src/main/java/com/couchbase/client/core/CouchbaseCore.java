@@ -47,6 +47,8 @@ import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.AddServiceResponse;
+import com.couchbase.client.core.message.internal.GetConfigProviderRequest;
+import com.couchbase.client.core.message.internal.GetConfigProviderResponse;
 import com.couchbase.client.core.message.internal.InternalRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeResponse;
@@ -55,14 +57,15 @@ import com.couchbase.client.core.message.internal.RemoveServiceResponse;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.state.LifecycleState;
 import com.lmax.disruptor.EventTranslatorOneArg;
+import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The general implementation of a {@link ClusterFacade}.
@@ -147,6 +150,22 @@ public class CouchbaseCore implements ClusterFacade {
             environment.responseBufferSize(),
             disruptorExecutor
         );
+        responseDisruptor.handleExceptionsWith(new ExceptionHandler() {
+            @Override
+            public void handleEventException(Throwable ex, long sequence, Object event) {
+                LOGGER.warn("Exception while Handling Response Events {}, {}", event, ex);
+            }
+
+            @Override
+            public void handleOnStartException(Throwable ex) {
+                LOGGER.warn("Exception while Starting Response RingBuffer {}", ex);
+            }
+
+            @Override
+            public void handleOnShutdownException(Throwable ex) {
+                LOGGER.info("Exception while shutting down Response RingBuffer {}", ex);
+            }
+        });
         responseDisruptor.handleEventsWith(new ResponseHandler(environment, this, configProvider));
         responseDisruptor.start();
         RingBuffer<ResponseEvent> responseRingBuffer = responseDisruptor.getRingBuffer();
@@ -157,6 +176,22 @@ public class CouchbaseCore implements ClusterFacade {
             disruptorExecutor
         );
         requestHandler = new RequestHandler(environment, configProvider.configs(), responseRingBuffer);
+        requestDisruptor.handleExceptionsWith(new ExceptionHandler() {
+            @Override
+            public void handleEventException(Throwable ex, long sequence, Object event) {
+                LOGGER.warn("Exception while Handling Request Events {}, {}", event, ex);
+            }
+
+            @Override
+            public void handleOnStartException(Throwable ex) {
+                LOGGER.warn("Exception while Starting Request RingBuffer {}", ex);
+            }
+
+            @Override
+            public void handleOnShutdownException(Throwable ex) {
+                LOGGER.info("Exception while shutting down Request RingBuffer {}", ex);
+            }
+        });
         requestDisruptor.handleEventsWith(requestHandler);
         requestDisruptor.start();
         requestRingBuffer = requestDisruptor.getRingBuffer();
@@ -167,16 +202,17 @@ public class CouchbaseCore implements ClusterFacade {
     public <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request) {
         if (request instanceof InternalRequest) {
             handleInternalRequest(request);
+            return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else if (request instanceof ClusterRequest) {
             handleClusterRequest(request);
+            return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else {
             boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
             if (!published) {
                 request.observable().onError(BACKPRESSURE_EXCEPTION);
             }
+            return (Observable<R>) request.observable();
         }
-
-        return (Observable<R>) request.observable().subscribeOn(environment.scheduler());
     }
 
     /**
@@ -237,14 +273,14 @@ public class CouchbaseCore implements ClusterFacade {
                         return sharedEnvironment ? Observable.just(true) : environment.shutdown();
                     }
                 }).map(new Func1<Boolean, Boolean>() {
-                @Override
-                public Boolean call(Boolean success) {
-                    requestDisruptor.shutdown();
-                    responseDisruptor.shutdown();
-                    disruptorExecutor.shutdownNow();
-                    return success;
-                }
-            })
+                    @Override
+                    public Boolean call(Boolean success) {
+                        requestDisruptor.shutdown();
+                        responseDisruptor.shutdown();
+                        disruptorExecutor.shutdownNow();
+                        return success;
+                    }
+                })
                 .map(new Func1<Boolean, DisconnectResponse>() {
                     @Override
                     public DisconnectResponse call(Boolean success) {
@@ -267,7 +303,10 @@ public class CouchbaseCore implements ClusterFacade {
      * @param request the request to dispatch.
      */
     private void handleInternalRequest(final CouchbaseRequest request) {
-        if (request instanceof AddNodeRequest) {
+        if (request instanceof GetConfigProviderRequest) {
+            request.observable().onNext(new GetConfigProviderResponse(configProvider));
+            request.observable().onCompleted();
+        } else if (request instanceof AddNodeRequest) {
             requestHandler
                 .addNode(((AddNodeRequest) request).hostname())
                 .map(new Func1<LifecycleState, AddNodeResponse>() {

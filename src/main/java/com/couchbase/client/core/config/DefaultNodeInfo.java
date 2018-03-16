@@ -42,15 +42,22 @@ public class DefaultNodeInfo implements NodeInfo {
 
     private final String viewUri;
     private final InetAddress hostname;
-    private int configPort;
     private final Map<ServiceType, Integer> directServices;
     private final Map<ServiceType, Integer> sslServices;
+    private int configPort;
 
+    /**
+     * Creates a new {@link DefaultNodeInfo} with no SSL services.
+     *
+     * @param viewUri  the URI of the view service.
+     * @param hostname the hostname of the node.
+     * @param ports    the port list of the node services.
+     */
     @JsonCreator
     public DefaultNodeInfo(
-        @JsonProperty("couchApiBase") String viewUri,
-        @JsonProperty("hostname") String hostname,
-        @JsonProperty("ports") Map<String, Integer> ports) {
+            @JsonProperty("couchApiBase") String viewUri,
+            @JsonProperty("hostname") String hostname,
+            @JsonProperty("ports") Map<String, Integer> ports) {
         this.viewUri = viewUri;
         try {
             this.hostname = InetAddress.getByName(trimPort(hostname));
@@ -61,7 +68,16 @@ public class DefaultNodeInfo implements NodeInfo {
         this.sslServices = new HashMap<ServiceType, Integer>();
     }
 
-    public DefaultNodeInfo(String viewUri, InetAddress hostname, Map<ServiceType, Integer> direct, Map<ServiceType, Integer> ssl) {
+    /**
+     * Creates a new {@link DefaultNodeInfo} with SSL services.
+     *
+     * @param viewUri  the URI of the view service.
+     * @param hostname the hostname of the node.
+     * @param direct   the port list of the direct node services.
+     * @param ssl      the port list of the ssl node services.
+     */
+    public DefaultNodeInfo(String viewUri, InetAddress hostname, Map<ServiceType, Integer> direct,
+                           Map<ServiceType, Integer> ssl) {
         this.viewUri = viewUri;
         this.hostname = hostname;
         this.directServices = direct;
@@ -98,12 +114,14 @@ public class DefaultNodeInfo implements NodeInfo {
             }
         }
         services.put(ServiceType.CONFIG, configPort);
-        services.put(ServiceType.VIEW, URI.create(viewUri).getPort());
+        if (viewUri != null) {
+            services.put(ServiceType.VIEW, URI.create(viewUri).getPort());
+        }
         return services;
     }
 
     private String trimPort(String hostname) {
-        String[] parts =  hostname.split(":");
+        String[] parts = hostname.split(":");
         configPort = Integer.parseInt(parts[1]);
         return parts[0];
     }
@@ -111,6 +129,6 @@ public class DefaultNodeInfo implements NodeInfo {
     @Override
     public String toString() {
         return "NodeInfo{" + "viewUri='" + viewUri + '\'' + ", hostname=" + hostname + ", configPort="
-            + configPort + ", directServices=" + directServices + ", sslServices=" + sslServices + '}';
+                + configPort + ", directServices=" + directServices + ", sslServices=" + sslServices + '}';
     }
 }

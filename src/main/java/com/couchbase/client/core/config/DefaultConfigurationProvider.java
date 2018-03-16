@@ -30,6 +30,9 @@ import com.couchbase.client.core.config.refresher.CarrierRefresher;
 import com.couchbase.client.core.config.refresher.HttpRefresher;
 import com.couchbase.client.core.config.refresher.Refresher;
 import com.couchbase.client.core.env.CoreEnvironment;
+import com.couchbase.client.core.event.EventBus;
+import com.couchbase.client.core.event.system.BucketClosedEvent;
+import com.couchbase.client.core.event.system.BucketOpenedEvent;
 import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -52,7 +55,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * **The default implementation of a {@link ConfigurationProvider}.**
  *
- * The {@link ConfigurationProvider} is the central orchestrator for configuration management. Observers can subscribe
+ * The {@link ConfigurationProvider} is the central orchestrator for configuration management. Observers can observe
  * bucket and cluster configurations from this component. Behind the scenes, it facilitates configuration loaders and
  * configuration refreshers that grab initial configurations and keep them refreshed respectively. The structure
  * looks like this:
@@ -61,25 +64,24 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @startuml architecture.png
  *
- * [ConfigurationProvider] --> [Config from REST]
- * [ConfigurationProvider] --> [Config from Carrier]
+ *     [ConfigurationProvider] --> [Config from REST]
+ *     [ConfigurationProvider] --> [Config from Carrier]
  *
- * package "Config from REST" {
- *   [HttpLoader]
- *   [HttpRefresher]
- * }
+ *     package "Config from REST" {
+ *         [HttpLoader]
+ *         [HttpRefresher]
+ *     }
  *
- * [HttpLoader] --> 8091
- * [HttpRefresher] --> 8091
+ *     [HttpLoader] --> 8091
+ *     [HttpRefresher] --> 8091
  *
- * package "Config from Carrier" {
- *     [CarrierLoader]
- *     [CarrierRefresher]
- * }
+ *     package "Config from Carrier" {
+ *         [CarrierLoader]
+ *         [CarrierRefresher]
+ *     }
  *
- * [CarrierLoader] --> 11210
- * [CarrierRefresher] --> 11210
- *
+ *     [CarrierLoader] --> 11210
+ *     [CarrierRefresher] --> 11210
  *
  * @enduml
  *
@@ -116,6 +118,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     private final List<Loader> loaderChain;
     private final Map<LoaderType, Refresher> refreshers;
     private final CoreEnvironment environment;
+    private final EventBus eventBus;
+
 
     /**
      * Signals if the provider is bootstrapped and serving configs.
@@ -136,10 +140,12 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             cluster,
             environment,
             Arrays.asList((Loader) new CarrierLoader(cluster, environment), new HttpLoader(cluster, environment)),
-            new HashMap<LoaderType, Refresher>() {{
-                put(LoaderType.Carrier, new CarrierRefresher(environment, cluster));
-                put(LoaderType.HTTP, new HttpRefresher(cluster));
-            }}
+            new HashMap<LoaderType, Refresher>() {
+                {
+                    put(LoaderType.Carrier, new CarrierRefresher(environment, cluster));
+                    put(LoaderType.HTTP, new HttpRefresher(cluster));
+                }
+            }
         );
     }
 
@@ -162,6 +168,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         this.loaderChain = loaderChain;
         this.refreshers = refreshers;
         this.environment = environment;
+        this.eventBus = environment.eventBus();
 
         configObservable = PublishSubject.create();
         seedHosts = new AtomicReference<Set<InetAddress>>();
@@ -218,7 +225,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public Observable<ClusterConfig> openBucket(final String bucket, final String password) {
+        LOGGER.debug("Got instructed to open bucket {}", bucket);
         if (currentConfig.get() != null && currentConfig.get().hasBucket(bucket)) {
+            LOGGER.debug("Bucket {} already opened.", bucket);
             return Observable.just(currentConfig.get());
         }
 
@@ -253,6 +262,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                 @Override
                 public void call(ClusterConfig clusterConfig) {
                     LOGGER.info("Opened bucket " + bucket);
+                    if (eventBus != null) {
+                        eventBus.publish(new BucketOpenedEvent(bucket));
+                    }
                 }
             })
             .onErrorResumeNext(new Func1<Throwable, Observable<ClusterConfig>>() {
@@ -265,11 +277,15 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public Observable<ClusterConfig> closeBucket(String name) {
+        LOGGER.debug("Closing bucket {}", name);
         return Observable.just(name).map(new Func1<String, ClusterConfig>() {
             @Override
             public ClusterConfig call(String bucket) {
                 removeBucketConfig(bucket);
                 LOGGER.info("Closed bucket " + bucket);
+                if (eventBus != null) {
+                    eventBus.publish(new BucketClosedEvent(bucket));
+                }
                 return currentConfig.get();
             }
         });
@@ -277,13 +293,15 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public Observable<Boolean> closeBuckets() {
+        LOGGER.debug("Closing all open buckets");
         if (currentConfig.get() == null || currentConfig.get().bucketConfigs().isEmpty()) {
             return Observable.just(true);
         }
 
+        Set<String> configs = new HashSet<String>(currentConfig.get().bucketConfigs().keySet());
         return Observable
-            .from(currentConfig.get().bucketConfigs().keySet())
-            .subscribeOn(environment.scheduler())
+            .from(configs)
+            .observeOn(environment.scheduler())
             .flatMap(new Func1<String, Observable<? extends ClusterConfig>>() {
                 @Override
                 public Observable<? extends ClusterConfig> call(String bucketName) {
@@ -301,6 +319,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public void proposeBucketConfig(String bucket, String rawConfig) {
+        LOGGER.debug("New Bucket {} config proposed.", bucket);
+        if (LOGGER.isTraceEnabled()) {
+            LOGGER.trace("Proposed raw config is {}", rawConfig);
+        }
+
         BucketConfig config = BucketConfigParser.parse(rawConfig);
         config.password(currentConfig.get().bucketConfig(bucket).password());
         upsertBucketConfig(config);
@@ -308,6 +331,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
 
     @Override
     public void signalOutdated() {
+        LOGGER.debug("Received signal for outdated configuration.");
+
         for (Refresher refresher : refreshers.values()) {
             refresher.refresh(currentConfig.get());
         }
@@ -321,6 +346,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      * @param bucketConfig the config itself.
      */
     private void registerBucketForRefresh(final LoaderType loaderType, final BucketConfig bucketConfig) {
+        LOGGER.debug("Registering Bucket {} to refresh at Loader {}", bucketConfig.name(), loaderType);
         Refresher refresher = refreshers.get(loaderType);
         if (refresher == null) {
             throw new IllegalStateException("Could not find refresher for loader type: " + loaderType);
@@ -338,7 +364,9 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      */
     private void upsertBucketConfig(final BucketConfig config) {
         ClusterConfig cluster = currentConfig.get();
-        if (config.rev() > 0 && cluster.bucketConfig(config.name()) != null && config.rev() <= cluster.bucketConfig(config.name()).rev()) {
+        if (config.rev() > 0 && cluster.bucketConfig(config.name()) != null
+            && config.rev() <= cluster.bucketConfig(config.name()).rev()) {
+            LOGGER.trace("Not applying new configuration, older rev ID.");
             return;
         }
 
@@ -364,6 +392,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      * @param name the name of the bucket.
      */
     private void removeBucketConfig(final String name) {
+        LOGGER.debug("Removing bucket {} configuration from known configs.", name);
         ClusterConfig cluster = currentConfig.get();
         cluster.deleteBucketConfig(name);
         currentConfig.set(cluster);

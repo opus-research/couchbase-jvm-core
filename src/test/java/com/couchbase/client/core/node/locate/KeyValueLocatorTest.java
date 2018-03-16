@@ -24,17 +24,17 @@ package com.couchbase.client.core.node.locate;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.config.DefaultNodeInfo;
-import com.couchbase.client.core.config.DefaultPartition;
 import com.couchbase.client.core.config.NodeInfo;
-import com.couchbase.client.core.config.Partition;
+import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.state.LifecycleState;
 import org.junit.Test;
-
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -43,12 +43,19 @@ import static org.mockito.Mockito.when;
 
 /**
  * Verifies the functionality of the {@link KeyValueLocator}.
+ *
+ * @author Michael Nitschinger
+ * @since 1.0.0
  */
 public class KeyValueLocatorTest {
 
     @Test
     public void shouldLocateGetRequestForCouchbaseBucket() throws Exception {
         Locator locator = new KeyValueLocator();
+
+
+        NodeInfo nodeInfo1 = new DefaultNodeInfo("foo", "192.168.56.101:11210", Collections.EMPTY_MAP);
+        NodeInfo nodeInfo2 = new DefaultNodeInfo("foo", "192.168.56.102:11210", Collections.EMPTY_MAP);
 
         GetRequest getRequestMock = mock(GetRequest.class);
         ClusterConfig configMock = mock(ClusterConfig.class);
@@ -62,24 +69,33 @@ public class KeyValueLocatorTest {
         when(getRequestMock.bucket()).thenReturn("bucket");
         when(getRequestMock.key()).thenReturn("key");
         when(configMock.bucketConfig("bucket")).thenReturn(bucketMock);
-        when(bucketMock.partitions()).thenReturn(Arrays.asList(
-            new DefaultPartition((short) 0, new short[] {1}),
-            new DefaultPartition((short) 0, new short[] {1}),
-            new DefaultPartition((short) 1, new short[] {0}),
-            (Partition) new DefaultPartition((short) 1, new short[] {0})
-        ));
-        when(bucketMock.partitionHosts()).thenReturn(Arrays.asList(
-            (NodeInfo) new DefaultNodeInfo("foo", "192.168.56.101:11210", Collections.EMPTY_MAP),
-            new DefaultNodeInfo("foo", "192.168.56.102:11210", Collections.EMPTY_MAP)
-        ));
+        when(bucketMock.nodes()).thenReturn(Arrays.asList(nodeInfo1, nodeInfo2));
+        when(bucketMock.numberOfPartitions()).thenReturn(1024);
+        when(bucketMock.nodeIndexForMaster(656)).thenReturn((short) 0);
+        when(bucketMock.nodeAtIndex(0)).thenReturn(nodeInfo1);
 
         Node[] foundNodes = locator.locate(getRequestMock, nodes, configMock);
         assertEquals(node1Mock, foundNodes[0]);
     }
 
     @Test
-    public void shouldFanOutBroadcastableRequest() {
+    public void shouldPickTheRightNodeForGetBucketConfigRequest() throws Exception {
+        Locator locator = new KeyValueLocator();
 
+        Set<Node> nodes = new LinkedHashSet<Node>();
+        Node node1Mock = mock(Node.class);
+        when(node1Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.101"));
+        when(node1Mock.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        Node node2Mock = mock(Node.class);
+        when(node2Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
+        when(node2Mock.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        nodes.addAll(Arrays.asList(node1Mock, node2Mock));
+
+        GetBucketConfigRequest requestMock = mock(GetBucketConfigRequest.class);
+        when(requestMock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
+
+        Node[] foundNodes = locator.locate(requestMock, nodes, mock(ClusterConfig.class));
+        assertEquals(node2Mock.hostname(), foundNodes[0].hostname());
     }
 
 }
