@@ -108,33 +108,16 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
             NetworkAddress convertedHost;
             int directPort;
             try {
-                String parts[] = rawHost.split(":");
-                String host = "";
-                String port = parts[parts.length - 1];
-                if (parts.length > 2) {
-                    // Handle IPv6 syntax
-                    for (int i = 0; i < parts.length - 1; i++) {
-                        host += parts[i];
-                        if (parts[i].endsWith("]")) {
-                            break;
-                        } else {
-                            host += ":";
-                        }
-                    }
-                } else {
-                    // Simple IPv4 Handling
-                    host = parts[0];
-                }
-
-                convertedHost = NetworkAddress.create(host);
+                String pair[] = rawHost.split(":");
+                convertedHost = NetworkAddress.create(pair[0]);
                 try {
-                    directPort = Integer.parseInt(port);
+                    directPort = Integer.parseInt(pair[1]);
                 } catch (NumberFormatException e) {
                     LOGGER.warn("Could not parse port from the node address: {}, fallback to 0", rawHost);
                     directPort = 0;
                 }
             } catch (Exception e) {
-                throw new ConfigurationException("Could not resolve " + rawHost + "on config building.", e);
+                throw new ConfigurationException("Could not resolve " + rawHost + "on config building.");
             }
             for (NodeInfo nodeInfo : nodeInfos) {
                 if (nodeInfo.hostname().equals(convertedHost) &&
