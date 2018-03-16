@@ -29,7 +29,6 @@ import rx.subjects.Subject;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public abstract class AbstractDCPMessage extends AbstractDCPRequest implements DCPMessage {
     private final String key;
     private final int totalBodyLength;

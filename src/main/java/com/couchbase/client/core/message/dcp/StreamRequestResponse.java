@@ -29,7 +29,6 @@ import java.util.List;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public class StreamRequestResponse extends AbstractDCPResponse {
     private final List<FailoverLogEntry> failoverLog;
     private final long rollbackToSequenceNumber;

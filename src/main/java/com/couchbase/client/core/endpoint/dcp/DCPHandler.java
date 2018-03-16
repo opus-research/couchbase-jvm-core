@@ -59,7 +59,6 @@ import java.util.Queue;
  * @author Sergey Avseyev
  * @since 1.1.0
  */
-@Deprecated
 public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheResponse, BinaryMemcacheRequest, DCPRequest> {
 
     public static final byte OP_OPEN_CONNECTION = 0x50;
