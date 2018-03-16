@@ -28,10 +28,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <native.folder>${project.build.directory}/native</native.folder>
-        <native.original>libnetty-transport-native-epoll.so</native.original>
-        <native.renamed>libcom-couchbase-client-deps-netty-transport-native-epoll.so</native.renamed>
-
         <rxjava.version>1.0.15</rxjava.version>
         <netty.version>4.0.35.Final</netty.version>
         <disruptor.version>3.3.4</disruptor.version>
@@ -219,14 +215,6 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>2.4.1</version>
                 <configuration>
-                    <filters>
-                        <filter>
-                            <artifact>*:*</artifact>
-                            <excludes>
-                                <exclude>META-INF/native/libnetty-transport-native-epoll.so</exclude>
-                            </excludes>
-                        </filter>
-                    </filters>
                     <artifactSet>
                         <excludes>
                             <exclude>io.reactivex:rxjava</exclude>
@@ -234,8 +222,6 @@
                             <exclude>commons-logging:commons-logging</exclude>
                             <exclude>log4j:log4j</exclude>
                             <exclude>org.mockito:mockito-all</exclude>
-                            <exclude>org.codehaus.mojo:animal-sniffer-annotations</exclude>
-                            <exclude></exclude>
                         </excludes>
                     </artifactSet>
                     <relocations>
@@ -357,66 +343,12 @@
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>2.10</version>
-                <executions>
-                    <execution>
-                        <id>unpack</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>unpack</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>io.netty</groupId>
-                                    <artifactId>netty-all</artifactId>
-                                    <outputDirectory>${native.folder}</outputDirectory>
-                                    <includes>META-INF/native/libnetty-transport-native-epoll.so</includes>
-                                </artifactItem>
-                            </artifactItems>
-                            <includes>META-INF/native/libnetty-transport-native-epoll.so</includes>
-                            <outputDirectory>${native.folder}</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>true</overWriteSnapshots>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>com.coderplus.maven.plugins</groupId>
-                <artifactId>copy-rename-maven-plugin</artifactId>
-                <version>1.0</version>
-                <executions>
-                    <execution>
-                        <id>rename-file</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>rename</goal>
-                        </goals>
-                        <configuration>
-                            <sourceFile>${native.folder}/META-INF/native/${native.original}</sourceFile>
-                            <destinationFile>${native.folder}/META-INF/native/${native.renamed}</destinationFile>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
 
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
-                <includes>
-                    <include>**/*</include>
-                </includes>
-            </resource>
-            <resource>
-                <directory>${native.folder}/META-INF</directory>
-                <targetPath>META-INF</targetPath>
                 <includes>
                     <include>**/*</include>
                 </includes>
