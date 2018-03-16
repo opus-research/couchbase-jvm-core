@@ -200,13 +200,13 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     request.observable().onError(ex);
                 }
             }
-        } finally {
-            event.setRequest(null);
-            if (endOfBatch && nodes != null) {
+            if (endOfBatch) {
                 for (Node node : nodes) {
                     node.send(SignalFlush.INSTANCE);
                 }
             }
+        } finally {
+            event.setRequest(null);
         }
     }
 
