@@ -20,8 +20,6 @@ import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.ResponseStatusDetails;
-import io.netty.buffer.ByteBuf;
 
 /**
  * Helper class to easily convert different handler status types to a common one.
@@ -50,8 +48,6 @@ public class ResponseStatusConverter {
     public static final int HTTP_UNAUTHORIZED = 401;
     public static final int HTTP_NOT_FOUND = 404;
     public static final int HTTP_INTERNAL_ERROR = 500;
-
-    private static final byte JSON_DATAYPE = 0x01;
 
 
     /**
@@ -180,14 +176,6 @@ public class ResponseStatusConverter {
                 status = ResponseStatus.FAILURE;
         }
         return status;
-    }
-
-    public static ResponseStatusDetails detailsFromBinary(byte dataType, ByteBuf content) {
-        if (dataType == JSON_DATAYPE) {
-            return ResponseStatusDetails.convert(content.slice());
-        } else {
-            return null;
-        }
     }
 
     /**
