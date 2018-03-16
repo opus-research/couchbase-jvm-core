@@ -23,6 +23,8 @@ import com.lmax.disruptor.RingBuffer;
 
 public class ServiceFactory {
 
+    public static final ServiceFactory INSTANCE = new ServiceFactory();
+
     /**
      * The logger used.
      */
@@ -42,11 +44,9 @@ public class ServiceFactory {
         }
     }
 
-    private ServiceFactory() {
+    private ServiceFactory() { }
 
-    }
-
-    public static Service create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
+    public Service create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
         ServiceType type, final RingBuffer<ResponseEvent> responseBuffer) {
 
         if (FORCE_OLD_SERVICES) {
@@ -59,8 +59,6 @@ public class ServiceFactory {
                     return new ConfigService(hostname, bucket, username, password, port, env, responseBuffer);
                 case QUERY:
                     return new OldQueryService(hostname, bucket, username, password, port, env, responseBuffer);
-                case DCP:
-                    return new DCPService(hostname, bucket, username, password, port, env, responseBuffer);
                 case SEARCH:
                     return new OldSearchService(hostname, bucket, username, password, port, env, responseBuffer);
                 case ANALYTICS:
@@ -78,8 +76,6 @@ public class ServiceFactory {
                     return new ConfigService(hostname, bucket, username, password, port, env, responseBuffer);
                 case QUERY:
                     return new QueryService(hostname, bucket, username, password, port, env, responseBuffer);
-                case DCP:
-                    return new DCPService(hostname, bucket, username, password, port, env, responseBuffer);
                 case SEARCH:
                     return new SearchService(hostname, bucket, username, password, port, env, responseBuffer);
                 case ANALYTICS:

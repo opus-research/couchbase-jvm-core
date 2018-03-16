@@ -30,7 +30,7 @@ import rx.subjects.Subject;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Experimental
+@InterfaceStability.Committed
 @InterfaceAudience.Public
 public abstract class AbstractSubdocMutationRequest extends AbstractSubdocRequest implements BinarySubdocMutationRequest {
 
@@ -42,7 +42,9 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
 
     private boolean xattr;
 
-    private boolean createDocument;
+    private boolean upsertDocument;
+
+    private boolean insertDocument;
 
     private long cas;
 
@@ -122,7 +124,31 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
     }
 
     @Override
-    public boolean createDocument() { return this.createDocument; }
+    public boolean createDocument() { return this.upsertDocument; }
 
-    public void createDocument(boolean createDocument) { this.createDocument = createDocument; }
+    public void createDocument(boolean createDocument) {
+        if (this.insertDocument && createDocument) {
+            throw new IllegalArgumentException("Invalid to set createDocument to true along with insertDocument");
+        }
+        this.upsertDocument = createDocument;
+    }
+
+    @Override
+    public boolean upsertDocument() { return this.upsertDocument; }
+
+    public void upsertDocument(boolean upsertDocument) {
+        if (this.insertDocument && upsertDocument) {
+            throw new IllegalArgumentException("Invalid to set upsertDocument to true along with insertDocument");
+        }
+        this.upsertDocument = upsertDocument; }
+
+    @Override
+    public boolean insertDocument() { return this.insertDocument; }
+
+    public void insertDocument(boolean insertDocument) {
+        if (this.upsertDocument && insertDocument) {
+            throw new IllegalArgumentException("Invalid to set insertDocument to true along with upsertDocument");
+        }
+        this.insertDocument = insertDocument;
+    }
 }

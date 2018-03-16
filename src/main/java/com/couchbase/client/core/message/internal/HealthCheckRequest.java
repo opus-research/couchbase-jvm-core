@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.message.internal;
 
-package com.couchbase.client.core.cluster;
+import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
-import com.couchbase.client.core.util.ClusterDependentTest;
-import org.junit.After;
-import org.junit.Before;
+public class HealthCheckRequest extends AbstractCouchbaseRequest implements InternalRequest {
 
-public class DCPTest extends ClusterDependentTest {
-    @Before
-    public void connectToCluster() throws Exception {
-        connect(false);
+    public HealthCheckRequest() {
+        super(null, null);
     }
 
-    @After
-    public void disconnectFromCluster() throws Exception {
-        disconnect();
-    }
 }
