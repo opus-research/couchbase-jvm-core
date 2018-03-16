@@ -27,8 +27,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.Subscriber;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * {@link ShutdownHook} hook for an {@link EventLoopGroup}.
  *
@@ -49,27 +47,26 @@ public class IoPoolShutdownHook implements ShutdownHook {
         return Observable.create(new Observable.OnSubscribe<Boolean>() {
             @Override
             public void call(final Subscriber<? super Boolean> subscriber) {
-                ioPool.shutdownGracefully(0, 10, TimeUnit.MILLISECONDS).addListener(
-                        new GenericFutureListener<Future<? super Object>>() {
-
-                            @Override
-                            public void operationComplete(Future<? super Object> future) throws Exception {
-                                if (subscriber.isUnsubscribed()) {
-                                    return;
-                                }
-
-                                if (!future.isSuccess()) {
-                                    subscriber.onError(future.cause());
-                                } else {
-                                    shutdown = true;
+                ioPool.shutdownGracefully().addListener(new GenericFutureListener() {
+                    @Override
+                    public void operationComplete(final Future future) throws Exception {
+                        if (!subscriber.isUnsubscribed()) {
+                            try {
+                                if (future.isSuccess()) {
                                     subscriber.onNext(true);
+                                    shutdown = true;
                                     subscriber.onCompleted();
+                                } else {
+                                    subscriber.onError(future.cause());
                                 }
+                            } catch (Exception ex) {
+                                subscriber.onError(ex);
                             }
                         }
-                );
+                    }
+                });
             }
-        });
+        }).onErrorResumeNext(Observable.just(true));
     }
 
     @Override
