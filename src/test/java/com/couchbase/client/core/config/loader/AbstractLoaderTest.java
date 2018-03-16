@@ -48,10 +48,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -76,10 +75,10 @@ public class AbstractLoaderTest {
     @Test
     public void shouldLoadConfigForOneSeedNode() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
         );
-        when(cluster.send(argThat(hasRequestFromFactory(AddServiceRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();
@@ -96,10 +95,10 @@ public class AbstractLoaderTest {
     @Test
     public void shouldLoadConfigsFromMoreSeedNodes() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
         );
-        when(cluster.send(argThat(hasRequestFromFactory(AddServiceRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();
@@ -117,10 +116,10 @@ public class AbstractLoaderTest {
     @Test
     public void shouldFailIfNoConfigCouldBeLoaded() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
         );
-        when(cluster.send(argThat(hasRequestFromFactory(AddServiceRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();
@@ -142,10 +141,10 @@ public class AbstractLoaderTest {
     @Test
     public void shouldIgnoreFailingConfigOnManySeedNodes() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
         );
-        when(cluster.send(argThat(hasRequestFromFactory(AddServiceRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();
@@ -185,7 +184,7 @@ public class AbstractLoaderTest {
     @Test
     public void shouldFailIfNodeCouldNotBeAdded() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.FAILURE, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();
@@ -207,10 +206,10 @@ public class AbstractLoaderTest {
     @Test
     public void shouldFailIfServiceCouldNotBeAdded() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        when(cluster.send(argThat(hasRequestFromFactory(AddNodeRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
         );
-        when(cluster.send(argThat(hasRequestFromFactory(AddServiceRequest.class)))).thenReturn(
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.FAILURE, host))
         );
         Set<InetAddress> seedNodes = new HashSet<InetAddress>();

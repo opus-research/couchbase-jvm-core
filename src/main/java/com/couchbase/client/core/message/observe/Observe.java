@@ -25,11 +25,9 @@ package com.couchbase.client.core.message.observe;
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.DocumentConcurrentlyModifiedException;
 import com.couchbase.client.core.ReplicaNotConfiguredException;
-import com.couchbase.client.core.RequestFactory;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.cluster.GetClusterConfigRequest;
 import com.couchbase.client.core.message.cluster.GetClusterConfigResponse;
 import com.couchbase.client.core.message.kv.ObserveRequest;
@@ -277,12 +275,7 @@ public class Observe {
             @Override
             public Observable<ObserveResponse> call() {
                 return core
-                        .<GetClusterConfigResponse>send(new RequestFactory() {
-                            @Override
-                            public CouchbaseRequest call() {
-                                return new GetClusterConfigRequest();
-                            }
-                        })
+                        .<GetClusterConfigResponse>send(new GetClusterConfigRequest())
                         .map(new Func1<GetClusterConfigResponse, Integer>() {
                             @Override
                             public Integer call(GetClusterConfigResponse response) {
@@ -305,12 +298,7 @@ public class Observe {
                             @Override
                             public Observable<ObserveResponse> call(Integer replicas) {
                                 List<Observable<ObserveResponse>> obs = new ArrayList<Observable<ObserveResponse>>();
-                                Observable<ObserveResponse> masterRes = core.send(new RequestFactory() {
-                                    @Override
-                                    public CouchbaseRequest call() {
-                                        return new ObserveRequest(id, cas, true, (short) 0, bucket);
-                                    }
-                                });
+                                Observable<ObserveResponse> masterRes = core.send(new ObserveRequest(id, cas, true, (short) 0, bucket));
                                 if (swallowErrors) {
                                     obs.add(masterRes.onErrorResumeNext(Observable.<ObserveResponse>empty()));
                                 } else {
@@ -319,13 +307,7 @@ public class Observe {
 
                                 if (persistTo.touchesReplica() || replicateTo.touchesReplica()) {
                                     for (short i = 1; i <= replicas; i++) {
-                                        final short rnum = i;
-                                        Observable<ObserveResponse> res = core.send(new RequestFactory() {
-                                            @Override
-                                            public CouchbaseRequest call() {
-                                                return new ObserveRequest(id, cas, false, rnum, bucket);
-                                            }
-                                        });
+                                        Observable<ObserveResponse> res = core.send(new ObserveRequest(id, cas, false, i, bucket));
                                         if (swallowErrors) {
                                             obs.add(res.onErrorResumeNext(Observable.<ObserveResponse>empty()));
                                         } else {
