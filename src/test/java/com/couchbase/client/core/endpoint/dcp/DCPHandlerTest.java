@@ -88,7 +88,7 @@ public class DCPHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals(connectionName, new String(outbound.getKey()));
+        assertEquals(connectionName, outbound.getKey());
         assertEquals(connectionName.length(), outbound.getKeyLength());
         assertEquals(connectionName.length() + 8, outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
