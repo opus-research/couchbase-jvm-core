@@ -25,6 +25,8 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 
+import java.util.List;
+
 /**
  * Handles the registration of services and their associated buckets.
  *
@@ -46,6 +48,6 @@ public interface ServiceRegistry {
      *
      * @return all stored services.
      */
-    Service[] services();
+    List<Service> services();
 
 }

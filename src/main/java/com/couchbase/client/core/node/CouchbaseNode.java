@@ -134,7 +134,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                     if (!connected) {
                         LOGGER.info("Connected to Node " + hostname.getHostName());
 
-                        if (eventBus != null && eventBus.hasSubscribers()) {
+                        if (eventBus !=  null) {
                             eventBus.publish(new NodeConnectedEvent(hostname));
                         }
                     }
@@ -143,7 +143,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 } else if (newState == LifecycleState.DISCONNECTED) {
                     if (connected) {
                         LOGGER.info("Disconnected from Node " + hostname.getHostName());
-                        if (eventBus != null && eventBus.hasSubscribers()) {
+                        if (eventBus != null) {
                             eventBus.publish(new NodeDisconnectedEvent(hostname));
                         }
                     }

@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2015 Couchbase, Inc.
+/*
+ * Copyright (c) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,41 +19,41 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.message.kv;
+
+package com.couchbase.client.core.endpoint.dcp;
+
+import com.couchbase.client.core.message.dcp.DCPRequest;
+import rx.subjects.PublishSubject;
+import rx.subjects.ReplaySubject;
 
 /**
- * Observe through sequence numbers instead of cas.
+ * Represents stream of incoming DCP messages.
  *
- * @author Michael Nitschinger
- * @since 1.2.0
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public class ObserveSeqnoRequest extends AbstractKeyValueRequest {
+public class DCPStream {
+    public final int id;
+    public final String bucket;
+    public final PublishSubject<DCPRequest> subject;
 
-    private final long vbucketUUID;
-    private final boolean master;
-    private final short replica;
-
-    public ObserveSeqnoRequest(long vbucketUUID, boolean master, short replica, String key, String bucket) {
-        super(key, bucket, null);
-        if (master && replica > 0) {
-            throw new IllegalArgumentException("Either master or a replica node needs to be given");
-        }
-
-        this.vbucketUUID = vbucketUUID;
-        this.master = master;
-        this.replica = replica;
+    /**
+     * Creates new {@link DCPStream} instance.
+     *
+     * @param id stream identifier
+     * @param bucket name of the bucket
+     */
+    public DCPStream(int id, String bucket) {
+        this.id = id;
+        this.bucket = bucket;
+        subject = PublishSubject.create();
     }
 
-    public long vbucketUUID() {
-        return vbucketUUID;
+    public PublishSubject<DCPRequest> subject() {
+        return subject;
     }
 
-    public short replica() {
-        return replica;
+    public String bucket() {
+        return bucket;
     }
-
-    public boolean master() {
-        return master;
-    }
-
 }

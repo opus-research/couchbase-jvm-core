@@ -31,6 +31,7 @@ import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
 import com.couchbase.client.core.util.TestProperties;
+import io.netty.util.ThreadDeathWatcher;
 import org.junit.Test;
 import rx.Observable;
 import rx.functions.Func1;
@@ -42,6 +43,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertTrue;
 
@@ -71,7 +73,6 @@ public class ThreadCleanupTest {
         env = DefaultCoreEnvironment
                 .builder()
                 .dcpEnabled(true)
-                .mutationTokensEnabled(true)
                 .build();
         cluster = new CouchbaseCore(env);
         cluster.<SeedNodesResponse>send(new SeedNodesRequest(seedNode)).flatMap(
@@ -90,8 +91,6 @@ public class ThreadCleanupTest {
 
     @Test
     public void testSdkNettyRxJavaThreadsShutdownProperly() throws InterruptedException {
-        //FIXME differently improve the tolerance of this test to threads spawned by others
-        Thread.sleep(500);
         ThreadMXBean mx = ManagementFactory.getThreadMXBean();
         LOGGER.info("Threads at start");
         Set<String> ignore = dump(threads(mx));
@@ -105,7 +104,7 @@ public class ThreadCleanupTest {
         LOGGER.info("Shutting Down Couchbase Cluster");
         disconnect();
         LOGGER.info("Shutting Down Couchbase Env");
-        boolean hasShutdown = env.shutdownAsync().toBlocking().single();
+        boolean hasShutdown = env.shutdown().toBlocking().single();
         //TODO also test RxJava Schedulers.shutdown here once we depend on 1.0.15+
         LOGGER.info("Shutting Down RxJava should be implemented here");
         LOGGER.info("");
