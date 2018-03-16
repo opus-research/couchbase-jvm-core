@@ -43,6 +43,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.oio.OioEventLoopGroup;
@@ -133,7 +134,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private final boolean isTransient;
 
+
     private final int connectCallbackGracePeriod;
+
+    private final EventLoopGroup ioPool;
 
     /**
      * Factory which handles {@link SSLEngine} creation.
@@ -171,8 +175,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Constructor to which allows to pass in an artificial bootstrap adapter.
      *
      * This method should not be used outside of tests. Please use the
-     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean)} constructor
-     * instead.
+     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup)}
+     * constructor instead.
      *
      * @param bucket the name of the bucket.
      * @param password the password of the bucket.
@@ -189,6 +193,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.isTransient = isTransient;
         this.disconnected = false;
         this.connectCallbackGracePeriod = Integer.parseInt(DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD);
+        this.ioPool = env.ioPool();
     }
 
     /**
@@ -202,13 +207,15 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param responseBuffer the response buffer for passing responses up the stack.
      */
     protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
-        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
+        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
+        final EventLoopGroup ioPool) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = responseBuffer;
         this.env = environment;
         this.isTransient = isTransient;
+        this.ioPool = ioPool;
         this.connectCallbackGracePeriod = Integer.parseInt(
             System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
         );
@@ -219,9 +226,9 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         }
 
         Class<? extends Channel> channelClass = NioSocketChannel.class;
-        if (environment.ioPool() instanceof EpollEventLoopGroup) {
+        if (ioPool instanceof EpollEventLoopGroup) {
             channelClass = EpollSocketChannel.class;
-        } else if (environment.ioPool() instanceof OioEventLoopGroup) {
+        } else if (ioPool instanceof OioEventLoopGroup) {
             channelClass = OioSocketChannel.class;
         }
 
@@ -231,7 +238,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         boolean tcpNodelay = environment().tcpNodelayEnabled();
         bootstrap = new BootstrapAdapter(new Bootstrap()
             .remoteAddress(hostname, port)
-            .group(environment.ioPool())
+            .group(ioPool)
             .channel(channelClass)
             .option(ChannelOption.ALLOCATOR, allocator)
             .option(ChannelOption.TCP_NODELAY, tcpNodelay)
@@ -310,7 +317,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         .onErrorResumeNext(new Func1<Throwable, Single<? extends ChannelFuture>>() {
             @Override
             public Single<? extends ChannelFuture> call(Throwable throwable) {
-                ChannelPromise promise = new DefaultChannelPromise(null, env.ioPool().next());
+                ChannelPromise promise = new DefaultChannelPromise(null, ioPool.next());
                 if (throwable instanceof TimeoutException) {
                     // Explicitly convert our timeout safeguard into a ConnectTimeoutException to simulate
                     // a socket connect timeout.
@@ -397,7 +404,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                         SignalConfigReload.INSTANCE, null);
                             }
                             transitionState(LifecycleState.CONNECTING);
-                            EventLoop ev = future.channel() != null ? future.channel().eventLoop() : env.ioPool().next();
+                            EventLoop ev = future.channel() != null ? future.channel().eventLoop() : ioPool.next();
                             ev.schedule(new Runnable() {
                                 @Override
                                 public void run() {
