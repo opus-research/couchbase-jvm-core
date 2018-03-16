@@ -54,7 +54,7 @@ public class ResponseHandlerTest {
 
     @Test
     public void shouldSendProposedConfigToProvider() throws Exception {
-        CouchbaseCore clusterMock = mock(CouchbaseCore.class);
+        ClusterFacade clusterMock = mock(ClusterFacade.class);
         ConfigurationProvider providerMock = mock(ConfigurationProvider.class);
         ResponseHandler handler = new ResponseHandler(ENVIRONMENT, clusterMock, providerMock);
         ByteBuf config = Unpooled.copiedBuffer("{\"json\": true}", CharsetUtil.UTF_8);
@@ -73,7 +73,7 @@ public class ResponseHandlerTest {
 
     @Test
     public void shouldIgnoreInvalidConfig() throws Exception {
-        CouchbaseCore clusterMock = mock(CouchbaseCore.class);
+        ClusterFacade clusterMock = mock(ClusterFacade.class);
         ConfigurationProvider providerMock = mock(ConfigurationProvider.class);
         ResponseHandler handler = new ResponseHandler(ENVIRONMENT, clusterMock, providerMock);
         ByteBuf config = Unpooled.copiedBuffer("Not my Vbucket", CharsetUtil.UTF_8);
