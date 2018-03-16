@@ -28,20 +28,18 @@ public interface CouchbaseBucketConfig extends BucketConfig {
      * Returns the node index for the given partition index and master.
      *
      * @param partition the index of the partition.
-     * @param useFastForward if the fast forward config should be used.
      * @return the index of the node.
      */
-    short nodeIndexForMaster(int partition, boolean useFastForward);
+    short nodeIndexForMaster(int partition);
 
     /**
      * Returns the node index for the given partition index and the replica.
      *
      * @param partition the index of the partition.
      * @param replica the replica number.
-     * @param useFastForward if the fast forward config should be used.
      * @return the index of the node.
      */
-    short nodeIndexForReplica(int partition, int replica, boolean useFastForward);
+    short nodeIndexForReplica(int partition, int replica);
 
     /**
      * Returns the total number of partitions.

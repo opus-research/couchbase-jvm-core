@@ -82,10 +82,7 @@ public class AbstractBucketConfigTest {
             return null;
         }
 
-        @Override
-        public boolean hasFastForwardMap() {
-            return false;
-        }
+
     }
 
 }
