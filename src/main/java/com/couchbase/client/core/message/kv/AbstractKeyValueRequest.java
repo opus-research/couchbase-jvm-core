@@ -22,6 +22,7 @@
 package com.couchbase.client.core.message.kv;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import io.netty.util.CharsetUtil;
 
 /**
  * Default implementation of a {@link BinaryRequest}.
@@ -43,6 +44,7 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
     /**
      * The key of the document, should be null if not tied to any.
      */
+    private final byte[] keyBtes;
     private final String key;
 
     /**
@@ -62,12 +64,19 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
     protected AbstractKeyValueRequest(String key, String bucket, String password) {
         super(bucket, password);
         this.key = key;
+
+        this.keyBtes = key == null || key.isEmpty() ? null : key.getBytes(CharsetUtil.UTF_8);
         opaque = GLOBAL_OPAQUE++;
     }
 
     @Override
     public String key() {
         return key;
+    }
+
+    @Override
+    public byte[] keyBytes() {
+        return keyBtes;
     }
 
     @Override
