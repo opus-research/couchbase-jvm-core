@@ -127,7 +127,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             ViewQueryRequest queryMsg = (ViewQueryRequest) msg;
             path.append("/").append(msg.bucket()).append("/_design/");
             path.append(queryMsg.development() ? "dev_" + queryMsg.design() : queryMsg.design());
-            path.append("/_view/").append(queryMsg.view());
+            if (queryMsg.spatial()) {
+                path.append("/_spatial/");
+            } else {
+                path.append("/_view/");
+            }
+            path.append(queryMsg.view());
             if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
                 path.append("?").append(queryMsg.query());
             }
@@ -326,7 +331,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      */
     private void parseViewInfo() {
         int rowsStart = -1;
-        for (int i = responseContent.readerIndex(); i < responseContent.writerIndex(); i++) {
+        for (int i = responseContent.readerIndex(); i < responseContent.writerIndex() - 2; i++) {
             byte curr = responseContent.getByte(i);
             byte f1 = responseContent.getByte(i + 1);
             byte f2 = responseContent.getByte(i + 2);
