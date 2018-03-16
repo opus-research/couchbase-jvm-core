@@ -34,7 +34,6 @@ import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.util.Resources;
-import com.couchbase.client.core.utils.Buffers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
@@ -103,7 +102,6 @@ public class QueryHandlerTest {
 
     private static final String FAKE_REQUESTID = "1234test-7802-4fc2-acd6-dfcd1c05a288";
     private static final String FAKE_CLIENTID = "1234567890123456789012345678901234567890123456789012345678901234";
-    private static final String FAKE_SIGNATURE = "{\"*\":\"*\"}";
 
     private ObjectMapper mapper = new ObjectMapper();
     private Queue<QueryRequest> queue;
@@ -138,7 +136,6 @@ public class QueryHandlerTest {
 
         CoreEnvironment environment = mock(CoreEnvironment.class);
         when(environment.scheduler()).thenReturn(Schedulers.computation());
-        when(environment.queryEnabled()).thenReturn(Boolean.TRUE);
         endpoint = mock(AbstractEndpoint.class);
         when(endpoint.environment()).thenReturn(environment);
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
@@ -186,7 +183,7 @@ public class QueryHandlerTest {
     private void assertResponse(GenericQueryResponse inbound,
             boolean expectedSuccess, ResponseStatus expectedStatus,
             String expectedRequestId, String expectedClientId,
-            String expectedFinalStatus, String expectedSignature,
+            String expectedFinalStatus,
             Action1<ByteBuf> assertRows,
             Action1<ByteBuf> assertErrors,
             Map<String, Object> metricsToCheck) {
@@ -218,17 +215,6 @@ public class QueryHandlerTest {
 
         inbound.errors().timeout(1, TimeUnit.SECONDS).toBlocking()
                .forEach(assertErrors);
-
-        List<ByteBuf> signatureList = inbound.signature().timeout(1, TimeUnit.SECONDS).toList().toBlocking().single();
-        if (expectedSignature != null) {
-            assertEquals(1, signatureList.size());
-            String signatureJson = signatureList.get(0).toString(CharsetUtil.UTF_8);
-            assertNotNull(signatureJson);
-            assertEquals(expectedSignature, signatureJson.replaceAll("\\s", ""));
-            ReferenceCountUtil.releaseLater(signatureList.get(0));
-        } else {
-            assertEquals(0, signatureList.size());
-        }
     }
 
     private static Map<String, Object> expectedMetricsCounts(int expectedErrors, int expectedResults) {
@@ -251,7 +237,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -291,7 +277,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -330,7 +316,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -361,7 +347,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -406,7 +392,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger found = new AtomicInteger(0);
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf row) {
@@ -459,7 +445,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger found = new AtomicInteger(0);
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -505,7 +491,6 @@ public class QueryHandlerTest {
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
         assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, expectedClientIdWithQuotes, "success",
-                FAKE_SIGNATURE,
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -551,7 +536,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456789", "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456789", "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -596,7 +581,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "", "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "", "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -641,7 +626,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -690,7 +675,7 @@ public class QueryHandlerTest {
         expectedMetrics.put("warningCount", 1);
 
         final AtomicInteger count = new AtomicInteger(0);
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -832,7 +817,6 @@ public class QueryHandlerTest {
         final AtomicInteger found = new AtomicInteger(0);
         final AtomicInteger errors = new AtomicInteger(0);
         assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456\\\"78901234567890", "success",
-                "{\"horseName\":\"json\"}",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
