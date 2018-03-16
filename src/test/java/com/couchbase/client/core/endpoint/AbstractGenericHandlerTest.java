@@ -104,7 +104,7 @@ public class AbstractGenericHandlerTest {
 
         ArrayDeque<Q> queue = new ArrayDeque<Q>();
 
-        return new AbstractGenericHandler<R, E, Q>(endpoint, responseRingBuffer, queue, false, true) {
+        return new AbstractGenericHandler<R, E, Q>(endpoint, responseRingBuffer, queue, false) {
             @Override
             protected E encodeRequest(ChannelHandlerContext ctx, Q msg) throws Exception {
                 return delegate.encodeRequest(ctx, msg);
