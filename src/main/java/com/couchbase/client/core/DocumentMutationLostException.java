@@ -24,7 +24,6 @@ package com.couchbase.client.core;
 public class DocumentMutationLostException extends CouchbaseException {
 
     public DocumentMutationLostException() {
-        super();
     }
 
     public DocumentMutationLostException(String message) {
