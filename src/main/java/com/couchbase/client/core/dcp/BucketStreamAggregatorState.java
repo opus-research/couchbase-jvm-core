@@ -22,7 +22,6 @@
 
 package com.couchbase.client.core.dcp;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -38,20 +37,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * Default state, which matches all changes in the stream.
      */
     public static final BucketStreamAggregatorState BLANK = new BucketStreamAggregatorState(0);
-    public static final BucketStreamAggregatorStateListener NULL_LISTENER =
-            new BucketStreamAggregatorStateListener() {
-                @Override
-                public void onDump(BucketStreamAggregatorState state) {
-                }
-
-                @Override
-                public void onDump(BucketStreamAggregatorState aggregatorState, int partition,
-                                   BucketStreamState streamState) {
-                }
-            };
-
-    private final BucketStreamAggregatorStateListener listener;
-    private BucketStreamState[] feeds;
+    private final BucketStreamState[] feeds;
 
     /**
      * Creates a new {@link BucketStreamAggregatorState}.
@@ -59,13 +45,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param feeds list containing state of each vBucket
      */
     public BucketStreamAggregatorState(final BucketStreamState[] feeds) {
-        this(feeds, NULL_LISTENER);
-    }
-
-    public BucketStreamAggregatorState(final BucketStreamState[] feeds,
-                                       final BucketStreamAggregatorStateListener listener) {
         this.feeds = feeds;
-        this.listener = listener;
     }
 
     /**
@@ -78,36 +58,11 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param numPartitions total number of states.
      */
     public BucketStreamAggregatorState(int numPartitions) {
-        this(numPartitions, NULL_LISTENER);
-    }
-
-    /**
-     * Creates a new {@link BucketStreamAggregatorState}.
-     * <p/>
-     * Initializes each entry with empty state BucketStreamState.BLANK. Note that it will throw
-     * {@link IndexOutOfBoundsException} during set if requested partition index will not fit
-     * the underlying container.
-     *
-     * @param numPartitions total number of states.
-     * @param listener      object used to serialize state
-     */
-    public BucketStreamAggregatorState(int numPartitions, final BucketStreamAggregatorStateListener listener) {
-        this.listener = listener;
         feeds = new BucketStreamState[numPartitions];
-        Arrays.fill(feeds, BucketStreamState.BLANK);
     }
 
     /**
-     * Returns number of aggregated partitions.
-     *
-     * @return number of partitions.
-     */
-    public int numPartitions() {
-        return feeds.length;
-    }
-
-    /**
-     * Sets state for particular vBucket and notifies listener.
+     * Sets state for particular vBucket.
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
@@ -115,45 +70,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      *                                   partition slots then requested index.
      */
     public void set(int partition, final BucketStreamState state) {
-        set(partition, state, true);
-    }
-
-    /**
-     * Sets state for particular vBucket and optionally notifies listener.
-     *
-     * @param partition vBucketID (partition number)
-     * @param state     stream state
-     * @param dump      false if state serialization should be skipped
-     * @throws IndexOutOfBoundsException if the state holder is BLANK, or allocated less
-     *                                   partition slots then requested index.
-     */
-    public void set(int partition, final BucketStreamState state, boolean dump) {
         feeds[partition] = state;
-        if (dump) {
-            listener.onDump(this, partition, state);
-        }
-    }
-
-    /**
-     * Replaces whole aggregator state and optionally notifies listener.
-     *
-     * @param feeds new state of partitions.
-     */
-    public void replace(final BucketStreamState[] feeds) {
-        replace(feeds, true);
-    }
-
-    /**
-     * Replaces whole aggregator state and optionally notifies listener.
-     *
-     * @param feeds new state of partitions.
-     * @param dump  false if state serialization should be skipped
-     */
-    public void replace(final BucketStreamState[] feeds, boolean dump) {
-        this.feeds = feeds;
-        if (dump) {
-            listener.onDump(this);
-        }
     }
 
     @Override
@@ -164,7 +81,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     /**
      * Returns state for the vBucket
      *
-     * @param partition vBucketID (partition number).
+     * @param partition vBucketID (partition number)
      * @return state or BucketStreamState.BLANK
      */
     public BucketStreamState get(int partition) {
@@ -176,7 +93,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Helper class to iterate over {@link BucketStreamAggregatorState}.
+     * Helper class to iterate over {@link BucketStreamAggregatorState}
      */
     public class BucketStreamAggregatorStateIterator implements Iterator<BucketStreamState> {
         private final BucketStreamState[] feeds;
