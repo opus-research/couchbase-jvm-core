@@ -62,18 +62,19 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed() {
-        return feed(new BucketStreamAggregatorState("jvmCore"));
+        return feed("jvmCore", BucketStreamAggregatorState.BLANK);
     }
 
     /**
      * Opens a DCP stream and returns the feed of changes.
      * Use BucketStreamAggregatorState.BLANK to start from very beginning.
      *
+     * @param name            name of the stream
      * @param aggregatorState state object
      * @return the feed with {@link DCPRequest}s.
      */
-    public Observable<DCPRequest> feed(final BucketStreamAggregatorState aggregatorState) {
-        return open(aggregatorState.name(), aggregatorState)
+    public Observable<DCPRequest> feed(final String name, final BucketStreamAggregatorState aggregatorState) {
+        return open(name, aggregatorState)
                 .flatMap(new Func1<StreamRequestResponse, Observable<DCPRequest>>() {
                              @Override
                              public Observable<DCPRequest> call(StreamRequestResponse response) {
@@ -94,17 +95,24 @@ public class BucketStreamAggregator {
     public Observable<StreamRequestResponse> open(final String name, final BucketStreamAggregatorState aggregatorState) {
         return core
                 .<OpenConnectionResponse>send(new OpenConnectionRequest(name, bucket))
-                .flatMap(new Func1<OpenConnectionResponse, Observable<StreamRequestResponse>>() {
+                .flatMap(new Func1<OpenConnectionResponse, Observable<Integer>>() {
                     @Override
-                    public Observable<StreamRequestResponse> call(OpenConnectionResponse reponse) {
+                    public Observable<Integer> call(OpenConnectionResponse openConnectionResponse) {
+                        return partitionSize();
+                    }
+                })
+                .flatMap(new Func1<Integer, Observable<StreamRequestResponse>>() {
+                    @Override
+                    public Observable<StreamRequestResponse> call(Integer numPartitions) {
                         return Observable
-                                .from(aggregatorState)
-                                .flatMap(new Func1<BucketStreamState, Observable<StreamRequestResponse>>() {
+                                .range(0, numPartitions)
+                                .flatMap(new Func1<Integer, Observable<StreamRequestResponse>>() {
                                     @Override
-                                    public Observable<StreamRequestResponse> call(final BucketStreamState feed) {
+                                    public Observable<StreamRequestResponse> call(final Integer partition) {
+                                        final BucketStreamState feed = aggregatorState.get(partition);
                                         Observable<StreamRequestResponse> res =
                                                 core.send(new StreamRequestRequest(
-                                                        feed.partition(), feed.vbucketUUID(),
+                                                        partition.shortValue(), feed.vbucketUUID(),
                                                         feed.startSequenceNumber(), feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),
                                                         bucket));
@@ -123,7 +131,7 @@ public class BucketStreamAggregator {
                                                         return Observable.just(response);
                                                 }
                                                 return core.send(new StreamRequestRequest(
-                                                        feed.partition(), feed.vbucketUUID(),
+                                                        partition.shortValue(), feed.vbucketUUID(),
                                                         rollbackSequenceNumber, feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),
                                                         bucket));
