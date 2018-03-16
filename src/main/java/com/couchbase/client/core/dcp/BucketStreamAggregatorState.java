@@ -22,11 +22,6 @@
 
 package com.couchbase.client.core.dcp;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import rx.Observable;
-import rx.subjects.PublishSubject;
-
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -37,17 +32,35 @@ import java.util.NoSuchElementException;
  * It basically contains list of the stream states.
  *
  * @author Sergey Avseyev
- * @since 1.2.0
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Public
 public class BucketStreamAggregatorState implements Iterable<BucketStreamState> {
     /**
      * Default state, which matches all changes in the stream.
      */
     public static final BucketStreamAggregatorState BLANK = new BucketStreamAggregatorState(0);
+    public static final BucketStreamAggregatorStateSerializer NULL_SERIALIZER =
+            new BucketStreamAggregatorStateSerializer() {
+                @Override
+                public void dump(BucketStreamAggregatorState state) {
+                }
 
-    private final PublishSubject<BucketStreamStateUpdatedEvent> updates;
+                @Override
+                public void dump(BucketStreamAggregatorState aggregatorState, int partition,
+                                 BucketStreamState streamState) {
+                }
+
+                @Override
+                public BucketStreamAggregatorState load(BucketStreamAggregatorState aggregatorState) {
+                    return BucketStreamAggregatorState.BLANK;
+                }
+
+                @Override
+                public BucketStreamState load(BucketStreamAggregatorState aggregatorState, int partition) {
+                    return BucketStreamState.BLANK;
+                }
+            };
+
+    private final BucketStreamAggregatorStateSerializer serializer;
     private BucketStreamState[] feeds;
 
     /**
@@ -56,8 +69,13 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param feeds list containing state of each vBucket
      */
     public BucketStreamAggregatorState(final BucketStreamState[] feeds) {
+        this(feeds, NULL_SERIALIZER);
+    }
+
+    public BucketStreamAggregatorState(final BucketStreamState[] feeds,
+                                       final BucketStreamAggregatorStateSerializer serializer) {
         this.feeds = feeds;
-        updates = PublishSubject.create();
+        this.serializer = serializer;
     }
 
     /**
@@ -70,16 +88,23 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param numPartitions total number of states.
      */
     public BucketStreamAggregatorState(int numPartitions) {
-        updates = PublishSubject.create();
-        feeds = new BucketStreamState[numPartitions];
-        Arrays.fill(feeds, BucketStreamState.BLANK);
+        this(numPartitions, NULL_SERIALIZER);
     }
 
     /**
-     * @return subject where all state updates posted.
+     * Creates a new {@link BucketStreamAggregatorState}.
+     * <p/>
+     * Initializes each entry with empty state BucketStreamState.BLANK. Note that it will throw
+     * {@link IndexOutOfBoundsException} during set if requested partition index will not fit
+     * the underlying container.
+     *
+     * @param numPartitions total number of states.
+     * @param serializer    object used to serialize state
      */
-    public Observable<BucketStreamStateUpdatedEvent> updates() {
-        return updates;
+    public BucketStreamAggregatorState(int numPartitions, final BucketStreamAggregatorStateSerializer serializer) {
+        this.serializer = serializer;
+        feeds = new BucketStreamState[numPartitions];
+        Arrays.fill(feeds, BucketStreamState.BLANK);
     }
 
     /**
@@ -92,7 +117,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Sets state for particular vBucket and notifies listener.
+     * Sets state for particular vBucket and notifies serializer.
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
@@ -104,23 +129,23 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Sets state for particular vBucket and optionally notifies listener.
+     * Sets state for particular vBucket and optionally notifies serializer.
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
-     * @param notify    false if state notification should be skipped
+     * @param dump      false if state serialization should be skipped
      * @throws IndexOutOfBoundsException if the state holder is BLANK, or allocated less
      *                                   partition slots then requested index.
      */
-    public void set(int partition, final BucketStreamState state, boolean notify) {
+    public void set(int partition, final BucketStreamState state, boolean dump) {
         feeds[partition] = state;
-        if (notify) {
-            updates.onNext(new BucketStreamStateUpdatedEvent(this, partition));
+        if (dump) {
+            serializer.dump(this, partition, state);
         }
     }
 
     /**
-     * Replaces whole aggregator state and optionally notifies listener.
+     * Replaces whole aggregator state and optionally notifies serializer.
      *
      * @param feeds new state of partitions.
      */
@@ -129,15 +154,15 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Replaces whole aggregator state and optionally notifies listener.
+     * Replaces whole aggregator state and optionally notifies serializer.
      *
-     * @param feeds  new state of partitions.
-     * @param notify false if state notification should be skipped
+     * @param feeds new state of partitions.
+     * @param dump  false if state serialization should be skipped
      */
-    public void replace(final BucketStreamState[] feeds, boolean notify) {
+    public void replace(final BucketStreamState[] feeds, boolean dump) {
         this.feeds = feeds;
-        if (notify) {
-            updates.onNext(new BucketStreamStateUpdatedEvent(this));
+        if (dump) {
+            serializer.dump(this);
         }
     }
 
