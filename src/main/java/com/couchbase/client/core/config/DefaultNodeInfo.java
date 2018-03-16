@@ -115,6 +115,7 @@ public class DefaultNodeInfo implements NodeInfo {
         }
         services.put(ServiceType.CONFIG, configPort);
         services.put(ServiceType.VIEW, URI.create(viewUri).getPort());
+        services.put(ServiceType.DCP, 11209);
         return services;
     }
 
