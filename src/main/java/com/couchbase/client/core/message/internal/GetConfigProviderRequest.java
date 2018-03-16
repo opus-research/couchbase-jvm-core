@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,39 +19,20 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+package com.couchbase.client.core.message.internal;
 
-package com.couchbase.client.core.event.system;
-
-import com.couchbase.client.core.event.CouchbaseEvent;
-import com.couchbase.client.core.event.EventType;
+import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 /**
- * .
+ * Request to fetch the configuration provider from the core.
  *
  * @author Michael Nitschinger
+ * @since 1.1.0
  */
-public class BucketClosedEvent implements CouchbaseEvent {
+public class GetConfigProviderRequest extends AbstractCouchbaseRequest implements InternalRequest {
 
-    private final String name;
-
-    public BucketClosedEvent(String name) {
-        this.name = name;
+    public GetConfigProviderRequest() {
+        super(null, null);
     }
 
-    @Override
-    public EventType type() {
-        return EventType.SYSTEM;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("BucketClosedEvent{");
-        sb.append("name='").append(name).append('\'');
-        sb.append('}');
-        return sb.toString();
-    }
 }

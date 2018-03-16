@@ -19,31 +19,29 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+package com.couchbase.client.core.message.internal;
 
-package com.couchbase.client.core.event;
-
-import rx.Observable;
+import com.couchbase.client.core.config.ConfigurationProvider;
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.ResponseStatus;
 
 /**
- * Defines the interface for a generic event bus.
+ * Response to fetch the configuration provider from the core.
  *
  * @author Michael Nitschinger
  * @since 1.1.0
  */
-public interface EventBus {
+public class GetConfigProviderResponse extends AbstractCouchbaseResponse {
 
-    /**
-     * Subscribe to the event bus to retrieve {@link CouchbaseEvent}s.
-     *
-     * @return the observable where the events are emitted into.
-     */
-    Observable<CouchbaseEvent> get();
+    private final ConfigurationProvider provider;
 
-    /**
-     * Publish a {@link CouchbaseEvent} into the bus.
-     *
-     * @param event the event to publish.
-     */
-    void publish(CouchbaseEvent event);
+    public GetConfigProviderResponse(ConfigurationProvider provider) {
+        super(ResponseStatus.SUCCESS, null);
+        this.provider = provider;
+    }
+
+    public ConfigurationProvider provider() {
+        return provider;
+    }
 
 }
