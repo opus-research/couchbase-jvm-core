@@ -419,7 +419,7 @@ public class KeyValueHandler
         }
 
         CouchbaseResponse response;
-        ByteBuf content = msg.content().copy();
+        ByteBuf content = msg.content().retain();
         long cas = msg.getCAS();
         String bucket = request.bucket();
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
@@ -444,9 +444,9 @@ public class KeyValueHandler
         } else if (request instanceof RemoveRequest) {
             response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
-            long value = status.isSuccess() ? content.readLong() : 0;
-            if (content != null) {
-                content.release();
+            long value = status.isSuccess() ? msg.content().readLong() : 0;
+            if (msg.content() != null) {
+                msg.content().release();
             }
             response = new CounterResponse(status, bucket, value, cas, request);
         } else if (request instanceof UnlockRequest) {
