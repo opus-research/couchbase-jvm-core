@@ -25,9 +25,9 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
 
-import java.util.List;
+import java.util.Set;
 
 public interface Locator {
 
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+    Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config);
 }

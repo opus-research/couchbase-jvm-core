@@ -27,8 +27,7 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
-
-import java.util.List;
+import java.util.Set;
 
 public class ViewLocator implements Locator {
 
@@ -38,7 +37,7 @@ public class ViewLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config) {
+    public Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config) {
         BucketConfig bucketConfig = config.bucketConfig(request.bucket());
         if (!(bucketConfig instanceof CouchbaseBucketConfig)) {
             request.observable().onError(NOT_AVAILABLE);
