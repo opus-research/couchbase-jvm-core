@@ -445,7 +445,7 @@ public class KeyValueHandler
             response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
             long value = status.isSuccess() ? content.readLong() : 0;
-            if (content != null && content.refCnt() > 0) {
+            if (content != null) {
                 content.release();
             }
             response = new CounterResponse(status, bucket, value, cas, request);
@@ -456,10 +456,8 @@ public class KeyValueHandler
         } else if (request instanceof ObserveRequest) {
             byte observed = status.isSuccess()
                 ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket, request);
+            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket,
+                content, request);
         } else if (request instanceof AppendRequest) {
             response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {

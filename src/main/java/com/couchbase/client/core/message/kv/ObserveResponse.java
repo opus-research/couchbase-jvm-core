@@ -2,6 +2,7 @@ package com.couchbase.client.core.message.kv;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
 
 /**
  * .
@@ -13,8 +14,8 @@ public class ObserveResponse extends AbstractKeyValueResponse {
     private final ObserveStatus observeStatus;
     private final boolean master;
 
-    public ObserveResponse(ResponseStatus status, byte obs, boolean master, String bucket, CouchbaseRequest request) {
-        super(status, bucket, null, request);
+    public ObserveResponse(ResponseStatus status, byte obs, boolean master, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         observeStatus = ObserveStatus.valueOf(obs);
         this.master = master;
     }
