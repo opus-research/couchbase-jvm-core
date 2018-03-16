@@ -27,7 +27,6 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public class RemoveMessage extends AbstractDCPMessage {
     private final long cas;
     private final long bySequenceNumber;

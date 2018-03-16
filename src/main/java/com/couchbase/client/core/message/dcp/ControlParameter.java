@@ -19,7 +19,6 @@ package com.couchbase.client.core.message.dcp;
 /**
  * @author Sergey Avseyev
  */
-@Deprecated
 public enum ControlParameter {
     /**
      * Used to enable to tell the Producer that the Consumer supports detecting
