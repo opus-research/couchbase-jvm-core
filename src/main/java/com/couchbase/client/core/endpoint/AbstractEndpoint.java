@@ -72,11 +72,6 @@ import java.util.concurrent.TimeUnit;
 public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleState> implements Endpoint {
 
     /**
-     * The maximum reconnect delay in milliseconds, so it does not grow out of bounds.
-     */
-    public static final int MAX_RECONNECT_DELAY = 4096;
-
-    /**
      * The logger used.
      */
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(Endpoint.class);
@@ -356,14 +351,12 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     /**
      * Returns the reconnect retry delay in  milliseconds.
      *
-     * It uses an exponential back-off algorithm (2^attempt) until a fixed
-     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}).
+     * For now just use linear backoff.
      *
      * @return the retry delay.
      */
     private long reconnectDelay() {
-        int delay = 1 << (reconnectAttempt++);
-        return delay >= MAX_RECONNECT_DELAY ? MAX_RECONNECT_DELAY : delay;
+        return 1 << (reconnectAttempt++);
     }
 
     /**
