@@ -253,9 +253,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 public void call() {
                     try {
                         observable.onNext(response);
-                        if (currentDecodingState == DecodingState.FINISHED) {
-                            observable.onCompleted();
-                        }
+                        observable.onCompleted();
                     } catch(Exception ex) {
                         LOGGER.warn("Caught exception while onNext on observable", ex);
                         observable.onError(ex);

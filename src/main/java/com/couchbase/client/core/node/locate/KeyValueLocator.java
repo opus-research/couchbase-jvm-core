@@ -36,14 +36,11 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveSeqnoRequest;
 import com.couchbase.client.core.message.kv.ReplicaGetRequest;
-import com.couchbase.client.core.message.kv.StatRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.state.LifecycleState;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.zip.CRC32;
@@ -74,9 +71,6 @@ public class KeyValueLocator implements Locator {
     public Node[] locate(final CouchbaseRequest request, final Set<Node> nodes, final ClusterConfig cluster) {
         if (request instanceof GetBucketConfigRequest) {
             return handleBucketConfigRequest((GetBucketConfigRequest) request, nodes);
-        }
-        if (request instanceof StatRequest) {
-            return handleStatRequest((StatRequest)request, nodes);
         }
 
         BucketConfig bucket = cluster.bucketConfig(request.bucket());
@@ -110,16 +104,6 @@ public class KeyValueLocator implements Locator {
             }
         }
         return EMPTY_NODES;
-    }
-
-    private static Node[] handleStatRequest(StatRequest request, Set<Node> nodes) {
-        List<Node> connectedNodes = new ArrayList<Node>(nodes.size());
-        for (Node node : nodes) {
-            if (node.isState(LifecycleState.CONNECTED)) {
-                connectedNodes.add(node);
-            }
-        }
-        return connectedNodes.toArray(new Node[connectedNodes.size()]);
     }
 
     /**
