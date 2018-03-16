@@ -30,7 +30,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import rx.Observable;
 import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,7 +50,7 @@ public abstract  class AbstractRefresher implements Refresher {
     /**
      * The config stream where the provider subscribes to.
      */
-    private final Subject<BucketConfig, BucketConfig> configStream;
+    private final PublishSubject<BucketConfig> configStream;
 
     /**
      * Cluster reference so that implementations can call requests.
@@ -68,7 +67,7 @@ public abstract  class AbstractRefresher implements Refresher {
      * @param cluster the cluster reference.
      */
     protected AbstractRefresher(final ClusterFacade cluster) {
-        this.configStream = PublishSubject.<BucketConfig>create().toSerialized();
+        this.configStream = PublishSubject.create();
         this.cluster = cluster;
         registrations = new ConcurrentHashMap<String, String>();
     }
