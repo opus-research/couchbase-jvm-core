@@ -31,10 +31,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.CombinedChannelDuplexHandler;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.MessageToMessageEncoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
@@ -47,8 +44,6 @@ import java.util.Queue;
  */
 public class GenericEndpointHandler extends CombinedChannelDuplexHandler<GenericEndpointHandler.EventResponseDecoder,
     GenericEndpointHandler.EventRequestEncoder> {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(GenericEndpointHandler.class);
 
     /**
      * Reference to the parent endpoint (to notify certain signals).
@@ -92,8 +87,6 @@ public class GenericEndpointHandler extends CombinedChannelDuplexHandler<Generic
      */
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
-        LOGGER.debug("ChannelInactive fired on " + ctx.channel().remoteAddress() + " for " +
-            endpoint.getClass().getSimpleName());
         endpoint.notifyChannelInactive();
         ctx.fireChannelInactive();
     }
@@ -104,33 +97,6 @@ public class GenericEndpointHandler extends CombinedChannelDuplexHandler<Generic
             ctx.flush();
         }
         ctx.fireChannelWritabilityChanged();
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        if (cause instanceof IOException) {
-            LOGGER.debug("Connection reset by peer", cause);
-            rescheduleOutstandingOps();
-        } else {
-            LOGGER.warn("Caught unknown exception in handler", cause);
-            ctx.fireExceptionCaught(cause);
-        }
-    }
-
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        rescheduleOutstandingOps();
-    }
-
-    private void rescheduleOutstandingOps() {
-        if (queue.isEmpty()) {
-            return;
-        }
-        LOGGER.debug("Rescheduling " + queue.size() + " outstanding requests on " + endpoint.getClass().getSimpleName());
-        while(!queue.isEmpty()) {
-            CouchbaseRequest req = queue.poll();
-            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, req, req.observable());
-        }
     }
 
     /**
