@@ -40,10 +40,13 @@ public class PartitionSelectionStrategyTest {
 
         Endpoint endpoint1 = mock(Endpoint.class);
         when(endpoint1.isState(LifecycleState.CONNECTED)).thenReturn(false);
+        when(endpoint1.isFree()).thenReturn(true);
         Endpoint endpoint2 = mock(Endpoint.class);
         when(endpoint2.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint2.isFree()).thenReturn(true);
         Endpoint endpoint3 = mock(Endpoint.class);
         when(endpoint3.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint3.isFree()).thenReturn(true);
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         GetBucketConfigRequest request = mock(GetBucketConfigRequest.class);
@@ -59,10 +62,13 @@ public class PartitionSelectionStrategyTest {
 
         Endpoint endpoint1 = mock(Endpoint.class);
         when(endpoint1.isState(LifecycleState.CONNECTED)).thenReturn(false);
+        when(endpoint1.isFree()).thenReturn(true);
         Endpoint endpoint2 = mock(Endpoint.class);
         when(endpoint2.isState(LifecycleState.CONNECTED)).thenReturn(false);
+        when(endpoint2.isFree()).thenReturn(true);
         Endpoint endpoint3 = mock(Endpoint.class);
         when(endpoint3.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint3.isFree()).thenReturn(true);
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         GetRequest request = mock(GetRequest.class);
@@ -79,10 +85,13 @@ public class PartitionSelectionStrategyTest {
 
         Endpoint endpoint1 = mock(Endpoint.class);
         when(endpoint1.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint1.isFree()).thenReturn(true);
         Endpoint endpoint2 = mock(Endpoint.class);
         when(endpoint2.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint2.isFree()).thenReturn(true);
         Endpoint endpoint3 = mock(Endpoint.class);
         when(endpoint3.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint3.isFree()).thenReturn(true);
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         GetRequest request = mock(GetRequest.class);
@@ -101,10 +110,13 @@ public class PartitionSelectionStrategyTest {
 
         Endpoint endpoint1 = mock(Endpoint.class);
         when(endpoint1.isState(LifecycleState.CONNECTED)).thenReturn(false);
+        when(endpoint1.isFree()).thenReturn(true);
         Endpoint endpoint2 = mock(Endpoint.class);
         when(endpoint2.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint2.isFree()).thenReturn(true);
         Endpoint endpoint3 = mock(Endpoint.class);
         when(endpoint3.isState(LifecycleState.CONNECTED)).thenReturn(true);
+        when(endpoint3.isFree()).thenReturn(true);
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         GetRequest request = mock(GetRequest.class);
