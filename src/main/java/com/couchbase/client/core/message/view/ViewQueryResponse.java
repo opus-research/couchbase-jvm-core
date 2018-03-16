@@ -31,16 +31,13 @@ public class ViewQueryResponse extends AbstractCouchbaseResponse {
 
     private final Observable<ByteBuf> rows;
     private final Observable<ByteBuf> info;
-    private final int responseCode;
-    private final String responsePhrase;
 
-    public ViewQueryResponse(Observable<ByteBuf> rows, Observable<ByteBuf> info, int responseCode,
-        String responsePhrase, ResponseStatus status, CouchbaseRequest request) {
+
+    public ViewQueryResponse(Observable<ByteBuf> rows, Observable<ByteBuf> info, ResponseStatus status,
+        CouchbaseRequest request) {
         super(status, request);
         this.rows = rows;
         this.info = info;
-        this.responseCode = responseCode;
-        this.responsePhrase = responsePhrase;
     }
 
     public Observable<ByteBuf> rows() {
@@ -48,11 +45,4 @@ public class ViewQueryResponse extends AbstractCouchbaseResponse {
     }
     public Observable<ByteBuf> info() { return info; }
 
-    public String responsePhrase() {
-        return responsePhrase;
-    }
-
-    public int responseCode() {
-        return responseCode;
-    }
 }
