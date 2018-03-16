@@ -358,7 +358,7 @@ public class CouchbaseCore implements ClusterFacade {
                     .map(new Func1<Service, RemoveServiceResponse>() {
                         @Override
                         public RemoveServiceResponse call(Service service) {
-                            return new RemoveServiceResponse(ResponseStatus.SUCCESS);
+                            return new RemoveServiceResponse(ResponseStatus.SUCCESS, service);
                         }
                     })
                     .subscribe(request.observable());

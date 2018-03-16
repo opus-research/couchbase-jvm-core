@@ -17,10 +17,18 @@ package com.couchbase.client.core.message.internal;
 
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.service.Service;
 
 public class RemoveServiceResponse extends AbstractCouchbaseResponse {
 
-    public RemoveServiceResponse(ResponseStatus status) {
+    private final Service service;
+
+    public RemoveServiceResponse(ResponseStatus status, Service service) {
         super(status, null);
+        this.service = service;
+    }
+
+    public Service service() {
+        return service;
     }
 }
