@@ -48,11 +48,6 @@ public class BestEffortRetryStrategy implements RetryStrategy {
     }
 
     @Override
-    public boolean shouldRetryObserve() {
-        return true;
-    }
-
-    @Override
     public String toString() {
         return "BestEffort";
     }
