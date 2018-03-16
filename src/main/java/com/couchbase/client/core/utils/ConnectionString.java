@@ -36,11 +36,9 @@ public class ConnectionString {
     private final Scheme scheme;
     private final List<InetSocketAddress> hosts;
     private final Map<String, String> params;
-    private final String username;
 
     protected ConnectionString(final String input) {
         this.scheme = parseScheme(input);
-        this.username = parseUser(input);
         this.hosts = parseHosts(input);
         this.params = parseParams(input);
     }
@@ -72,20 +70,9 @@ public class ConnectionString {
         }
     }
 
-    static String parseUser(final String input) {
-        if (!input.contains("@")) {
-            return null;
-        } else {
-            String schemeRemoved = input.replaceAll("\\w+://", "");
-            String username = schemeRemoved.replaceAll("@.*", "");
-            return username;
-        }
-    }
-
     static List<InetSocketAddress> parseHosts(final String input) {
         String schemeRemoved = input.replaceAll("\\w+://", "");
-        String usernameRemoved = schemeRemoved.replaceAll(".*@", "");
-        String paramsRemoved = usernameRemoved.replaceAll("\\?.*", "");
+        String paramsRemoved = schemeRemoved.replaceAll("\\?.*", "");
         String[] splitted = paramsRemoved.split(",");
 
         List<InetSocketAddress> hosts = new ArrayList<InetSocketAddress>();
@@ -125,10 +112,6 @@ public class ConnectionString {
         return scheme;
     }
 
-    public String username() {
-        return username;
-    }
-
     public List<InetSocketAddress> hosts() {
         return hosts;
     }
@@ -147,7 +130,6 @@ public class ConnectionString {
     public String toString() {
         final StringBuilder sb = new StringBuilder("ConnectionString{");
         sb.append("scheme=").append(scheme);
-        sb.append(", user=").append(username);
         sb.append(", hosts=").append(hosts);
         sb.append(", params=").append(params);
         sb.append('}');

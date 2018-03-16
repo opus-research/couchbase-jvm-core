@@ -47,24 +47,8 @@ public class OldKeyValueService extends AbstractPoolingService {
      * @param responseBuffer the shared response buffer.
      */
     public OldKeyValueService(final String hostname, final String bucket, final String password, final int port,
-                              final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    /**
-     * Creates a new {@link KeyValueService}.
-     *
-     * @param hostname the hostname of the service.
-     * @param bucket the name of the bucket.
-     * @param username the user authorized for bucket access
-     * @param password the password of the bucket.
-     * @param port the port of the service.
-     * @param env the shared environment.
-     * @param responseBuffer the shared response buffer.
-     */
-    public OldKeyValueService(final String hostname, final String bucket, final String username,  final String password, final int port,
                            final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.kvEndpoints(), env.kvEndpoints(), STRATEGY, responseBuffer,
+        super(hostname, bucket, password, port, env, env.kvEndpoints(), env.kvEndpoints(), STRATEGY, responseBuffer,
                 FACTORY);
     }
 
@@ -78,9 +62,9 @@ public class OldKeyValueService extends AbstractPoolingService {
      */
     static class KeyValueEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
+        public Endpoint create(String hostname, String bucket, String password, int port, CoreEnvironment env,
                                RingBuffer<ResponseEvent> responseBuffer) {
-            return new KeyValueEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new KeyValueEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 }
