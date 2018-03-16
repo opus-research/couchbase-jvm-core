@@ -18,7 +18,6 @@ package com.couchbase.client.core;
 public class RequestCancelledException extends CouchbaseException {
 
     public RequestCancelledException() {
-        super();
     }
 
     public RequestCancelledException(String message) {

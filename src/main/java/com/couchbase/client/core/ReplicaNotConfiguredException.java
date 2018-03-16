@@ -25,7 +25,6 @@ package com.couchbase.client.core;
 public class ReplicaNotConfiguredException extends CouchbaseException {
 
     public ReplicaNotConfiguredException() {
-        super();
     }
 
     public ReplicaNotConfiguredException(String message) {

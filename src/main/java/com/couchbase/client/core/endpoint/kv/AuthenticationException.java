@@ -20,7 +20,6 @@ import com.couchbase.client.core.CouchbaseException;
 public class AuthenticationException extends CouchbaseException {
 
     public AuthenticationException() {
-        super();
     }
 
     public AuthenticationException(String message) {
