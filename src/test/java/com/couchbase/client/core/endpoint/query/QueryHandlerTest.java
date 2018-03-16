@@ -123,7 +123,7 @@ public class QueryHandlerTest {
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<QueryRequest>();
-        handler = new QueryHandler(endpoint, responseBuffer.start(), queue, false);
+        handler = new QueryHandler(endpoint, responseBuffer.start(), queue);
         channel = new EmbeddedChannel(handler);
     }
 
