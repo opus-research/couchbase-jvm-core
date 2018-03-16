@@ -65,6 +65,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @author Sergey Avseyev
@@ -83,6 +85,10 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     public static final byte OP_BUFFER_ACK = 0x5d;
     public static final byte OP_GET_FAILOVER_LOG = 0x54;
     public static final byte OP_GET_LAST_CHECKPOINT = (byte) 0x97;
+
+    public static final ConcurrentMap<String, DCPConnection> connections =
+            new ConcurrentHashMap<String, DCPConnection>();
+
     /**
      * The Logger used in this handler.
      */
@@ -117,7 +123,12 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         if (msg instanceof OpenConnectionRequest) {
             OpenConnectionRequest openConnection = (OpenConnectionRequest) msg;
             request = handleOpenConnectionRequest(ctx, openConnection);
-            connection = new DCPConnection(env(), openConnection.connectionName(), openConnection.bucket());
+            DCPConnection newConnection = new DCPConnection(env(), openConnection.connectionName(), openConnection.bucket());
+            connection = connections.putIfAbsent(openConnection.connectionName(), newConnection);
+            if (connection == null) {
+                connection = newConnection;
+            }
+
         } else if (msg instanceof StreamRequestRequest) {
             request = handleStreamRequestRequest(ctx, (StreamRequestRequest) msg);
         } else if (msg instanceof GetFailoverLogRequest) {
@@ -305,6 +316,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
 
         if (connection.streamsCount() == 0) {
             connection.subject().onCompleted();
+            connections.remove(connection.name());
+            connection = null;
         }
     }
 
@@ -393,7 +406,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         request.setOpcode(OP_STREAM_REQUEST);
         request.setExtrasLength(extrasLength);
         request.setTotalBodyLength(extrasLength);
-        request.setOpaque(connection.addStream(connection.name()));
+        request.setOpaque(connection.addStream());
 
         return request;
     }

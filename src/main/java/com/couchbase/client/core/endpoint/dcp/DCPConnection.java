@@ -66,7 +66,7 @@ public class DCPConnection {
                 .toSerialized();
     }
 
-    public int addStream(final String connectionName) {
+    public int addStream() {
         int streamId = nextStreamId++;
         streams.add(streamId);
         return streamId;
