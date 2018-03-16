@@ -1034,7 +1034,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * If TCP_NODELAY is manually disabled, Nagle'ing will take effect on both the client
-         * and (if supported) the server side.
+         * (and if supported) and the server side.
          */
         public Builder tcpNodelayEnabled(boolean tcpNodelayEnabled) {
             this.tcpNodelayEnabled = tcpNodelayEnabled;

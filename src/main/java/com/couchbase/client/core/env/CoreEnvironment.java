@@ -98,7 +98,6 @@ public interface CoreEnvironment {
      * @return true if manual N1QL querying is enabled.
      * @deprecated
      */
-    @Deprecated
     boolean queryEnabled();
 
     /**
@@ -109,7 +108,6 @@ public interface CoreEnvironment {
      * @return the query port.
      * @deprecated
      */
-    @Deprecated
     int queryPort();
 
     /**
