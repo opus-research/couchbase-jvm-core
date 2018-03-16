@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 
+
 /**
  * Couchbase Core IO - Domain Model and Architecture
  * =================================================
@@ -95,23 +96,23 @@
  *
  * @startuml simple.png
  *
- *     cloud "Netty" {
- *         [View Channel 1]
- *         [View Channel 2]
- *         [Query Channel 1]
- *     }
+ * cloud "Netty" {
+ *     [View Channel 1]
+ *     [View Channel 2]
+ *     [Query Channel 1]
+ * }
  *
- *     [Node] --> [View Service]
- *     [Node] --> [Query Service]
+ * [Node] --> [View Service]
+ * [Node] --> [Query Service]
  *
- *     [View Service] --> [View Endpoint 1]
- *     [View Service] --> [View Endpoint 2]
+ * [View Service] --> [View Endpoint 1]
+ * [View Service] --> [View Endpoint 2]
  *
- *     [Query Service] --> [Query Endpoint 1]
+ * [Query Service] --> [Query Endpoint 1]
  *
- *     [View Endpoint 1] --> [View Channel 1]
- *     [View Endpoint 2] --> [View Channel 2]
- *     [Query Endpoint 1] --> [Query Channel 1]
+ * [View Endpoint 1] --> [View Channel 1]
+ * [View Endpoint 2] --> [View Channel 2]
+ * [Query Endpoint 1] --> [Query Channel 1]
  *
  * @enduml
  *
