@@ -75,7 +75,7 @@ public class KeyValueLocator implements Locator {
             return;
         }
         if (request instanceof GetAllMutationTokensRequest) {
-            locateByHostname(request, ((GetAllMutationTokensRequest) request).hostname(), nodes, env, responseBuffer);
+            firstConnectedNode(request, nodes, env, responseBuffer);
             return;
         }
 
@@ -97,6 +97,22 @@ public class KeyValueLocator implements Locator {
                 if (!hostname.equals(node.hostname())) {
                     continue;
                 }
+                node.send(request);
+                return;
+            }
+        }
+        RetryHelper.retryOrCancel(env, request, responseBuffer);
+    }
+
+    /**
+     * Returns first node in {@link LifecycleState#CONNECTED} state
+     *
+     * @param nodes the nodes to iterate
+     */
+    private static void firstConnectedNode(CouchbaseRequest request, List<Node> nodes, CoreEnvironment env,
+        RingBuffer<ResponseEvent> responseBuffer) {
+        for (Node node : nodes) {
+            if (node.isState(LifecycleState.CONNECTED)) {
                 node.send(request);
                 return;
             }
