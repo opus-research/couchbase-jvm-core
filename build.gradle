@@ -20,10 +20,6 @@
  * IN THE SOFTWARE.
  */
 
-import org.apache.tools.ant.filters.ReplaceTokens
-
-import java.text.SimpleDateFormat
-
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
@@ -67,10 +63,7 @@ def getVersionName() {
         }
         return stdout.toString().trim()
     } catch (e) {
-        //in case git command is not accessible...
-        //put the date in there to have at least a reference point
-        SimpleDateFormat sdf = new SimpleDateFormat("YYYYMMdd");
-        return "unknown"+sdf.format(new Date());
+        return "unknown"
     }
 }
 
@@ -167,9 +160,7 @@ artifacts {
 }
 
 checkstyle {
-    File f = new File(rootDir, "checkstyle.xml")
-    if (f.exists())
-        configFile = f
+    configFile = new File(rootDir, "checkstyle.xml")
 }
 
 shadowJar {
@@ -259,11 +250,3 @@ jar.manifest.mainAttributes(
         'Specification-Version': version,
         'Specification-Vendor': 'Couchbase, Inc.'
 )
-
-afterEvaluate {
-    //resources in src/main/resources will have @tokens@ replaced
-    configure(processResources) {
-        filter(ReplaceTokens,
-                tokens: [specVersion: version, implVersion: getVersionName()])
-    }
-}
