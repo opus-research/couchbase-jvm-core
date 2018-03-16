@@ -29,13 +29,13 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.kv.BinaryResponse;
-import com.couchbase.client.core.time.Delay;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.functions.Action0;
 import rx.subjects.Subject;
+import java.util.concurrent.TimeUnit;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
@@ -152,10 +152,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        CoreEnvironment env = environment;
-        Delay delay = env.retryDelay();
-
-        final Scheduler.Worker worker = env.scheduler().createWorker();
+        final Scheduler.Worker worker = environment.scheduler().createWorker();
         worker.schedule(new Action0() {
             @Override
             public void call() {
@@ -165,6 +162,6 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                     worker.unsubscribe();
                 }
             }
-        }, delay.calculate(request.incrementRetryCount()), delay.unit());
+        }, 10, TimeUnit.MILLISECONDS);
     }
 }
