@@ -385,6 +385,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             return;
         }
 
+        if ((newConfig instanceof CouchbaseBucketConfig) &&  ((CouchbaseBucketConfig)newConfig).numberOfPartitions() == 0) {
+            LOGGER.trace("Not applying new configuration, partitions list is empty.");
+            return;
+        }
+
         // If the current password of the config is empty and an old config exists
         // make sure to transfer the password over to the new config. Otherwise it
         // is possible that authentication errors because of a null password arise.
