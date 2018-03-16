@@ -225,7 +225,7 @@ public class CouchbaseCore implements ClusterFacade {
             request.observable().onCompleted();
         } else if (request instanceof OpenBucketRequest) {
             configProvider
-                .openBucket(request.bucket(), request.username(), request.password())
+                .openBucket(request.bucket(), request.password())
                 .flatMap(new Func1<ClusterConfig, Observable<ClusterConfig>>() {
                     @Override
                     public Observable<ClusterConfig> call(ClusterConfig clusterConfig) {
