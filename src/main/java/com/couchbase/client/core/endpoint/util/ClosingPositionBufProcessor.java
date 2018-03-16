@@ -104,11 +104,8 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
         return true;
     }
 
-    /** previous bytes (current - 1) inspected by string detection (useful to detect escaped quotes) */
+    /** previous byte inspected by string detection (useful to detect escaped quotes) */
     private byte lastByte = 0;
-
-    /** previous bytes (current - 2) inspected by string detection (useful to detect escaped quotes) */
-    private byte beforeLastByte = 0;
 
     /** flag to indicate that we are currently reading a JSON string */
     private boolean inString = false;
@@ -126,11 +123,9 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
     private boolean isEscaped(byte nextByte) {
         boolean result = false;
         if (inString) {
-            if (nextByte == '\"') { //detected a potential closing quote
-                //is it escaped? we're in string, so that'd mean previous char is a backslash that is itself not escaped
-                boolean escaped = lastByte == '\\' && beforeLastByte != '\\';
-                //we're still in string if the potential closing quote was in fact escaped
-                inString = escaped;
+            if (nextByte == '\"'
+                    && lastByte != '\\') {
+                inString = false;
             }
             result = true;
         } else {
@@ -139,7 +134,6 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
                 result = true;
             }
         }
-        beforeLastByte = lastByte;
         lastByte = nextByte;
         return result;
     }
