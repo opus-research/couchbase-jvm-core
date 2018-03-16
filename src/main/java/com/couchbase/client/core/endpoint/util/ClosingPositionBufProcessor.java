@@ -1,23 +1,17 @@
-/**
- * Copyright (c) 2015 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint.util;
 
@@ -39,7 +33,7 @@ import io.netty.buffer.ByteBufProcessor;
  * @author Simon Baslé
  * @since 1.1.0
  */
-public class ClosingPositionBufProcessor implements ByteBufProcessor {
+public class ClosingPositionBufProcessor extends AbstractStringAwareBufProcessor implements ByteBufProcessor {
 
     /**
      * The number of open characters found so far.
@@ -102,39 +96,5 @@ public class ClosingPositionBufProcessor implements ByteBufProcessor {
             }
         }
         return true;
-    }
-
-    /** previous byte inspected by string detection (useful to detect escaped quotes) */
-    private byte lastByte = 0;
-
-    /** flag to indicate that we are currently reading a JSON string */
-    private boolean inString = false;
-
-    /**
-     * Detects opening and closing of JSON strings and keep track of it in order
-     * to mark characters in the string (delimiter quotes included) as escaped.
-     *
-     * Quotes escaped by a \ are correctly detected and do not mark a closing of
-     * a JSON string.
-     *
-     * @param nextByte the next byte to inspect.
-     * @return true if the byte should be ignored as part of a JSON string, false otherwise.
-     */
-    private boolean isEscaped(byte nextByte) {
-        boolean result = false;
-        if (inString) {
-            if (nextByte == '\"'
-                    && lastByte != '\\') {
-                inString = false;
-            }
-            result = true;
-        } else {
-            if (nextByte == '\"') {
-                inString = true;
-                result = true;
-            }
-        }
-        lastByte = nextByte;
-        return result;
     }
 }

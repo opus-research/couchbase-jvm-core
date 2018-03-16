@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint.kv;
 
@@ -59,6 +53,7 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import rx.subjects.AsyncSubject;
@@ -122,6 +117,11 @@ public class KeyValueHandlerTest {
         channel = new EmbeddedChannel(new KeyValueHandler(mock(AbstractEndpoint.class), eventSink, requestQueue, false));
     }
 
+    @After
+    public void cleanup() {
+        channel.close().awaitUninterruptibly();
+    }
+
     @Test
     public void shouldEncodeGet() {
         String id = "key";
@@ -138,6 +138,7 @@ public class KeyValueHandlerTest {
         assertEquals(KeyValueHandler.OP_GET, outbound.getOpcode());
         assertEquals(0, outbound.getExtrasLength());
         assertEquals(request.opaque(), outbound.getOpaque());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -197,6 +198,7 @@ public class KeyValueHandlerTest {
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_GET_REPLICA, outbound.getOpcode());
         assertEquals(0, outbound.getExtrasLength());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -237,6 +239,7 @@ public class KeyValueHandlerTest {
         assertEquals(KeyValueHandler.OP_GET_AND_TOUCH, outbound.getOpcode());
         assertEquals(4, outbound.getExtrasLength());
         assertEquals(10, outbound.getExtras().readInt());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -254,6 +257,7 @@ public class KeyValueHandlerTest {
         assertEquals(KeyValueHandler.OP_GET_AND_LOCK, outbound.getOpcode());
         assertEquals(4, outbound.getExtrasLength());
         assertEquals(5, outbound.getExtras().readInt());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -268,6 +272,7 @@ public class KeyValueHandlerTest {
         assertEquals(0, outbound.getTotalBodyLength());
         assertEquals(0, outbound.getExtrasLength());
         assertEquals(KeyValueHandler.OP_GET_BUCKET_CONFIG, outbound.getOpcode());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -289,6 +294,7 @@ public class KeyValueHandlerTest {
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals(0, outbound.getCAS());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new InsertRequest("key", content.copy(), 10, 0, "bucket");
         request.partition((short) 512);
@@ -304,6 +310,7 @@ public class KeyValueHandlerTest {
         assertEquals(10, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new InsertRequest("key", content.copy(), 0, 5, "bucket");
         request.partition((short) 512);
@@ -319,6 +326,7 @@ public class KeyValueHandlerTest {
         assertEquals(0, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new InsertRequest("key", content.copy(), 30, 99, "bucket");
         request.partition((short) 512);
@@ -334,6 +342,7 @@ public class KeyValueHandlerTest {
         assertEquals(30, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         ReferenceCountUtil.release(content);
     }
@@ -357,6 +366,7 @@ public class KeyValueHandlerTest {
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals(0, outbound.getCAS());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new UpsertRequest("key", content.copy(), 10, 0, "bucket");
         request.partition((short) 512);
@@ -372,6 +382,7 @@ public class KeyValueHandlerTest {
         assertEquals(10, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new UpsertRequest("key", content.copy(), 0, 5, "bucket");
         request.partition((short) 512);
@@ -387,6 +398,7 @@ public class KeyValueHandlerTest {
         assertEquals(0, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new UpsertRequest("key", content.copy(), 30, 99, "bucket");
         request.partition((short) 512);
@@ -402,6 +414,7 @@ public class KeyValueHandlerTest {
         assertEquals(30, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         ReferenceCountUtil.release(content);
     }
@@ -425,6 +438,7 @@ public class KeyValueHandlerTest {
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals(0, outbound.getCAS());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new ReplaceRequest("key", content.copy(), 0, 10, 0, "bucket");
         request.partition((short) 512);
@@ -440,6 +454,7 @@ public class KeyValueHandlerTest {
         assertEquals(10, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new ReplaceRequest("key", content.copy(), 0, 0, 5, "bucket");
         request.partition((short) 512);
@@ -455,6 +470,7 @@ public class KeyValueHandlerTest {
         assertEquals(0, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         request = new ReplaceRequest("key", content.copy(), 0, 30, 99, "bucket");
         request.partition((short) 512);
@@ -470,6 +486,7 @@ public class KeyValueHandlerTest {
         assertEquals(30, outbound.getExtras().readInt());
         assertEquals(18, outbound.getTotalBodyLength());
         assertEquals("content", outbound.content().toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
 
         ReferenceCountUtil.release(content);
     }
@@ -482,6 +499,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         FullBinaryMemcacheRequest outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertEquals(4234234234L, outbound.getCAS());
+        ReferenceCountUtil.releaseLater(outbound);
         ReferenceCountUtil.release(content);
     }
 
@@ -500,6 +518,7 @@ public class KeyValueHandlerTest {
         assertEquals(KeyValueHandler.OP_REMOVE, outbound.getOpcode());
         assertEquals(0, outbound.getExtrasLength());
         assertEquals(234234234L, outbound.getCAS());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -518,6 +537,7 @@ public class KeyValueHandlerTest {
         assertEquals(5, outbound.getExtras().readLong());
         assertEquals(15, outbound.getExtras().readInt());
         assertEquals(KeyValueHandler.OP_COUNTER_INCR, outbound.getOpcode());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -536,6 +556,7 @@ public class KeyValueHandlerTest {
         assertEquals(5, outbound.getExtras().readLong());
         assertEquals(15, outbound.getExtras().readInt());
         assertEquals(KeyValueHandler.OP_COUNTER_DECR, outbound.getOpcode());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -554,6 +575,7 @@ public class KeyValueHandlerTest {
         assertEquals(4, outbound.getExtrasLength());
         assertEquals(30, outbound.getExtras().readInt());
         assertEquals(0, outbound.getCAS());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -571,6 +593,7 @@ public class KeyValueHandlerTest {
         assertEquals(KeyValueHandler.OP_UNLOCK, outbound.getOpcode());
         assertEquals(0, outbound.getExtrasLength());
         assertEquals(234234234L, outbound.getCAS());
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -588,6 +611,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, outbound.content().readShort());
         assertEquals("key".length(), outbound.content().readShort());
         assertEquals("key", outbound.content().readBytes(outbound.content().readableBytes()).toString(CharsetUtil.UTF_8));
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -654,6 +678,8 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         channel.writeOutbound(request);
         assertEquals(2, content.refCnt());
+        ReferenceCountUtil.releaseLater(content); //release content first time
+        ReferenceCountUtil.releaseLater(channel.readOutbound()); //releases extra once + content second time
     }
 
     @Test
@@ -687,6 +713,7 @@ public class KeyValueHandlerTest {
         FullBinaryMemcacheRequest written = (FullBinaryMemcacheRequest) channel.readOutbound();
 
         assertEquals(1, written.content().refCnt());
+        ReferenceCountUtil.releaseLater(written);
     }
 
     @Test
@@ -868,7 +895,7 @@ public class KeyValueHandlerTest {
         EmbeddedChannel channel = new EmbeddedChannel(testHandler);
 
         //test idle event triggers a k/v keepAlive request and hook is called
-        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT);
+        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_READER_IDLE_STATE_EVENT);
 
         assertEquals(1, keepAliveEventCounter.get());
         assertTrue(requestQueue.peek() instanceof KeyValueHandler.KeepAliveRequest);

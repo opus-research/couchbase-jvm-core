@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.env;
 
@@ -27,11 +21,15 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
+import com.couchbase.client.core.node.MemcachedHashingStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
+
+import java.security.KeyStore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link CoreEnvironment} provides all the core building blocks like environment settings and thread pools so
@@ -43,18 +41,34 @@ import rx.Scheduler;
  * Note that the {@link CoreEnvironment} is stateful, so be sure to call {@link #shutdown()} or
  * {@link #shutdownAsync()} properly.
  */
-public interface CoreEnvironment {
+public interface CoreEnvironment extends SecureEnvironment {
 
     /**
-     * Shutdown the {@link CoreEnvironment}.
+     * Shutdown the {@link CoreEnvironment} with the default timeout.
      *
-     * @deprecated This method will be changed in 2.3.0 into a synchronous version. Please migrate
-     * to {@link #shutdownAsync()} right now to avoid breaking your code.
+     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
+     * The async version can still be found at {@link #shutdownAsync()}.
      *
-     * @return an {@link Observable} eventually returning a boolean, indicating the success of the shutdown.
+     * @return returning a boolean, indicating the success of the shutdown.
      */
-    @Deprecated
-    Observable<Boolean> shutdown();
+    boolean shutdown();
+
+    /**
+     * Shutdown the {@link CoreEnvironment} with a custom timeout.
+     *
+     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
+     * The async version can still be found at {@link #shutdownAsync()}.
+     *
+     * @return returning a boolean, indicating the success of the shutdown.
+     */
+    boolean shutdown(long timeout, TimeUnit timeUnit);
+
+    /**
+     * The default timeout for disconnect operations, set to {@link DefaultCoreEnvironment#DISCONNECT_TIMEOUT}.
+     *
+     * @return the default disconnect timeout.
+     */
+    long disconnectTimeout();
 
     /**
      * Shutdown the {@link CoreEnvironment} in an asynchronous fashion.
@@ -87,49 +101,6 @@ public interface CoreEnvironment {
      * @return true if DCP is enabled, false otherwise.
      */
     boolean dcpEnabled();
-
-    /**
-     * Identifies if SSL should be enabled.
-     *
-     * @return true if SSL is enabled, false otherwise.
-     */
-    boolean sslEnabled();
-
-    /**
-     * Identifies the filepath to the ssl keystore.
-     *
-     * @return the path to the keystore file.
-     */
-    String sslKeystoreFile();
-
-    /**
-     * The password which is used to protect the keystore.
-     *
-     * @return the keystore password.
-     */
-    String sslKeystorePassword();
-
-    /**
-     * True if N1QL querying should be enabled manually, deprecated.
-     *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return true if manual N1QL querying is enabled.
-     * @deprecated
-     */
-    @Deprecated
-    boolean queryEnabled();
-
-    /**
-     * If manual querying enabled, this defines the N1QL port to use, deprecated.
-     *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return the query port.
-     * @deprecated
-     */
-    @Deprecated
-    int queryPort();
 
     /**
      * If bootstrapping through HTTP is enabled.
@@ -262,6 +233,28 @@ public interface CoreEnvironment {
     int searchEndpoints();
 
     /**
+     * Returns version information on the core. Version number is in the form
+     * MAJOR.MINOR.PATCH, and is the one for the core-io layer.
+     *
+     * @return the version string for the core.
+     * @see #coreBuild() for a more specific build information (relevant for tracking
+     * the exact version of the code the core was built from)
+     */
+    String coreVersion();
+
+    /**
+     * Returns build information on the Couchbase Java SDK core. This has a better
+     * granularity than {@link #coreVersion()} and thus is more relevant to track
+     * the exact version of the code the core was built from.
+     *
+     * Build information can contain VCS information like commit numbers, tags, etc...
+     *
+     * @return the build string for the core.
+     * @see #coreVersion() for more generic version information.
+     */
+    String coreBuild();
+
+    /**
      * Library identification string, which can be used as User-Agent header in HTTP requests.
      *
      * @return identification string
@@ -383,4 +376,24 @@ public interface CoreEnvironment {
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     String dcpConnectionName();
+
+    /**
+     * Waiting strategy used by request {@link com.lmax.disruptor.EventProcessor}s to wait for data from
+     * {@link com.lmax.disruptor.RingBuffer}
+     *
+     * @return waiting strategy
+     */
+    @InterfaceStability.Experimental
+    @InterfaceAudience.Public
+    WaitStrategyFactory requestBufferWaitStrategy();
+
+    /**
+     * Allows to specify a custom strategy to hash memcached bucket documents.
+     *
+     * If you want to use this SDK side by side with 1.x SDKs on memcached buckets, configure the
+     * environment to use the {@link com.couchbase.client.core.node.LegacyMemcachedHashingStrategy} instead.
+     *
+     * @return the memcached hashing strategy.
+     */
+    MemcachedHashingStrategy memcachedHashingStrategy();
 }

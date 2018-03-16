@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014-2015 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.node.locate;
 
@@ -27,6 +21,7 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
+import com.couchbase.client.core.config.DefaultCouchbaseBucketConfig;
 import com.couchbase.client.core.config.MemcachedBucketConfig;
 import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
@@ -81,7 +76,7 @@ public class KeyValueLocator implements Locator {
             return;
         }
         if (request instanceof GetAllMutationTokensRequest) {
-            firstConnectedNode(request, nodes, env, responseBuffer);
+            locateByHostname(request, ((GetAllMutationTokensRequest) request).hostname(), nodes, env, responseBuffer);
             return;
         }
 
@@ -99,26 +94,10 @@ public class KeyValueLocator implements Locator {
     private static void locateByHostname(final CouchbaseRequest request, final InetAddress hostname, List<Node> nodes,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         for (Node node : nodes) {
-            if (node.isState(LifecycleState.CONNECTED)) {
+            if (node.isState(LifecycleState.CONNECTED) || node.isState(LifecycleState.DEGRADED)) {
                 if (!hostname.equals(node.hostname())) {
                     continue;
                 }
-                node.send(request);
-                return;
-            }
-        }
-        RetryHelper.retryOrCancel(env, request, responseBuffer);
-    }
-
-    /**
-     * Returns first node in {@link LifecycleState#CONNECTED} state
-     *
-     * @param nodes the nodes to iterate
-     */
-    private static void firstConnectedNode(CouchbaseRequest request, List<Node> nodes, CoreEnvironment env,
-        RingBuffer<ResponseEvent> responseBuffer) {
-        for (Node node : nodes) {
-            if (node.isState(LifecycleState.CONNECTED)) {
                 node.send(request);
                 return;
             }
@@ -175,14 +154,16 @@ public class KeyValueLocator implements Locator {
      * @return the calculated node id.
      */
     private static int calculateNodeId(int partitionId, BinaryRequest request, CouchbaseBucketConfig config) {
+        boolean useFastForward = request.retryCount() > 0 && config.hasFastForwardMap();
+
         if (request instanceof ReplicaGetRequest) {
-            return config.nodeIndexForReplica(partitionId, ((ReplicaGetRequest) request).replica() - 1);
+            return config.nodeIndexForReplica(partitionId, ((ReplicaGetRequest) request).replica() - 1, useFastForward);
         } else if (request instanceof ObserveRequest && ((ObserveRequest) request).replica() > 0) {
-            return config.nodeIndexForReplica(partitionId, ((ObserveRequest) request).replica() - 1);
+            return config.nodeIndexForReplica(partitionId, ((ObserveRequest) request).replica() - 1, useFastForward);
         } else if (request instanceof ObserveSeqnoRequest && ((ObserveSeqnoRequest) request).replica() > 0) {
-            return config.nodeIndexForReplica(partitionId, ((ObserveSeqnoRequest) request).replica() - 1);
+            return config.nodeIndexForReplica(partitionId, ((ObserveSeqnoRequest) request).replica() - 1, useFastForward);
         } else {
-            return config.nodeIndexForMaster(partitionId);
+            return config.nodeIndexForMaster(partitionId, useFastForward);
         }
     }
 
@@ -201,17 +182,22 @@ public class KeyValueLocator implements Locator {
      */
     private static void errorObservables(int nodeId, BinaryRequest request, String name, CoreEnvironment env,
         RingBuffer<ResponseEvent> responseBuffer) {
-        if (nodeId == -2) {
+        if (nodeId == DefaultCouchbaseBucketConfig.PARTITION_NOT_EXISTENT) {
             if (request instanceof ReplicaGetRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ReplicaGetRequest) request).replica() + " not configured for bucket " + name));
+                return;
             } else if (request instanceof ObserveRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ObserveRequest) request).replica() + " not configured for bucket " + name));
+                return;
             } else if (request instanceof ObserveSeqnoRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ObserveSeqnoRequest) request).replica() + " not configured for bucket " + name));
+                return;
             }
+
+            RetryHelper.retryOrCancel(env, request, responseBuffer);
             return;
         }
 

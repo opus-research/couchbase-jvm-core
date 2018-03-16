@@ -16,7 +16,7 @@
 
     <groupId>com.couchbase.client</groupId>
     <artifactId>core-io</artifactId>
-    <version>1.2.7-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Couchbase JVM Core IO</name>
@@ -32,13 +32,14 @@
         <native.original>libnetty-transport-native-epoll.so</native.original>
         <native.renamed>libcom-couchbase-client-deps-netty-transport-native-epoll.so</native.renamed>
 
-        <rxjava.version>1.0.15</rxjava.version>
-        <netty.version>4.0.35.Final</netty.version>
-        <disruptor.version>3.3.4</disruptor.version>
-        <jackson.version>2.6.5</jackson.version>
+        <rxjava.version>1.2.3</rxjava.version>
+        <netty.version>4.0.42.Final</netty.version>
+        <disruptor.version>3.3.6</disruptor.version>
+        <jackson.version>2.7.8</jackson.version>
         <latency-utils.version>2.0.3</latency-utils.version>
         <junit.version>4.12</junit.version>
         <mockito.version>1.10.19</mockito.version>
+        <assertj.version>1.7.1</assertj.version>
         <slf4j.version>1.7.7</slf4j.version>
         <log4j.version>1.2.17</log4j.version>
         <commons-logging.version>1.1.3</commons-logging.version>
@@ -165,6 +166,12 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-all</artifactId>
             <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

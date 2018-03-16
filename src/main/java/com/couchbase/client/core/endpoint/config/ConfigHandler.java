@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint.config;
 
@@ -25,6 +19,8 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
+import com.couchbase.client.core.logging.CouchbaseLogger;
+import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.config.BucketConfigRequest;
@@ -44,6 +40,8 @@ import com.couchbase.client.core.message.config.InsertBucketRequest;
 import com.couchbase.client.core.message.config.InsertBucketResponse;
 import com.couchbase.client.core.message.config.RemoveBucketRequest;
 import com.couchbase.client.core.message.config.RemoveBucketResponse;
+import com.couchbase.client.core.message.config.RestApiRequest;
+import com.couchbase.client.core.message.config.RestApiResponse;
 import com.couchbase.client.core.message.config.UpdateBucketRequest;
 import com.couchbase.client.core.message.config.UpdateBucketResponse;
 import com.couchbase.client.core.service.ServiceType;
@@ -68,7 +66,9 @@ import rx.subjects.BehaviorSubject;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.RejectedExecutionException;
 
 
 /**
@@ -80,6 +80,11 @@ import java.util.Queue;
  * @since 1.0
  */
 public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpRequest, ConfigRequest> {
+
+    /**
+     * The logger used.
+     */
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(ConfigHandler.class);
 
     /**
      * Contains the current pending response header if set.
@@ -119,6 +124,9 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
     @Override
     protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final ConfigRequest msg) throws Exception {
+        if (msg instanceof RestApiRequest) {
+            return encodeRestApiRequest(ctx, (RestApiRequest) msg);
+        }
         HttpMethod httpMethod = HttpMethod.GET;
         if (msg instanceof FlushRequest || msg instanceof InsertBucketRequest || msg instanceof UpdateBucketRequest) {
             httpMethod = HttpMethod.POST;
@@ -141,6 +149,28 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
             request.headers().set(HttpHeaders.Names.ACCEPT, "*/*");
             request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/x-www-form-urlencoded");
         }
+        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, content.readableBytes());
+        request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
+
+        addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
+        return request;
+    }
+
+    private HttpRequest encodeRestApiRequest(ChannelHandlerContext ctx, RestApiRequest msg) {
+        HttpMethod httpMethod = msg.method();
+        ByteBuf content = Unpooled.copiedBuffer(msg.body(), CharsetUtil.UTF_8);
+        String path = msg.pathWithParameters();
+
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, httpMethod, path, content);
+        //these headers COULD be overridden
+        request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
+        request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
+
+        for (Map.Entry<String, Object> header : msg.headers().entrySet()) {
+            request.headers().set(header.getKey(), header.getValue());
+        }
+
+        //these headers should always be computed from the msg
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, content.readableBytes());
 
         addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
@@ -204,6 +234,9 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
             } else if (request instanceof FlushRequest) {
                 boolean done = responseHeader.getStatus().code() != 201;
                 response = new FlushResponse(done, body, status);
+            } else if (request instanceof RestApiRequest) {
+                response = new RestApiResponse((RestApiRequest) request, responseHeader.getStatus(),
+                        responseHeader.headers(), body);
             }
 
             finishedDecoding();
@@ -275,7 +308,14 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (streamingConfigObservable != null) {
-            streamingConfigObservable.onCompleted();
+            try {
+                streamingConfigObservable.onCompleted();
+            } catch (RejectedExecutionException ex) {
+                // this can happen during shutdown, so log it but don't let it
+                // bubble up the event loop.
+                LOGGER.info(logIdent(ctx, endpoint()) + "Could not complete config stream, scheduler shut "
+                    + "down already.");
+            }
         }
         super.handlerRemoved(ctx);
         releaseResponseContent();

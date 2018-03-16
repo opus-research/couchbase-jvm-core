@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core;
 
@@ -63,12 +57,12 @@ import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * The general implementation of a {@link ClusterFacade}.
@@ -97,7 +91,7 @@ public class CouchbaseCore implements ClusterFacade {
     /**
      * A preconstructed {@link BackpressureException}.
      */
-    private static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
+    public static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
 
     /**
      * The {@link RequestEvent} {@link RingBuffer}.
@@ -118,7 +112,6 @@ public class CouchbaseCore implements ClusterFacade {
 
     private final Disruptor<RequestEvent> requestDisruptor;
     private final Disruptor<ResponseEvent> responseDisruptor;
-    private final ExecutorService disruptorExecutor;
 
     private volatile boolean sharedEnvironment = true;
 
@@ -146,14 +139,13 @@ public class CouchbaseCore implements ClusterFacade {
 
         this.environment = environment;
         configProvider = new DefaultConfigurationProvider(this, environment);
-        disruptorExecutor = Executors.newFixedThreadPool(2, new DefaultThreadFactory("cb-core", true));
-
+        ThreadFactory disruptorThreadFactory = new DefaultThreadFactory("cb-core", true);
         responseDisruptor = new Disruptor<ResponseEvent>(
             new ResponseEventFactory(),
             environment.responseBufferSize(),
-            disruptorExecutor
+            disruptorThreadFactory
         );
-        responseDisruptor.handleExceptionsWith(new ExceptionHandler<ResponseEvent>() {
+        responseDisruptor.setDefaultExceptionHandler(new ExceptionHandler<ResponseEvent>() {
             @Override
             public void handleEventException(Throwable ex, long sequence, ResponseEvent event) {
                 LOGGER.warn("Exception while Handling Response Events {}", event, ex);
@@ -176,10 +168,12 @@ public class CouchbaseCore implements ClusterFacade {
         requestDisruptor = new Disruptor<RequestEvent>(
             new RequestEventFactory(),
             environment.requestBufferSize(),
-            disruptorExecutor
+            disruptorThreadFactory,
+            ProducerType.MULTI,
+            environment.requestBufferWaitStrategy().newWaitStrategy()
         );
         requestHandler = new RequestHandler(environment, configProvider.configs(), responseRingBuffer);
-        requestDisruptor.handleExceptionsWith(new ExceptionHandler<RequestEvent>() {
+        requestDisruptor.setDefaultExceptionHandler(new ExceptionHandler<RequestEvent>() {
             @Override
             public void handleEventException(Throwable ex, long sequence, RequestEvent event) {
                 LOGGER.warn("Exception while Handling Request Events {}", event, ex);
@@ -280,7 +274,6 @@ public class CouchbaseCore implements ClusterFacade {
                     public Boolean call(Boolean success) {
                         requestDisruptor.shutdown();
                         responseDisruptor.shutdown();
-                        disruptorExecutor.shutdownNow();
                         return success;
                     }
                 })

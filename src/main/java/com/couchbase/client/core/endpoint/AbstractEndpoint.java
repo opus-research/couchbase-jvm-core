@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint;
 
@@ -45,7 +39,10 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.ConnectTimeoutException;
+import io.netty.channel.DefaultChannelPromise;
+import io.netty.channel.EventLoop;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.oio.OioEventLoopGroup;
@@ -54,16 +51,25 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.EventExecutor;
 import rx.Observable;
+import rx.Observer;
+import rx.Single;
+import rx.SingleSubscriber;
 import rx.Subscriber;
+import rx.functions.Action1;
+import rx.functions.Func1;
+import rx.observables.AsyncOnSubscribe;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLHandshakeException;
+import java.net.ConnectException;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The common parent implementation for all {@link Endpoint}s.
@@ -90,6 +96,12 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Pre-created not connected exception for performance reasons.
      */
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
+
+    /**
+     * If the callback does not return, what additional delay should be set over the socket connect
+     * timeout so that it returns eventually and is not stuck for a long time (in ms).
+     */
+    private static final String DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD = "2000";
 
     /**
      * The netty bootstrap adapter.
@@ -120,6 +132,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Defines if the endpoint should destroy itself after one successful msg.
      */
     private final boolean isTransient;
+
+    private final int connectCallbackGracePeriod;
 
     /**
      * Factory which handles {@link SSLEngine} creation.
@@ -165,15 +179,16 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param adapter the bootstrap adapter.
      */
     protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient) {
+        final boolean isTransient, CoreEnvironment env) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = null;
-        this.env = null;
+        this.env = env;
         this.isTransient = isTransient;
         this.disconnected = false;
+        this.connectCallbackGracePeriod = Integer.parseInt(DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD);
     }
 
     /**
@@ -194,6 +209,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.responseBuffer = responseBuffer;
         this.env = environment;
         this.isTransient = isTransient;
+        this.connectCallbackGracePeriod = Integer.parseInt(
+            System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
+        );
+        LOGGER.debug("Using a connectCallbackGracePeriod of {} on Endpoint {}:{}", connectCallbackGracePeriod,
+            hostname, port);
         if (environment.sslEnabled()) {
             this.sslEngineFactory = new SSLEngineFactory(environment);
         }
@@ -274,9 +294,37 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      *                      some errors (like socket connect timeout).
      */
     protected void doConnect(final Subject<LifecycleState, LifecycleState> observable, final boolean bootstrapping) {
-        bootstrap.connect().addListener(new ChannelFutureListener() {
+        Single.create(new Single.OnSubscribe<ChannelFuture>() {
             @Override
-            public void operationComplete(final ChannelFuture future) throws Exception {
+            public void call(final SingleSubscriber<? super ChannelFuture> ss) {
+                bootstrap.connect().addListener(new ChannelFutureListener() {
+                    @Override
+                    public void operationComplete(ChannelFuture cf) throws Exception {
+                        ss.onSuccess(cf);
+                    }
+                });
+            }
+        })
+        // Safeguard if the callback doesn't return after the socket timeout + a grace period of one second.
+        .timeout(env.socketConnectTimeout() + connectCallbackGracePeriod, TimeUnit.MILLISECONDS)
+        .onErrorResumeNext(new Func1<Throwable, Single<? extends ChannelFuture>>() {
+            @Override
+            public Single<? extends ChannelFuture> call(Throwable throwable) {
+                ChannelPromise promise = new DefaultChannelPromise(null, env.ioPool().next());
+                if (throwable instanceof TimeoutException) {
+                    // Explicitly convert our timeout safeguard into a ConnectTimeoutException to simulate
+                    // a socket connect timeout.
+                    promise.setFailure(new ConnectTimeoutException("Connect callback did not return, "
+                        + "hit safeguarding timeout."));
+                } else {
+                    promise.setFailure(throwable);
+                }
+                return Single.just(promise);
+            }
+        })
+        .subscribe(new SingleSubscriber<ChannelFuture>() {
+            @Override
+            public void onSuccess(ChannelFuture future) {
                 if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
@@ -290,32 +338,55 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     } else {
                         if (future.cause() instanceof AuthenticationException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Authentication Failure.");
+                                    + "Authentication Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof SSLHandshakeException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "SSL Handshake Failure during connect.");
+                                    + "SSL Handshake Failure during connect.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof ClosedChannelException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Generic Failure.");
+                                    + "Generic Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof ConnectTimeoutException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Socket connect took longer than specified timeout.");
+                                    + "Socket connect took longer than specified timeout.");
+                            transitionState(LifecycleState.DISCONNECTED);
+                            observable.onError(future.cause());
+                        } else if (future.cause() instanceof ConnectException) {
+                            LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
+                                    + "Could not connect to remote socket.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (isTransient) {
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
+                        } else {
+                            LOGGER.debug("Unhandled exception during channel connect, ignoring.", future.cause());
                         }
 
-                        if (!disconnected && !bootstrapping && !isTransient) {
+                        if (bootstrapping) {
+                            // we need to reconnect sockets, but the original observable has been failed already.
+                            // so transparently initiate the reconnect loop so if bootstrap succeeds and this endpoint
+                            // comes back online later it is picked up properly.
+                            connect(false).subscribe(new Subscriber<LifecycleState>() {
+                                @Override
+                                public void onCompleted() {}
+
+                                @Override
+                                public void onNext(LifecycleState lifecycleState) {}
+
+                                @Override
+                                public void onError(Throwable e) {
+                                    LOGGER.warn("Error during reconnect: ", e);
+                                }
+                            });
+                        } else if (!disconnected && !isTransient) {
                             long delay = env.reconnectDelay().calculate(reconnectAttempt++);
                             TimeUnit delayUnit = env.reconnectDelay().unit();
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
@@ -326,7 +397,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                         SignalConfigReload.INSTANCE, null);
                             }
                             transitionState(LifecycleState.CONNECTING);
-                            future.channel().eventLoop().schedule(new Runnable() {
+                            EventLoop ev = future.channel() != null ? future.channel().eventLoop() : env.ioPool().next();
+                            ev.schedule(new Runnable() {
                                 @Override
                                 public void run() {
                                     // Make sure to avoid a race condition where the reconnect could override
@@ -342,13 +414,20 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                 }
                             }, delay, delayUnit);
                         } else {
-                            LOGGER.debug("{}Not retrying because already disconnected.",
+                            LOGGER.debug("{}Not retrying because already disconnected or transient.",
                                     logIdent(channel, AbstractEndpoint.this));
                         }
                     }
                 }
                 observable.onNext(state());
                 observable.onCompleted();
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                // All errors are converted to failed ChannelFutures before, so this observable
+                // should never fail.
+                LOGGER.warn("Unexpected error on connect callback wrapper, this is a bug.", error);
             }
         });
     }

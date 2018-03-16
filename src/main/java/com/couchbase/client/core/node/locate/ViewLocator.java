@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.node.locate;
 
@@ -27,20 +21,29 @@ import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.env.CoreEnvironment;
+import com.couchbase.client.core.logging.CouchbaseLogger;
+import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
+import com.couchbase.client.core.utils.MathUtils;
 import com.lmax.disruptor.RingBuffer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ViewLocator implements Locator {
 
+    /**
+     * The Logger used.
+     */
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(ViewLocator.class);
+
     private static final ServiceNotAvailableException NOT_AVAILABLE =
         new ServiceNotAvailableException("Views are not available on this bucket type.");
 
-    private long counter = 0;
+    private volatile long counter = 0;
 
     @Override
     public void locateAndDispatch(CouchbaseRequest request, List<Node> nodes, ClusterConfig config,
@@ -51,26 +54,31 @@ public class ViewLocator implements Locator {
             return;
         }
 
+        nodes = filterNodes(nodes, (CouchbaseBucketConfig) bucketConfig);
+        if (nodes.isEmpty()) {
+            RetryHelper.retryOrCancel(env, request, responseBuffer);
+            return;
+        }
+
         int nodeSize = nodes.size();
-        int offset = (int) counter++ % nodeSize;
+        int offset = (int) MathUtils.floorMod(counter++, nodeSize);
+        Node node = nodes.get(offset);
+        if (node != null) {
+            node.send(request);
+        } else {
+            LOGGER.warn("Locator found selected node to be null, this is a bug. {}, {}", request, nodes);
+            RetryHelper.retryOrCancel(env, request, responseBuffer);
+        }
+    }
 
-        for (int i = offset; i < nodeSize; i++) {
-            Node node = nodes.get(i);
-            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
-                node.send(request);
-                return;
+    private List<Node> filterNodes(final List<Node> allNodes, final CouchbaseBucketConfig cfg) {
+        List<Node> result = new ArrayList<Node>(allNodes.size());
+        for (Node n : allNodes) {
+            if (checkNode(n, cfg)) {
+                result.add(n);
             }
         }
-
-        for (int i = 0; i < offset; i++) {
-            Node node = nodes.get(i);
-            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
-                node.send(request);
-                return;
-            }
-        }
-
-        RetryHelper.retryOrCancel(env, request, responseBuffer);
+        return result;
     }
 
     protected boolean checkNode(final Node node, CouchbaseBucketConfig config) {

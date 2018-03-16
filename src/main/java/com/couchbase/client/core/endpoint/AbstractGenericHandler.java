@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint;
 
@@ -33,9 +27,11 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
+import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -48,12 +44,14 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.subjects.Subject;
 
 import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
@@ -149,6 +147,13 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private ChannelPromise connectFuture;
 
     /**
+     * Returns the remote http host in usable format.
+     */
+    private String remoteHttpHost;
+
+    private final int sentQueueLimit;
+
+    /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
      *
      * @param endpoint the endpoint reference.
@@ -176,6 +181,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestTimings = new ArrayDeque<Long>();
         this.classNameCache = new IdentityHashMap<Class<? extends CouchbaseRequest>, String>();
         this.moveResponseOut = env() == null || !env().callbacksOnIoPool();
+        this.sentQueueLimit = Integer.parseInt(System.getProperty("com.couchbase.sentRequestQueueLimit", "5120"));
     }
 
     /**
@@ -210,6 +216,16 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @return the service type.
      */
     protected abstract ServiceType serviceType();
+
+    @Override
+    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+        if (sentRequestQueue.size() < sentQueueLimit) {
+            super.write(ctx, msg, promise);
+        } else {
+            LOGGER.debug("Rescheduling {} because sentRequestQueueLimit reached.", msg);
+            RetryHelper.retryOrCancel(env(), (CouchbaseRequest) msg, responseBuffer);
+        }
+    }
 
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
@@ -411,7 +427,15 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         LOGGER.debug(logIdent(ctx, endpoint) + "Channel Active.");
-        remoteHostname = ctx.channel().remoteAddress().toString();
+
+        SocketAddress addr = ctx.channel().remoteAddress();
+        if (addr instanceof InetSocketAddress) {
+            // Avoid lookup, so just use the address
+            remoteHostname = ((InetSocketAddress) addr).getAddress().getHostAddress();
+        } else {
+            // Should not happen in production, but in testing it might be different
+            remoteHostname = addr.toString();
+        }
         ctx.fireChannelActive();
     }
 
@@ -500,17 +524,14 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     @Override
     public void userEventTriggered(final ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
-            IdleStateEvent e = (IdleStateEvent) evt;
-            if (e.state() == IdleState.ALL_IDLE) {
-                CouchbaseRequest keepAlive = createKeepAliveRequest();
-                if (keepAlive != null) {
-                    keepAlive.observable().subscribe(new KeepAliveResponseAction(ctx));
-                    onKeepAliveFired(ctx, keepAlive);
+            CouchbaseRequest keepAlive = createKeepAliveRequest();
+            if (keepAlive != null) {
+                keepAlive.observable().subscribe(new KeepAliveResponseAction(ctx));
+                onKeepAliveFired(ctx, keepAlive);
 
-                    Channel channel = ctx.channel();
-                    if (channel.isActive() && channel.isWritable()) {
-                        ctx.pipeline().writeAndFlush(keepAlive);
-                    }
+                Channel channel = ctx.channel();
+                if (channel.isActive() && channel.isWritable()) {
+                    ctx.pipeline().writeAndFlush(keepAlive);
                 }
             }
         } else {
@@ -609,12 +630,22 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         return "[" + ctx.channel().remoteAddress() + "][" + endpoint.getClass().getSimpleName() + "]: ";
     }
 
-    private class KeepAliveResponseAction implements Action1<CouchbaseResponse> {
+    private class KeepAliveResponseAction extends Subscriber<CouchbaseResponse> {
         private final ChannelHandlerContext ctx;
-        public KeepAliveResponseAction(ChannelHandlerContext ctx) { this.ctx = ctx; }
+        KeepAliveResponseAction(ChannelHandlerContext ctx) { this.ctx = ctx; }
 
         @Override
-        public void call(CouchbaseResponse couchbaseResponse) {
+        public void onCompleted() {
+            // ignored on purpose.
+        }
+
+        @Override
+        public void onError(Throwable e) {
+            LOGGER.warn(logIdent(ctx, endpoint) + "Got error while consuming KeepAliveResponse.", e);
+        }
+
+        @Override
+        public void onNext(CouchbaseResponse couchbaseResponse) {
             onKeepAliveResponse(this.ctx, couchbaseResponse);
         }
     }
@@ -640,6 +671,29 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
+    }
+
+    /**
+     * Helper method to return the remote http host, cached.
+     *
+     * @param ctx the handler context.
+     * @return the remote http host.
+     */
+    protected String remoteHttpHost(ChannelHandlerContext ctx) {
+        if (remoteHttpHost == null) {
+            SocketAddress addr = ctx.channel().remoteAddress();
+            if (addr instanceof InetSocketAddress) {
+                InetSocketAddress inetAddr = (InetSocketAddress) addr;
+                remoteHttpHost = inetAddr.getAddress().getHostAddress() + ":" + inetAddr.getPort();
+            } else {
+                remoteHttpHost = addr.toString();
+            }
+        }
+        return remoteHttpHost;
+    }
+
+    public DecodingState getDecodingState() {
+        return this.currentDecodingState;
     }
 
 }

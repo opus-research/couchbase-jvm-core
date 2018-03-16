@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint.query;
 
@@ -38,6 +32,8 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
+import com.couchbase.client.core.message.query.RawQueryRequest;
+import com.couchbase.client.core.message.query.RawQueryResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
@@ -63,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findNextChar;
 import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findNextCharNotPrefixedBy;
 import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findSectionClosingPosition;
+import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findSplitPosition;
 
 /**
  * The {@link QueryHandler} is responsible for encoding {@link QueryRequest}s into lower level
@@ -76,14 +73,17 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandler.class);
 
-    private static final byte QUERY_STATE_INITIAL = 0;
-    private static final byte QUERY_STATE_SIGNATURE = 1;
-    private static final byte QUERY_STATE_ROWS = 2;
-    private static final byte QUERY_STATE_ERROR = 3;
-    private static final byte QUERY_STATE_WARNING = 4;
-    private static final byte QUERY_STATE_STATUS = 5;
-    private static final byte QUERY_STATE_INFO = 6;
-    private static final byte QUERY_STATE_DONE = 7;
+    protected static final byte QUERY_STATE_INITIAL = 0;
+    protected static final byte QUERY_STATE_SIGNATURE = 1;
+    protected static final byte QUERY_STATE_ROWS = 2;
+    protected static final byte QUERY_STATE_ROWS_RAW = 20;
+    protected static final byte QUERY_STATE_ROWS_DECIDE = 29;
+    protected static final byte QUERY_STATE_ERROR = 3;
+    protected static final byte QUERY_STATE_WARNING = 4;
+    protected static final byte QUERY_STATE_STATUS = 5;
+    protected static final byte QUERY_STATE_INFO = 6;
+    protected static final byte QUERY_STATE_NO_INFO = 7; //alternate case where there's nothing after status
+    protected static final byte QUERY_STATE_DONE = 8;
 
     /**
      * This is the number of characters expected to be present to be able to read
@@ -179,11 +179,13 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             ByteBuf query = ctx.alloc().buffer(((GenericQueryRequest) msg).query().length());
             query.writeBytes(((GenericQueryRequest) msg).query().getBytes(CHARSET));
             request.headers().add(HttpHeaders.Names.CONTENT_LENGTH, query.readableBytes());
+            request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
             request.content().writeBytes(query);
             query.release();
         } else if (msg instanceof KeepAliveRequest) {
             request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
+            request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
             return request;
         } else {
             throw new IllegalArgumentException("Unknown incoming QueryRequest type "
@@ -218,7 +220,10 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             responseContent.writeBytes(((HttpContent) msg).content());
             boolean lastChunk = msg instanceof LastHttpContent;
 
-            if (currentRequest() instanceof GenericQueryRequest) {
+            //important to place the RawQueryRequest test before, as it extends GenericQueryRequest
+            if (currentRequest() instanceof RawQueryRequest) {
+                response = handleRawQueryResponse(lastChunk, ctx);
+            } else if (currentRequest() instanceof GenericQueryRequest) {
                 if (queryRowObservable == null) {
                     //still in initial parsing
                     response = handleGenericQueryResponse(lastChunk);
@@ -229,11 +234,25 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
                 } else {
                     parseQueryResponse(lastChunk);
                 }
-
             }
         }
 
         return response;
+    }
+
+    private RawQueryResponse handleRawQueryResponse(boolean lastChunk, ChannelHandlerContext ctx) {
+        if (!lastChunk) {
+            return null;
+        }
+        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ByteBuf responseCopy = ctx.alloc().buffer(responseContent.readableBytes(), responseContent.readableBytes());
+        responseCopy.writeBytes(responseContent);
+
+        cleanupQueryStates();
+
+        return new RawQueryResponse(status, currentRequest(), responseCopy,
+                responseHeader.getStatus().code(),
+                responseHeader.getStatus().reasonPhrase());
     }
 
     /**
@@ -339,6 +358,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         querySignatureObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
 
+        //set up trace ids on all these UnicastAutoReleaseSubjects, so that if they get in a bad state
+        // (multiple subscribers or subscriber coming in too late) we can trace back to here
+        String rid = clientId == null ? requestId : clientId + " / " + requestId;
+        queryRowObservable.withTraceIdentifier("queryRow." + rid);
+        queryErrorObservable.withTraceIdentifier("queryError." + rid);
+        queryInfoObservable.withTraceIdentifier("queryInfo." + rid);
+        querySignatureObservable.withTraceIdentifier("querySignature." + rid);
+
         return new GenericQueryResponse(
                 queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
                 queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
@@ -367,8 +394,13 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             parseQuerySignature(lastChunk);
         }
 
+        if (queryParsingState == QUERY_STATE_ROWS_DECIDE) {
+            decideBetweenRawAndObjects(lastChunk);
+        }
         if (queryParsingState == QUERY_STATE_ROWS) {
             parseQueryRows(lastChunk);
+        } else if (queryParsingState == QUERY_STATE_ROWS_RAW) {
+            parseQueryRowsRaw(lastChunk);
         }
 
         if (queryParsingState == QUERY_STATE_ERROR) {
@@ -385,6 +417,8 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
         if (queryParsingState == QUERY_STATE_INFO) {
             parseQueryInfo(lastChunk);
+        } else if (queryParsingState == QUERY_STATE_NO_INFO) {
+            finishInfo();
         }
 
         if (queryParsingState == QUERY_STATE_DONE) {
@@ -411,13 +445,18 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         if (endNextToken < 0 && !lastChunk) {
             return queryParsingState;
         }
+
+        if (endNextToken < 0 && lastChunk && queryParsingState >= QUERY_STATE_STATUS) {
+            return QUERY_STATE_NO_INFO;
+        }
+
         byte newState;
         ByteBuf peekSlice = responseContent.readSlice(endNextToken + 1);
         String peek = peekSlice.toString(CHARSET);
         if (peek.contains("\"signature\":")) {
             newState = QUERY_STATE_SIGNATURE;
         } else if (peek.endsWith("\"results\":")) {
-            newState = QUERY_STATE_ROWS;
+            newState = QUERY_STATE_ROWS_DECIDE;
         } else if (peek.endsWith("\"status\":")) {
             newState = QUERY_STATE_STATUS;
         } else if (peek.endsWith("\"errors\":")) {
@@ -442,6 +481,44 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
         sectionDone = false;
         return newState;
+    }
+
+    private void decideBetweenRawAndObjects(boolean lastChunk) {
+        responseContent.markReaderIndex();
+        int openArrayPos = findNextChar(responseContent, '[');
+        if (openArrayPos > -1) {
+            responseContent.skipBytes(openArrayPos + 1);
+        } else {
+            responseContent.resetReaderIndex();
+            if (lastChunk == true) {
+                throw new IllegalStateException("Unable to decide between raw and objects with content " + responseContent.toString(CHARSET));
+            }
+            return; //more data
+        }
+
+        int spaceToSkip = responseContent.forEachByte(new WhitespaceSkipper());
+        if (spaceToSkip > -1) {
+            responseContent.readerIndex(spaceToSkip);
+        } else {
+            //there's only whitespace! need more info
+            responseContent.resetReaderIndex();
+            return;
+        }
+
+        if (responseContent.isReadable()) {
+            byte first = responseContent.getByte(responseContent.readerIndex());
+            if (first == '{') {
+                queryParsingState = QUERY_STATE_ROWS;
+            } else if (first == ']') {
+                //empty result section!
+                sectionDone();
+                queryParsingState = transitionToNextToken(lastChunk);
+            } else {
+                queryParsingState = QUERY_STATE_ROWS_RAW;
+            }
+        } else {
+            responseContent.resetReaderIndex();
+        }
     }
 
     private void sectionDone() {
@@ -497,7 +574,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private void parseQueryRows(boolean lastChunk) {
         while (true) {
             int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos)) {
+            if (isEmptySection(openBracketPos) || (lastChunk && openBracketPos < 0)) {
                 sectionDone();
                 queryParsingState = transitionToNextToken(lastChunk);
                 break;
@@ -517,12 +594,44 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
+     * Parses the query raw results from the content stream as long as there is data to be found.
+     */
+    private void parseQueryRowsRaw(boolean lastChunk) {
+        while (responseContent.isReadable()) {
+            int splitPos = findSplitPosition(responseContent, ',');
+            int arrayEndPos = findSplitPosition(responseContent, ']');
+
+            boolean doSectionDone = false;
+
+            if (splitPos == -1 && arrayEndPos == -1) {
+                //need more data
+                break;
+            } else if (arrayEndPos > 0 && (arrayEndPos < splitPos || splitPos == -1)) {
+                splitPos = arrayEndPos;
+                doSectionDone = true;
+            }
+
+            int length = splitPos - responseContent.readerIndex();
+            ByteBuf resultSlice = responseContent.readSlice(length);
+            queryRowObservable.onNext(resultSlice.copy());
+            responseContent.skipBytes(1);
+            responseContent.discardReadBytes();
+
+            if (doSectionDone) {
+                sectionDone();
+                queryParsingState = transitionToNextToken(lastChunk);
+                break;
+            }
+        }
+    }
+
+    /**
      * Parses the errors and warnings from the content stream as long as there are some to be found.
      */
     private void parseQueryError(boolean lastChunk) {
         while (true) {
             int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos)) {
+            if (isEmptySection(openBracketPos) || (lastChunk && openBracketPos < 0)) {
                 sectionDone();
                 queryParsingState = transitionToNextToken(lastChunk); //warnings or status
                 break;
@@ -589,6 +698,12 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryInfoObservable.onNext(responseContent.slice(from, to).copy());
         responseContent.readerIndex(to + openBracketPos);
 
+        //has to be here rather than in parseQueryResponse, as when there is a split
+        //(and thus not enough data) it could finish the metrics too early
+        finishInfo();
+    }
+
+    private void finishInfo() {
         queryInfoObservable.onCompleted();
         sectionDone();
         queryParsingState = QUERY_STATE_DONE;
@@ -651,5 +766,9 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     @Override
     protected ServiceType serviceType() {
         return ServiceType.QUERY;
+    }
+
+    public int getQueryParsingState() {
+        return this.queryParsingState;
     }
 }

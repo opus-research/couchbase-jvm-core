@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.env;
 
@@ -33,6 +27,7 @@ import com.couchbase.client.core.event.DefaultEventBus;
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.event.EventType;
 import com.couchbase.client.core.event.consumers.LoggingConsumer;
+import com.couchbase.client.core.event.system.TooManyEnvironmentsEvent;
 import com.couchbase.client.core.logging.CouchbaseLogLevel;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -44,19 +39,26 @@ import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.MetricsCollectorConfig;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
 import com.couchbase.client.core.metrics.RuntimeMetricsCollector;
+import com.couchbase.client.core.node.DefaultMemcachedHashingStrategy;
+import com.couchbase.client.core.node.MemcachedHashingStrategy;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
+import com.lmax.disruptor.BlockingWaitStrategy;
+import com.lmax.disruptor.WaitStrategy;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscription;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
+import com.couchbase.client.core.utils.Blocking;
 
+import java.security.KeyStore;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -71,8 +73,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
-    public static final boolean QUERY_ENABLED = false;
-    public static final int QUERY_PORT = 8093;
+    public static final KeyStore SSL_KEYSTORE = null;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -102,7 +103,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
     public static final boolean CALLBACKS_ON_IO_POOL = false;
+    public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
+    public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
+        DefaultMemcachedHashingStrategy.INSTANCE;
 
+    public static String CORE_VERSION;
+    public static String CORE_GIT_VERSION;
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
 
@@ -118,6 +124,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     static final int MIN_POOL_SIZE = 3;
 
     private static final String VERSION_PROPERTIES = "com.couchbase.client.core.properties";
+
 
     /**
      * Sets up the package version and user agent.
@@ -140,10 +147,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                 version = versionProp.getProperty("specificationVersion");
                 gitVersion = versionProp.getProperty("implementationVersion");
             } catch (Exception e) {
-                LOGGER.info("Could not retrieve version properties, defaulting.", e);
+                LOGGER.info("Could not retrieve core version properties, defaulting.", e);
             }
+
+            CORE_VERSION = version == null ? "unknown" : version;
+            CORE_GIT_VERSION = gitVersion == null ? "unknown" : gitVersion;
             PACKAGE_NAME_AND_VERSION = String.format("couchbase-jvm-core/%s (git: %s)",
-                version == null ? "unknown" : version, gitVersion == null ? "unknown" : gitVersion);
+                CORE_VERSION, CORE_GIT_VERSION);
 
             USER_AGENT = String.format("%s (%s/%s %s; %s %s)",
                 PACKAGE_NAME_AND_VERSION,
@@ -170,8 +180,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
     private final String sslKeystorePassword;
-    private final boolean queryEnabled;
-    private final int queryPort;
+    private final KeyStore sslKeystore;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -203,6 +212,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
     private final boolean callbacksOnIoPool;
+    private final long disconnectTimeout;
+    private final WaitStrategyFactory requestBufferWaitStrategy;
+    private final MemcachedHashingStrategy memcachedHashingStrategy;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -220,16 +232,17 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final Subscription metricsCollectorSubscription;
 
     protected DefaultCoreEnvironment(final Builder builder) {
+        boolean emitEnvWarnMessage = false;
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
             LOGGER.warn("More than " + MAX_ALLOWED_INSTANCES + " Couchbase Environments found (" + instanceCounter
                 + "), this can have severe impact on performance and stability. Reuse environments!");
+            emitEnvWarnMessage = true;
         }
+
         dcpEnabled = booleanPropertyOr("dcpEnabled", builder.dcpEnabled);
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
-        queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled);
-        queryPort = intPropertyOr("queryPort", builder.queryPort);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -261,6 +274,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
+        disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
+        sslKeystore = builder.sslKeystore;
+        memcachedHashingStrategy = builder.memcachedHashingStrategy;
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -332,6 +348,21 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         } else {
             metricsCollectorSubscription = null;
         }
+
+        if (builder.requestBufferWaitStrategy == null) {
+            requestBufferWaitStrategy = new WaitStrategyFactory() {
+                @Override
+                public WaitStrategy newWaitStrategy() {
+                    return new BlockingWaitStrategy();
+                }
+            };
+        } else {
+            requestBufferWaitStrategy = builder.requestBufferWaitStrategy;
+        }
+
+        if (emitEnvWarnMessage) {
+            eventBus.publish(new TooManyEnvironmentsEvent(instanceCounter));
+        }
     }
 
     public static DefaultCoreEnvironment create() {
@@ -385,9 +416,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    @Deprecated
-    public Observable<Boolean> shutdown() {
-        return shutdownAsync();
+    public boolean shutdown() {
+        return shutdown(disconnectTimeout(), TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public boolean shutdown(long timeout, TimeUnit timeUnit) {
+        return Blocking.blockForSingle(shutdownAsync(), timeout, timeUnit);
     }
 
     @Override
@@ -409,7 +444,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                             public Boolean call(Boolean previousStatus, ShutdownStatus currentStatus) {
                                 return previousStatus && currentStatus.success;
                             }
-                        });
+                        })
+                .doOnTerminate(new Action0() {
+                    @Override
+                    public void call() {
+                        instanceCounter--;
+                    }
+                });
         return result;
     }
 
@@ -493,13 +534,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public boolean queryEnabled() {
-        return queryEnabled;
-    }
-
-    @Override
-    public int queryPort() {
-        return queryPort;
+    public KeyStore sslKeystore() {
+        return sslKeystore;
     }
 
     @Override
@@ -589,6 +625,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
+    public String coreVersion() {
+        return CORE_VERSION;
+    }
+
+    @Override
+    public String coreBuild() {
+        return CORE_GIT_VERSION;
+    }
+
+    @Override
     public String userAgent() {
         return userAgent;
     }
@@ -673,16 +719,34 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return callbacksOnIoPool;
     }
 
+    @Override
+    public long disconnectTimeout() {
+        return disconnectTimeout;
+    }
+
+    @Override
+    public WaitStrategyFactory requestBufferWaitStrategy() {
+        return requestBufferWaitStrategy;
+    }
+
+    @Override
+    public MemcachedHashingStrategy memcachedHashingStrategy() {
+        return memcachedHashingStrategy;
+    }
+
+    public static int instanceCounter() {
+        return instanceCounter;
+    }
+
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
+        private KeyStore sslKeystore = SSL_KEYSTORE;
         private String userAgent = USER_AGENT;
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
-        private boolean queryEnabled = QUERY_ENABLED;
-        private int queryPort = QUERY_PORT;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
         private boolean bootstrapCarrierEnabled = BOOTSTRAP_CARRIER_ENABLED;
         private int bootstrapHttpDirectPort = BOOTSTRAP_HTTP_DIRECT_PORT;
@@ -717,9 +781,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
         private boolean callbacksOnIoPool = CALLBACKS_ON_IO_POOL;
+        private long disconnectTimeout = DISCONNECT_TIMEOUT;
+        private WaitStrategyFactory requestBufferWaitStrategy;
+        private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
 
-        private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
-        private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
+        private MetricsCollectorConfig runtimeMetricsCollectorConfig;
+        private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
         private LoggingConsumer defaultMetricsLoggingConsumer = LoggingConsumer.create();
 
         protected Builder() {
@@ -744,6 +811,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
+         *
+         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
+         * keystore is used it takes precedence over the file approach.
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
@@ -752,6 +822,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Sets the SSL Keystore password to be used with the Keystore file (default value null, none).
+         *
          * @see #sslKeystoreFile(String)
          */
         public Builder sslKeystorePassword(final String sslKeystorePassword) {
@@ -760,24 +831,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
-         * Toggles the N1QL Query feature (default value {@value #QUERY_ENABLED}).
-         * This parameter will be deprecated once N1QL is in General Availability and shipped with the server.
+         * Sets the SSL Keystore directly and not indirectly via filepath.
          *
-         * If not bundled with the server, the N1QL service must run on all the cluster's nodes.
-         */
-        public Builder queryEnabled(final boolean queryEnabled) {
-            this.queryEnabled = queryEnabled;
-            return this;
-        }
-
-        /**
-         * Defines the port for N1QL Query (default value {@value #QUERY_PORT}).
-         * This parameter will be deprecated once N1QL is in General Availability and shipped with the server.
+         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
+         * keystore is used it takes precedence over the file approach.
          *
-         * If not bundled with the server, the N1QL service must run on all the cluster's nodes.
+         * @param sslKeystore the keystore to use.
          */
-        public Builder queryPort(final int queryPort) {
-            this.queryPort = queryPort;
+        public Builder sslKeystore(final KeyStore sslKeystore) {
+            this.sslKeystore = sslKeystore;
             return this;
         }
 
@@ -1187,6 +1249,38 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        /**
+         * Sets a custom disconnect timeout.
+         *
+         * @param disconnectTimeout the disconnect timeout in milliseconds.
+         */
+        public Builder disconnectTimeout(long disconnectTimeout) {
+            this.disconnectTimeout = disconnectTimeout;
+            return this;
+        }
+
+        /**
+         * Sets a custom waiting strategy for requests. Default is {@link BlockingWaitStrategy}.
+         *
+         * @param waitStrategy waiting strategy
+         */
+        @InterfaceStability.Experimental
+        @InterfaceAudience.Public
+        public Builder requestBufferWaitStrategy(WaitStrategyFactory waitStrategy) {
+            this.requestBufferWaitStrategy = waitStrategy;
+            return this;
+        }
+
+        /**
+         * Sets a custom memcached node hashing strategy, mainly used for compatibility with other clients.
+         *
+         * @param memcachedHashingStrategy the strategy to use.
+         */
+        public Builder memcachedHashingStrategy(MemcachedHashingStrategy memcachedHashingStrategy) {
+            this.memcachedHashingStrategy = memcachedHashingStrategy;
+            return this;
+        }
+
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1202,9 +1296,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     protected StringBuilder dumpParameters(StringBuilder sb) {
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
-        sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
-        sb.append(", queryEnabled=").append(queryEnabled);
-        sb.append(", queryPort=").append(queryPort);
+        sb.append(", sslKeystorePassword=").append(sslKeystorePassword != null && !sslKeystorePassword.isEmpty());
+        sb.append(", sslKeystore=").append(sslKeystore);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
@@ -1227,6 +1320,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         if (coreSchedulerShutdownHook == null || coreSchedulerShutdownHook instanceof NoOpShutdownHook) {
             sb.append("!unmanaged");
         }
+        sb.append(", memcachedHashingStrategy=").append(memcachedHashingStrategy.getClass().getSimpleName());
         sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);
@@ -1245,6 +1339,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
         sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
+        sb.append(", disconnectTimeout=").append(disconnectTimeout);
+        sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
 
         return sb;
     }

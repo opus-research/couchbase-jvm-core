@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core;
 
@@ -55,12 +49,12 @@ import com.couchbase.client.core.state.LifecycleState;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
 import rx.Observable;
+import rx.Subscriber;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -164,7 +158,26 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 try {
                     LOGGER.debug("Got notified of a new configuration arriving.");
                     configuration = config;
-                    reconfigure(config).subscribe();
+                    reconfigure(config).subscribe(new Subscriber<ClusterConfig>() {
+                        @Override
+                        public void onCompleted() {}
+
+                        @Override
+                        public void onError(Throwable e) {
+                            LOGGER.warn("Received Error during Reconfiguration.", e);
+                        }
+
+                        @Override
+                        public void onNext(final ClusterConfig clusterConfig) {
+                            int logicalNodes = nodes.size();
+                            int configNodes = clusterConfig.allNodeAddresses().size();
+
+                            if (logicalNodes != configNodes) {
+                                LOGGER.debug("Number of logical Nodes does not match the number of nodes in the "
+                                    + "current configuration! logical: {}, config: {}", logicalNodes, configNodes);
+                            }
+                        }
+                    });
 
                     if (eventBus != null) {
                         eventBus.publish(new ConfigUpdatedEvent(config));
@@ -239,8 +252,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         } else if (request instanceof ViewRequest && !config.serviceEnabled(ServiceType.VIEW)) {
             throw new ServiceNotAvailableException("The View service is not enabled or no node in the cluster "
                 + "supports it.");
-        } else if (request instanceof QueryRequest && !(environment.queryEnabled()
-            || config.serviceEnabled(ServiceType.QUERY))) {
+        } else if (request instanceof QueryRequest && !config.serviceEnabled(ServiceType.QUERY)) {
             throw new ServiceNotAvailableException("The Query service is not enabled or no node in the "
                 + "cluster supports it.");
         } else if (request instanceof SearchRequest && !config.serviceEnabled(ServiceType.SEARCH)) {
@@ -404,7 +416,18 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 @Override
                 public void call(Node node) {
                     removeNode(node);
-                    node.disconnect().subscribe();
+                    node.disconnect().subscribe(new Subscriber<LifecycleState>() {
+                        @Override
+                        public void onCompleted() {}
+
+                        @Override
+                        public void onError(Throwable e) {
+                            LOGGER.warn("Got error during node disconnect.", e);
+                        }
+
+                        @Override
+                        public void onNext(LifecycleState lifecycleState) {}
+                    });
                 }
             }).last().map(new Func1<Node, ClusterConfig>() {
                 @Override
@@ -431,18 +454,24 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             .doOnNext(new Action1<Boolean>() {
                 @Override
                 public void call(Boolean aBoolean) {
-                    Set<InetAddress> configNodes = new HashSet<InetAddress>();
-                    for (Map.Entry<String, BucketConfig> bucket : config.bucketConfigs().entrySet()) {
-                        for (final NodeInfo node : bucket.getValue().nodes()) {
-                            configNodes.add(node.hostname());
-                        }
-                    }
+                    Set<InetAddress> configNodes = config.allNodeAddresses();
 
                     for (Node node : nodes) {
                         if (!configNodes.contains(node.hostname())) {
                             LOGGER.debug("Removing and disconnecting node {}.", node.hostname());
                             removeNode(node);
-                            node.disconnect().subscribe();
+                            node.disconnect().subscribe(new Subscriber<LifecycleState>() {
+                                @Override
+                                public void onCompleted() {}
+
+                                @Override
+                                public void onError(Throwable e) {
+                                    LOGGER.warn("Got error during node disconnect.", e);
+                                }
+
+                                @Override
+                                public void onNext(LifecycleState lifecycleState) {}
+                            });
                         }
                     }
                 }
@@ -471,9 +500,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     public Observable<Map<ServiceType, Integer>> call(final LifecycleState lifecycleState) {
                         Map<ServiceType, Integer> services =
                                 environment.sslEnabled() ? nodeInfo.sslServices() : nodeInfo.services();
-                        if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
-                            services.put(ServiceType.QUERY, environment.queryPort());
-                        }
                         if (services.containsKey(ServiceType.BINARY) && environment.dcpEnabled()) {
                             services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }

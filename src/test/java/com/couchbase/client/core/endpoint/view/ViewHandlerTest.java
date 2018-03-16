@@ -1,30 +1,23 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.endpoint.view;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -57,9 +50,11 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Observable;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 
@@ -77,11 +72,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
@@ -141,6 +134,8 @@ public class ViewHandlerTest {
 
     @After
     public void clear() {
+        //triggers the release of the responseContent common buffer
+        channel.close().awaitUninterruptibly();
         responseBuffer.shutdown();
     }
 
@@ -156,6 +151,8 @@ public class ViewHandlerTest {
         assertEquals("/bucket/_design/dev_name", outbound.getUri());
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
+        assertTrue(outbound.headers().contains(HttpHeaders.Names.HOST));
+        ReferenceCountUtil.releaseLater(outbound); //for consistency, but it uses Unpooled
     }
 
     @Test
@@ -177,7 +174,7 @@ public class ViewHandlerTest {
         assertEquals("name", inbound.name());
         assertEquals(true, inbound.development());
         assertEquals(response, inbound.content().toString(CharsetUtil.UTF_8));
-
+        ReferenceCountUtil.releaseLater(inbound);
     }
 
     @Test
@@ -192,6 +189,7 @@ public class ViewHandlerTest {
         assertEquals("/bucket/_design/dev_design/_view/view?query", outbound.getUri());
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
+        ReferenceCountUtil.releaseLater(outbound); //for consistency, but it uses Unpooled
     }
 
     @Test
@@ -208,7 +206,7 @@ public class ViewHandlerTest {
         ViewQueryResponse inbound = (ViewQueryResponse) firedEvents.get(0);
 
         assertTrue(inbound.status().isSuccess());
-        assertFalse(inbound.rows().toList().toBlocking().single().isEmpty());
+        assertEquals(5, countAndRelease(inbound.rows()));
 
         inbound.info().toBlocking().forEach(new Action1<ByteBuf>() {
             @Override
@@ -222,6 +220,7 @@ public class ViewHandlerTest {
                     e.printStackTrace();
                     assertFalse(true);
                 }
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
     }
@@ -248,6 +247,7 @@ public class ViewHandlerTest {
             public void call(ByteBuf byteBuf) {
                 called.incrementAndGet();
                 assertEquals("{\"total_rows\":7303}", byteBuf.toString(CharsetUtil.UTF_8));
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
         assertEquals(1, called.get());
@@ -285,6 +285,7 @@ public class ViewHandlerTest {
                     e.printStackTrace();
                     assertFalse(true);
                 }
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
         assertEquals(1, calledRow.get());
@@ -295,6 +296,7 @@ public class ViewHandlerTest {
             public void call(ByteBuf byteBuf) {
                 called.incrementAndGet();
                 assertEquals("{\"total_rows\":7303}", byteBuf.toString(CharsetUtil.UTF_8));
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
         assertEquals(1, called.get());
@@ -332,6 +334,8 @@ public class ViewHandlerTest {
                     e.printStackTrace();
                     assertFalse(true);
                 }
+                ReferenceCountUtil.releaseLater(byteBuf);
+
             }
         });
         assertEquals(500, calledRow.get());
@@ -342,6 +346,7 @@ public class ViewHandlerTest {
             public void call(ByteBuf byteBuf) {
                 called.incrementAndGet();
                 assertEquals("{\"total_rows\":7303}", byteBuf.toString(CharsetUtil.UTF_8));
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
         assertEquals(1, called.get());
@@ -372,7 +377,7 @@ public class ViewHandlerTest {
         EmbeddedChannel channel = new EmbeddedChannel(testHandler);
 
         //test idle event triggers a view keepAlive request and hook is called
-        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT);
+        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_READER_IDLE_STATE_EVENT);
 
         assertEquals(1, keepAliveEventCounter.get());
         assertTrue(queue.peek() instanceof ViewHandler.KeepAliveRequest);
@@ -387,6 +392,8 @@ public class ViewHandlerTest {
 
         assertEquals(2, keepAliveEventCounter.get());
         assertEquals(ResponseStatus.NOT_EXISTS, keepAliveResponse.status());
+        //different channel, needs to be closed to release the internal responseContent
+        channel.close().awaitUninterruptibly();
     }
 
     @Test
@@ -402,6 +409,7 @@ public class ViewHandlerTest {
         String content = outbound.content().toString(CharsetUtil.UTF_8);
         assertTrue(content.startsWith("{\"keys\":["));
         assertTrue(content.endsWith("]}"));
+        ReferenceCountUtil.releaseLater(outbound);
     }
 
     @Test
@@ -418,6 +426,7 @@ public class ViewHandlerTest {
         assertTrue(failMsg, outbound.getUri().endsWith("?stale=false&endKey=test&keys=" + urlEncodedKeys));
         String content = outbound.content().toString(CharsetUtil.UTF_8);
         assertTrue(content.isEmpty());
+        ReferenceCountUtil.releaseLater(outbound); //NO-OP since content is empty but still...
     }
 
     @Test
@@ -433,6 +442,7 @@ public class ViewHandlerTest {
         assertTrue(failMsg, outbound.getUri().endsWith("?keys=" + urlEncodedKeys));
         String content = outbound.content().toString(CharsetUtil.UTF_8);
         assertTrue(content.isEmpty());
+        ReferenceCountUtil.releaseLater(outbound); //NO-OP since content is empty but still...
     }
 
     @Test
@@ -447,6 +457,7 @@ public class ViewHandlerTest {
         assertTrue(outbound.getUri().endsWith("?stale=false&endKey=test"));
         String content = outbound.content().toString(CharsetUtil.UTF_8);
         assertTrue(content.isEmpty());
+        ReferenceCountUtil.releaseLater(outbound); //NO-OP since content is empty but still...
     }
 
     @Test
@@ -461,6 +472,7 @@ public class ViewHandlerTest {
         assertTrue(outbound.getUri().endsWith("?stale=false&endKey=test"));
         String content = outbound.content().toString(CharsetUtil.UTF_8);
         assertTrue(content.isEmpty());
+        ReferenceCountUtil.releaseLater(outbound); //NO-OP since content is empty but still...
     }
 
     @Test
@@ -478,6 +490,7 @@ public class ViewHandlerTest {
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
         assertNotNull(outbound.headers().get(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
+        ReferenceCountUtil.releaseLater(outbound); //for consistency, but it uses Unpooled
     }
 
     @Test
@@ -495,8 +508,7 @@ public class ViewHandlerTest {
         ViewQueryResponse inbound = (ViewQueryResponse) firedEvents.get(0);
         assertTrue(inbound.status().isSuccess());
 
-        List<ByteBuf> rows = inbound.rows().toList().toBlocking().single();
-        assertTrue(rows.isEmpty());
+        assertEquals(0, countAndRelease(inbound.rows()));
 
         String error = inbound.error().toBlocking().single();
         Map<String, Object> parsed = mapper.readValue(error, Map.class);
@@ -519,8 +531,7 @@ public class ViewHandlerTest {
         ViewQueryResponse inbound = (ViewQueryResponse) firedEvents.get(0);
         assertTrue(inbound.status().isSuccess());
 
-        List<ByteBuf> rows = inbound.rows().toList().toBlocking().single();
-        assertEquals(10, rows.size());
+        assertEquals(10, countAndRelease(inbound.rows()));
 
         String error = inbound.error().toBlocking().single();
         Map<String, Object> parsed = mapper.readValue(error, Map.class);
@@ -543,11 +554,11 @@ public class ViewHandlerTest {
         assertFalse(inbound.status().isSuccess());
         assertEquals(ResponseStatus.NOT_EXISTS, inbound.status());
 
-        List<ByteBuf> rows = inbound.rows().toList().toBlocking().single();
-        assertTrue(rows.isEmpty());
+        assertEquals(0, countAndRelease(inbound.rows()));
 
         String error = inbound.error().toBlocking().single();
         assertEquals("{\"errors\":[{\"error\":\"not_found\",\"reason\":\"Design document _design/designdoc not found\"}]}", error);
+
     }
 
     @Test
@@ -569,6 +580,7 @@ public class ViewHandlerTest {
 
         ByteBuf singleRow = inbound.rows().toBlocking().single(); //single will blow up if not exactly one
         String singleRowData = singleRow.toString(CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(singleRow);
         Map found = null;
         try {
             found = mapper.readValue(singleRowData, Map.class);
@@ -591,9 +603,22 @@ public class ViewHandlerTest {
             public void call(ByteBuf byteBuf) {
                 called.incrementAndGet();
                 assertEquals("{\"total_rows\":1}", byteBuf.toString(CharsetUtil.UTF_8));
+                ReferenceCountUtil.releaseLater(byteBuf);
             }
         });
         assertEquals(1, called.get());
+    }
+
+    private int countAndRelease(Observable<ByteBuf> bufObservable) {
+        return bufObservable
+                .doOnNext(new Action1<ByteBuf>() {
+                    @Override
+                    public void call(ByteBuf byteBuf) {
+                        byteBuf.release();
+                    }
+                }).count()
+                .toBlocking()
+                .singleOrDefault(0);
     }
 
 }
