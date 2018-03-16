@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,35 +20,46 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.dcp;
+package com.couchbase.client.core.message.kv;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 
+import java.util.Arrays;
+
 /**
+ * Represents response to {@link GetAllMutationTokensRequest}.
+ *
  * @author Sergey Avseyev
- * @since 1.1.0
+ * @since 1.2.2
  */
 @InterfaceStability.Experimental
-@InterfaceAudience.Private
-public class OpenConnectionResponse extends AbstractDCPResponse {
-    private final DCPConnection connection;
+public class GetAllMutationTokensResponse extends AbstractKeyValueResponse {
+    final MutationToken[] mutationTokens;
 
-    /**
-     * Sets the required properties for the response.
-     *
-     * @param status  the status of the response.
-     * @param request
-     */
-    public OpenConnectionResponse(final ResponseStatus status, final DCPConnection connection, final CouchbaseRequest request) {
-        super(status, request);
-        this.connection = connection;
+    public GetAllMutationTokensResponse(final MutationToken[] mutationTokens, final ResponseStatus status,
+                                        final short serverStatusCode, final String bucket,
+                                        final CouchbaseRequest request) {
+        super(status, serverStatusCode, bucket, null, request);
+        this.mutationTokens = mutationTokens;
     }
 
-    public DCPConnection connection() {
-        return connection;
+    /**
+     * @return list of mutation tokens for partitions in requested state.
+     */
+    public MutationToken[] mutationTokens() {
+        return mutationTokens;
+    }
+
+    @Override
+    public String toString() {
+        return new StringBuilder()
+                .append("GetAllMutationTokensResponse{")
+                .append("bucket='").append(bucket()).append('\'')
+                .append(", status=").append(status()).append(" (").append(serverStatusCode()).append(')')
+                .append(", mutationTokens=").append(Arrays.toString(mutationTokens))
+                .append(", request=").append(request())
+                .append('}').toString();
     }
 }

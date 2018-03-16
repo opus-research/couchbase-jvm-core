@@ -26,8 +26,6 @@ import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.cluster.GetClusterConfigRequest;
 import com.couchbase.client.core.message.cluster.GetClusterConfigResponse;
 import com.couchbase.client.core.message.dcp.DCPRequest;
@@ -37,7 +35,8 @@ import com.couchbase.client.core.message.dcp.StreamRequestRequest;
 import com.couchbase.client.core.message.dcp.StreamRequestResponse;
 import rx.Observable;
 import rx.functions.Func1;
-import rx.internal.util.RxRingBuffer;
+
+import java.util.List;
 
 /**
  * Provides a higher level abstraction over a DCP stream.
@@ -50,7 +49,7 @@ import rx.internal.util.RxRingBuffer;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class BucketStreamAggregator {
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(BucketStreamAggregator.class);
+    public static String DEFAULT_CONNECTION_NAME = "jvmCore";
 
     private final ClusterFacade core;
     private final String bucket;
@@ -66,7 +65,12 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed() {
-        return feed(new BucketStreamAggregatorState("jvmCore"));
+        final BucketStreamAggregatorState state = new BucketStreamAggregatorState(DEFAULT_CONNECTION_NAME);
+        int numPartitions = partitionSize().toBlocking().first();
+        for (short partition = 0; partition < numPartitions; partition++) {
+            state.put(new BucketStreamState(partition, 0, 0, 0xffffffff, 0, 0xffffffff));
+        }
+        return feed(state);
     }
 
     /**
@@ -76,37 +80,12 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed(final BucketStreamAggregatorState aggregatorState) {
-        Observable<Observable<Observable<DCPRequest>>> streamWindows = open(aggregatorState)
-                .map(new Func1<StreamRequestResponse, Observable<DCPRequest>>() {
-                         @Override
-                         public Observable<DCPRequest> call(StreamRequestResponse response) {
-                             return response.stream();
-                         }
-                     }
-                )
-                .window(RxRingBuffer.SIZE / 2);
-        return Observable.merge(Observable.merge(streamWindows));
-    }
-
-    /**
-     * Opens DCP stream for all vBuckets starting with given state.
-     * Use BucketStreamAggregatorState.BLANK to start from very beginning.
-     *
-     * @param aggregatorState state object
-     * @return collection of stream objects
-     */
-    public Observable<StreamRequestResponse> open(final BucketStreamAggregatorState aggregatorState) {
-        if (aggregatorState.numberOfInfiniteStreams() > RxRingBuffer.SIZE) {
-            LOGGER.warn("Number of requested infinite streams({}) is bigger than RxRingBuffer.SIZE({}). " +
-                    "Consider either increasing rx.ring-buffer.size, or setting limits for the buckets",
-                    aggregatorState.numberOfInfiniteStreams(), RxRingBuffer.SIZE);
-        }
         final String connectionName = aggregatorState.name();
         return core
                 .<OpenConnectionResponse>send(new OpenConnectionRequest(connectionName, bucket))
-                .flatMap(new Func1<OpenConnectionResponse, Observable<StreamRequestResponse>>() {
+                .flatMap(new Func1<OpenConnectionResponse, Observable<DCPRequest>>() {
                     @Override
-                    public Observable<StreamRequestResponse> call(final OpenConnectionResponse response) {
+                    public Observable<DCPRequest> call(final OpenConnectionResponse response) {
                         return Observable
                                 .from(aggregatorState)
                                 .flatMap(new Func1<BucketStreamState, Observable<StreamRequestResponse>>() {
@@ -127,7 +106,7 @@ public class BucketStreamAggregator {
                                                         rollbackSequenceNumber = 0;
                                                         break;
                                                     case ROLLBACK:
-                                                        rollbackSequenceNumber = response.getRollbackToSequenceNumber();
+                                                        rollbackSequenceNumber = response.rollbackToSequenceNumber();
                                                         break;
                                                     default:
                                                         return Observable.just(response);
@@ -139,6 +118,13 @@ public class BucketStreamAggregator {
                                                         bucket));
                                             }
                                         });
+                                    }
+                                })
+                                .toList()
+                                .flatMap(new Func1<List<StreamRequestResponse>, Observable<DCPRequest>>() {
+                                    @Override
+                                    public Observable<DCPRequest> call(List<StreamRequestResponse> streamRequestResponses) {
+                                        return response.connection().subject();
                                     }
                                 });
                     }

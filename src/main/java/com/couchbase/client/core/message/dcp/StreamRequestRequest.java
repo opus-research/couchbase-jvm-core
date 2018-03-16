@@ -66,29 +66,31 @@ public class StreamRequestRequest extends AbstractDCPRequest {
      * use the end sequence of the last partial snapshot that was received.
      */
     private final long snapshotEndSequenceNumber;
+    private final String connectionName;
 
 
-    public StreamRequestRequest(final String connectionName, short partition, String bucket) {
+    public StreamRequestRequest(String connectionName, short partition, String bucket) {
         this(connectionName, partition, 0, 0, 0xffffffff, 0, 0, bucket, null);
     }
 
-    public StreamRequestRequest(final String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
+    public StreamRequestRequest(String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
                                 long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
                                 String bucket) {
         this(connectionName, partition, vbucketUUID, startSequenceNumber, endSequenceNumber,
                 snapshotStartSequenceNumber, snapshotEndSequenceNumber, bucket, null);
     }
 
-    public StreamRequestRequest(final String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
+    public StreamRequestRequest(String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
                                 long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
                                 String bucket, String password) {
-        super(connectionName, bucket, password);
+        super(bucket, password);
         this.partition(partition);
         this.vbucketUUID = vbucketUUID;
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
         this.snapshotStartSequenceNumber = snapshotStartSequenceNumber;
         this.snapshotEndSequenceNumber = snapshotEndSequenceNumber;
+        this.connectionName = connectionName;
     }
 
     public long vbucketUUID() {
@@ -109,5 +111,9 @@ public class StreamRequestRequest extends AbstractDCPRequest {
 
     public long snapshotEndSequenceNumber() {
         return snapshotEndSequenceNumber;
+    }
+
+    public String connectionName() {
+        return connectionName;
     }
 }

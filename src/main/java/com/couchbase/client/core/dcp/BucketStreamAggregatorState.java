@@ -122,17 +122,4 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     public String toString() {
         return feeds.values().toString();
     }
-
-    /**
-     * @return number of streams with the highest value of end sequence number
-     */
-    public int numberOfInfiniteStreams() {
-        int infiniteStreams = 0;
-        for (BucketStreamState streamState : feeds.values()) {
-            if (streamState.endSequenceNumber() == 0xffffffff) {
-                infiniteStreams++;
-            }
-        }
-        return infiniteStreams;
-    }
 }

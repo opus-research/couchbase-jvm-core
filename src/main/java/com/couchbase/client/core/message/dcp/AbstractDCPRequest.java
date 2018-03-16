@@ -25,9 +25,7 @@ package com.couchbase.client.core.message.dcp;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
 /**
@@ -39,14 +37,6 @@ import rx.subjects.Subject;
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
 public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implements DCPRequest {
-    /**
-     * The connection name can be used to get statistics about the connection state
-     * as well as other useful debugging information. If a connection already exists
-     * on the Producer with the same name then the old connection is closed and
-     * a new one is opened.
-     */
-    private final String connectionName;
-
     protected static short DEFAULT_PARTITION = 0;
 
     /**
@@ -60,14 +50,13 @@ public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implem
      * @param bucket   the bucket of the document.
      * @param password the optional password of the bucket.
      */
-    public AbstractDCPRequest(final String connectionName, final String bucket, final String password) {
-        this(connectionName, bucket, password, AsyncSubject.<CouchbaseResponse>create());
+    public AbstractDCPRequest(String bucket, String password) {
+        super(bucket, password);
     }
 
-    public AbstractDCPRequest(final String connectionName, final String bucket, final String password,
-                              final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
+    public AbstractDCPRequest(String bucket, String password, Subject<CouchbaseResponse,
+            CouchbaseResponse> observable) {
         super(bucket, password, observable);
-        this.connectionName = connectionName;
     }
 
     @Override
@@ -87,15 +76,10 @@ public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implem
         return this;
     }
 
-    public String connectionName() {
-        return connectionName;
-    }
-
     public String toString() {
         final StringBuilder sb = new StringBuilder(this.getClass().getSimpleName() + "{");
         sb.append("observable=").append(observable());
         sb.append(", bucket='").append(bucket()).append('\'');
-        sb.append(", connectionName='").append(connectionName).append('\'');
         sb.append(", partition=").append(partition());
         return sb.append('}').toString();
     }

@@ -79,8 +79,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int BOOTSTRAP_CARRIER_SSL_PORT = 11207;
     public static final int REQUEST_BUFFER_SIZE = 16384;
     public static final int RESPONSE_BUFFER_SIZE = 16384;
-    public static final int DCP_CONNECTION_BUFFER_SIZE = 20971520; // 20MiB
-    public static final double DCP_CONNECTION_BUFFER_ACK_THRESHOLD = 0.2; // for 20Mib it is 4MiB
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
@@ -97,8 +95,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean TCP_NODELAY_ENALED = true;
     public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
-    public static final int DCP_STREAM_SIZE = 1024;
-
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
@@ -171,8 +167,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int computationPoolSize;
     private final int responseBufferSize;
     private final int requestBufferSize;
-    private final int dcpConnectionBufferSize;
-    private final double dcpConnectionBufferAckThreshold;
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
@@ -189,7 +183,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean tcpNodelayEnabled;
     private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
-    private final int dcpStreamSize;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -227,8 +220,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         int computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize);
         responseBufferSize = intPropertyOr("responseBufferSize", builder.responseBufferSize);
         requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize);
-        dcpConnectionBufferSize = intPropertyOr("dcpConnectionBufferSize", builder.dcpConnectionBufferSize);
-        dcpConnectionBufferAckThreshold = doublePropertyOr("dcpConnectionBufferAckThreshold", builder.dcpConnectionBufferAckThreshold);
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
@@ -245,7 +236,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         tcpNodelayEnabled = booleanPropertyOr("tcpNodelayEnabled", builder.tcpNodelayEnabled);
         mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
-        dcpStreamSize = intPropertyOr("dcpStreamSize", builder.dcpStreamSize);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -354,14 +344,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return def;
         }
         return Integer.parseInt(found);
-    }
-
-    protected static double doublePropertyOr(String path, double def) {
-        String found = System.getProperty(NAMESPACE + path);
-        if (found == null) {
-            return def;
-        }
-        return Double.parseDouble(found);
     }
 
     @Override
@@ -536,15 +518,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public int responseBufferSize() {
         return responseBufferSize;
     }
-    @Override
-    public int dcpConnectionBufferSize() {
-        return dcpConnectionBufferSize;
-    }
-
-    @Override
-    public double dcpConnectionBufferAckThreshold() {
-        return dcpConnectionBufferAckThreshold;
-    }
 
     @Override
     public int kvEndpoints() {
@@ -641,11 +614,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return socketConnectTimeout;
     }
 
-    @Override
-    public int dcpStreamSize() {
-        return dcpStreamSize;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -666,8 +634,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int computationPoolSize = COMPUTATION_POOL_SIZE;
         private int responseBufferSize = RESPONSE_BUFFER_SIZE;
         private int requestBufferSize = REQUEST_BUFFER_SIZE;
-        public int dcpConnectionBufferSize = DCP_CONNECTION_BUFFER_SIZE;
-        public double dcpConnectionBufferAckThreshold = DCP_CONNECTION_BUFFER_ACK_THRESHOLD;
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
@@ -687,7 +653,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean tcpNodelayEnabled = TCP_NODELAY_ENALED;
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
-        private int dcpStreamSize = DCP_STREAM_SIZE;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
@@ -843,26 +808,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder responseBufferSize(final int responseBufferSize) {
             this.responseBufferSize = responseBufferSize;
-            return this;
-        }
-
-        /**
-         * Sets the size of the buffer to control speed of DCP producer. The server will stop emitting data if
-         * the current value of the buffer reach this limit. Set it to zero, if flow control have to be disabled.
-         * (default value {@value #DCP_CONNECTION_BUFFER_SIZE}).
-         */
-        public Builder dcpConnectionBufferSize(final int dcpConnectionBufferSize) {
-            this.dcpConnectionBufferSize = dcpConnectionBufferSize;
-            return this;
-        }
-
-        /**
-         * When this threshold of {@value #DCP_CONNECTION_BUFFER_SIZE} reached per DCP connection,
-         * the library will send Buffer Acknowledge message to signal producer, that data has been processed.
-         * (default value {@value #DCP_CONNECTION_BUFFER_ACK_THRESHOLD}).
-         */
-        public Builder dcpConnectionBufferAckThreshold(final int dcpConnectionBufferAckThreshold) {
-            this.dcpConnectionBufferAckThreshold = dcpConnectionBufferAckThreshold;
             return this;
         }
 
@@ -1122,16 +1067,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Sets size boundary of ReplaySubject inside DCPStream.
-         *
-         * @param dcpStreamSize the number of events for ReplaySubject inside DCPStream.
-         */
-        public Builder dcpStreamSize(int dcpStreamSize) {
-            this.dcpStreamSize = dcpStreamSize;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1185,7 +1120,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
         sb.append(", mutationTokensEnabled=").append(mutationTokensEnabled);
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
-        sb.append(", dcpStreamSize=").append(dcpStreamSize);
         return sb;
     }
 

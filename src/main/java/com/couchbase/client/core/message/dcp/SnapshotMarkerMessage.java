@@ -72,14 +72,14 @@ public class SnapshotMarkerMessage extends AbstractDCPRequest {
      */
     private final boolean ack;
 
-    public SnapshotMarkerMessage(final String connectionName, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket) {
-        this(connectionName, partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
+        this(partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
     }
 
-    public SnapshotMarkerMessage(final String connectionName, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket, String password) {
-        super(connectionName, bucket, password);
+        super(bucket, password);
         partition(partition);
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;

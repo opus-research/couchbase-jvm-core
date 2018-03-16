@@ -38,8 +38,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
 public interface DCPRequest extends CouchbaseRequest {
-    String connectionName();
-
     /**
      * The partition (vBucket) to use for this request.
      *
