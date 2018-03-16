@@ -90,11 +90,4 @@ public interface BucketConfig {
      */
     List<NodeInfo> nodes();
 
-    /**
-     * If a config is marked as tainted.
-     *
-     * @return
-     */
-    boolean tainted();
-
 }

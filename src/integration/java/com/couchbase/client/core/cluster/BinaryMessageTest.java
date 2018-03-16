@@ -60,13 +60,6 @@ public class BinaryMessageTest extends ClusterDependentTest {
 
         assertEquals(content, cluster(). <GetResponse>send(request).toBlocking().single().content()
             .toString(CharsetUtil.UTF_8));
-
-        while(true) {
-            for(int i=0; i < 64; i++) {
-               cluster().<GetResponse>send(new GetRequest("foo" + i, bucket())).toBlocking().single();
-            }
-        }
-
     }
 
 

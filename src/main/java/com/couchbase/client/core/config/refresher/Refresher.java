@@ -64,18 +64,4 @@ public interface Refresher {
      */
     Observable<Boolean> shutdown();
 
-    /**
-     * Marks the given bucket as tainted.
-     *
-     * @param config
-     */
-    void markTainted(BucketConfig config);
-
-    /**
-     * Mark the given bucket as not tainted.
-     *
-     * @param config
-     */
-    void markUntainted(BucketConfig config);
-
 }
