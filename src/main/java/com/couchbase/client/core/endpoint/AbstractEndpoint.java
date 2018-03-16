@@ -147,6 +147,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private volatile long reconnectAttempt = 1;
 
     /**
+     * Set to true once disconnected.
+     */
+    private volatile boolean disconnected;
+
+    /**
      * Preset the stack trace for the static exceptions.
      */
     static {
@@ -173,6 +178,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.responseBuffer = null;
         this.env = null;
         this.isTransient = isTransient;
+        this.disconnected = false;
     }
 
     /**
@@ -301,7 +307,16 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                             future.channel().eventLoop().schedule(new Runnable() {
                                 @Override
                                 public void run() {
-                                    doConnect(observable);
+                                    // Make sure to avoid a race condition where the reconnect could override
+                                    // the disconnect phase. If this happens, explicitly break the retry loop
+                                    // and re-run the disconnect phase to make sure all is properly freed.
+                                    if (!disconnected) {
+                                        doConnect(observable);
+                                    } else {
+                                        disconnect();
+                                        LOGGER.debug("{}Explicitly breaking retry loop because already disconnected.",
+                                            logIdent(channel, AbstractEndpoint.this));
+                                    }
                                 }
                             }, delay, delayUnit);
                         }
@@ -316,6 +331,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
 
     @Override
     public Observable<LifecycleState> disconnect() {
+        disconnected = true;
+
         if (state() == LifecycleState.DISCONNECTED || state() == LifecycleState.DISCONNECTING) {
             return Observable.just(state());
         }
