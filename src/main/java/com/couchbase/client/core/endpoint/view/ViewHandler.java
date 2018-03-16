@@ -59,8 +59,11 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.subjects.AsyncSubject;
 
+import java.net.URLEncoder;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
@@ -103,6 +106,11 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     private UnicastAutoReleaseSubject<ByteBuf> viewInfoObservable;
 
     /**
+     * Contains optional errors that happened during execution.
+     */
+    private AsyncSubject<String> viewErrorObservable;
+
+    /**
      * Represents the current query parsing state.
      */
     private byte viewParsingState = QUERY_STATE_INITIAL;
@@ -126,40 +134,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      */
     ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ViewRequest> queue, boolean isTransient) {
         super(endpoint, responseBuffer, queue, isTransient);
-    }
-
-    /**
-     * A utility method to split a GET-like query String into a {@link Tuple2} of Strings if size
-     * of the original gets above a threshold. If not, the original String is returned as value1
-     * of the tuple, and value2 is null. Otherwise, value1 is the original query string minus a "keys"
-     * parameter, and value2 is a json representation of the keys parameter.
-     *
-     * @param queryString the GET-like query string to process if length is above threshold.
-     * @param splitThreshold the size processing threshold.
-     * @return a {@link Tuple2} with keys parameter isolated in value2 as a JSON object.
-     */
-    protected Tuple2<String, String> extractKeysFromQueryString(String queryString, int splitThreshold) {
-        if (queryString.length() < splitThreshold) {
-            return Tuple.create(queryString, null);
-        }
-
-        //split
-        String[] params = queryString.split("&");
-        StringBuilder reworkedQueryParams = new StringBuilder();
-        StringBuilder keys = new StringBuilder(queryString.length());
-        for (String param : params) {
-            if (param.startsWith("keys=")) {
-                keys.append("{\"keys\":").append(param.substring(5)).append('}');
-            } else {
-                reworkedQueryParams.append(param).append('&');
-            }
-        }
-        //eliminate last & in reworkedQueryParams
-        if (reworkedQueryParams.length() > 0) {
-            reworkedQueryParams.deleteCharAt(reworkedQueryParams.length() - 1);
-        }
-
-        return Tuple.create(reworkedQueryParams.toString(), keys.toString());
     }
 
     @Override
@@ -187,20 +161,36 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             }
             path.append(queryMsg.view());
 
-            if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
-                Tuple2<String, String> splitIfPostNeeded = extractKeysFromQueryString(
-                        queryMsg.query(), MAX_GET_LENGTH);
-                if (splitIfPostNeeded.value2() == null) {
+            int queryLength = queryMsg.query() == null ? 0 : queryMsg.query().length();
+            int keysLength = queryMsg.keys() == null ? 0 : queryMsg.keys().length();
+            boolean hasQuery = queryLength > 0;
+            boolean hasKeys = keysLength > 0;
+
+            if (hasQuery || hasKeys) {
+                if (queryLength + keysLength < MAX_GET_LENGTH) {
                     //the query is short enough for GET
-                    path.append("?").append(queryMsg.query());
+                    //it has query, query+keys or keys only
+                    if (hasQuery) {
+                        path.append("?").append(queryMsg.query());
+                        if (hasKeys) {
+                            path.append("&keys=").append(encodeKeysGet(queryMsg.keys()));
+                        }
+                    } else {
+                        //it surely has keys if not query
+                        path.append("?keys=").append(encodeKeysGet(queryMsg.keys()));
+                    }
                 } else {
+                    //the query is too long for GET, use the keys as JSON body
+                    if (hasQuery) {
+                        path.append("?").append(queryMsg.query());
+                    }
+                    String keysContent = encodeKeysPost(queryMsg.keys());
+
                     //switch to POST
                     method = HttpMethod.POST;
-                    //parameter string is the reworked one
-                    path.append('?').append(splitIfPostNeeded.value1());
                     //body is "keys" but in JSON
-                    content = ctx.alloc().buffer(splitIfPostNeeded.value2().length());
-                    content.writeBytes(splitIfPostNeeded.value2().getBytes(CHARSET));
+                    content = ctx.alloc().buffer(keysContent.length());
+                    content.writeBytes(keysContent.getBytes(CHARSET));
                 }
             }
         } else if (msg instanceof GetDesignDocumentRequest) {
@@ -233,6 +223,24 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         addAuth(ctx, request, msg.bucket(), msg.password());
 
         return request;
+    }
+
+    /**
+     * Encodes the "keys" JSON array into a JSON object suitable for a POST body on query service.
+     */
+    private String encodeKeysPost(String keys) {
+        return "{\"keys\":" + keys + "}";
+    }
+
+    /**
+     * Encodes the "keys" JSON array into an URL-encoded form suitable for a GET on query service.
+     */
+    private String encodeKeysGet(String keys) {
+        try {
+            return URLEncoder.encode(keys, "UTF-8");
+        } catch(Exception ex) {
+            throw new RuntimeException("Could not prepare view argument: " + ex);
+        }
     }
 
     @Override
@@ -321,9 +329,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         long ttl = env().autoreleaseAfter();
         viewRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         viewInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
+        viewErrorObservable = AsyncSubject.create();
+
         return new ViewQueryResponse(
             viewRowObservable.onBackpressureBuffer().observeOn(scheduler),
             viewInfoObservable.onBackpressureBuffer().observeOn(scheduler),
+            viewErrorObservable.observeOn(scheduler),
             code,
             phrase,
             status,
@@ -345,12 +356,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             parseViewInfo();
         }
 
-        if (viewParsingState == QUERY_STATE_ERROR) {
-            parseViewError(last);
-        }
-
         if (viewParsingState == QUERY_STATE_ROWS) {
             parseViewRows(last);
+        }
+
+        if (viewParsingState == QUERY_STATE_ERROR) {
+            parseViewError(last);
         }
 
         if (viewParsingState == QUERY_STATE_DONE) {
@@ -365,6 +376,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         finishedDecoding();
         viewInfoObservable = null;
         viewRowObservable = null;
+        viewErrorObservable = null;
         viewParsingState = QUERY_STATE_INITIAL;
     }
 
@@ -377,6 +389,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
                 viewParsingState = QUERY_STATE_INFO;
                 break;
             default:
+                viewInfoObservable.onCompleted();
                 viewRowObservable.onCompleted();
                 viewParsingState = QUERY_STATE_ERROR;
         }
@@ -392,9 +405,18 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             return;
         }
 
-        viewInfoObservable.onNext(responseContent.copy());
-        viewInfoObservable.onCompleted();
+        if (responseHeader.getStatus().code() == 200) {
+            int openBracketPos = responseContent.bytesBefore((byte) '[') + responseContent.readerIndex();
+            int closeBracketLength = findSectionClosingPosition(responseContent, '[', ']') - openBracketPos + 1;
+            ByteBuf slice = responseContent.slice(openBracketPos, closeBracketLength);
+            viewErrorObservable.onNext("{\"errors\":" + slice.toString(CharsetUtil.UTF_8) + "}");
+        } else {
+            viewErrorObservable.onNext("{\"errors\":[" + responseContent.toString(CharsetUtil.UTF_8) + "]}");
+        }
+
+        viewErrorObservable.onCompleted();
         viewParsingState = QUERY_STATE_DONE;
+        responseContent.discardReadBytes();
     }
 
     /**
@@ -445,6 +467,15 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     private void parseViewRows(boolean last) {
         while (true) {
             int openBracketPos = responseContent.bytesBefore((byte) '{');
+            int errorBlockPosition = findErrorBlockPosition(openBracketPos);
+
+            if (errorBlockPosition > 0 && errorBlockPosition < openBracketPos) {
+                responseContent.readerIndex(errorBlockPosition + responseContent.readerIndex());
+                viewRowObservable.onCompleted();
+                viewParsingState = QUERY_STATE_ERROR;
+                return;
+            }
+
             int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
             if (closeBracketPos == -1) {
                 break;
@@ -454,13 +485,32 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             int to = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
             viewRowObservable.onNext(responseContent.slice(from, to).copy());
             responseContent.readerIndex(closeBracketPos);
+            responseContent.discardReadBytes();
         }
 
-        responseContent.discardReadBytes();
+
         if (last) {
             viewRowObservable.onCompleted();
+            viewErrorObservable.onCompleted();
             viewParsingState = QUERY_STATE_DONE;
         }
+    }
+
+    private int findErrorBlockPosition(int openBracketPos) {
+        int errorPosition = -1;
+
+        int readerIndex = responseContent.readerIndex();
+        for (int i = readerIndex; i < readerIndex + openBracketPos - 2; i++) {
+            byte curr = responseContent.getByte(i);
+            byte f1 = responseContent.getByte(i + 1);
+            byte f2 = responseContent.getByte(i + 2);
+
+            if (curr == '"' && f1 == 'e' && f2 == 'r') {
+                errorPosition = i;
+                break;
+            }
+        }
+        return errorPosition > -1 ? errorPosition - responseContent.readerIndex() : errorPosition;
     }
 
     /**
@@ -490,9 +540,15 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (viewRowObservable != null) {
             viewRowObservable.onCompleted();
+            viewRowObservable = null;
         }
         if (viewInfoObservable != null) {
             viewInfoObservable.onCompleted();
+            viewInfoObservable = null;
+        }
+        if (viewErrorObservable != null) {
+            viewErrorObservable.onCompleted();
+            viewErrorObservable = null;
         }
         cleanupViewStates();
         if (responseContent != null && responseContent.refCnt() > 0) {

@@ -40,6 +40,7 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
+import rx.subjects.Subject;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -103,7 +104,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     /**
      * The observable which will push out new config changes to interested parties.
      */
-    private final PublishSubject<ClusterConfig> configObservable;
+    private final Subject<ClusterConfig, ClusterConfig> configObservable;
 
     /**
      * Represents the current cluster-wide configuration.
@@ -170,7 +171,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         this.environment = environment;
         this.eventBus = environment.eventBus();
 
-        configObservable = PublishSubject.create();
+        configObservable = PublishSubject.<ClusterConfig>create().toSerialized();
         seedHosts = new AtomicReference<Set<InetAddress>>();
         bootstrapped = false;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
@@ -325,7 +326,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         }
 
         BucketConfig config = BucketConfigParser.parse(rawConfig);
-        config.password(currentConfig.get().bucketConfig(bucket).password());
         upsertBucketConfig(config);
     }
 
@@ -360,26 +360,36 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      *
      * This method also sends out an update to the subject afterwards, so that observers are notified.
      *
-     * @param config the configuration of the bucket.
+     * @param newConfig the configuration of the bucket.
      */
-    private void upsertBucketConfig(final BucketConfig config) {
+    private void upsertBucketConfig(final BucketConfig newConfig) {
         ClusterConfig cluster = currentConfig.get();
-        if (config.rev() > 0 && cluster.bucketConfig(config.name()) != null
-            && config.rev() <= cluster.bucketConfig(config.name()).rev()) {
+        BucketConfig oldConfig = cluster.bucketConfig(newConfig.name());
+
+        if (newConfig.rev() > 0 && oldConfig != null && newConfig.rev() <= oldConfig.rev()) {
             LOGGER.trace("Not applying new configuration, older rev ID.");
             return;
         }
 
-        cluster.setBucketConfig(config.name(), config);
-        LOGGER.debug("Applying new configuration {}", config);
+        // If the current password of the config is empty and an old config exists
+        // make sure to transfer the password over to the new config. Otherwise it
+        // is possible that authentication errors because of a null password arise.
+        // See JVMCBC-185
+        if (newConfig.password() == null && oldConfig != null) {
+            newConfig.password(oldConfig.password());
+        }
+
+        cluster.setBucketConfig(newConfig.name(), newConfig);
+        LOGGER.debug("Applying new configuration {}", newConfig);
+
         currentConfig.set(cluster);
 
-        boolean tainted = config.tainted();
+        boolean tainted = newConfig.tainted();
         for (Refresher refresher : refreshers.values()) {
             if (tainted) {
-                refresher.markTainted(config);
+                refresher.markTainted(newConfig);
             } else {
-                refresher.markUntainted(config);
+                refresher.markUntainted(newConfig);
             }
         }
 

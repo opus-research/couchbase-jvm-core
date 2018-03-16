@@ -25,6 +25,9 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
+import com.couchbase.client.core.endpoint.util.ClosingPositionBufProcessor;
+import com.couchbase.client.core.endpoint.util.StringClosingPositionBufProcessor;
+import com.couchbase.client.core.endpoint.util.WhitespaceSkipper;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
@@ -38,7 +41,9 @@ import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufProcessor;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
@@ -179,11 +184,13 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         } else if (msg instanceof KeepAliveRequest) {
             request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
+            return request;
         } else {
             throw new IllegalArgumentException("Unknown incoming QueryRequest type "
                 + msg.getClass());
         }
 
+        addAuth(ctx, request, msg.bucket(), msg.password());
         return request;
     }
 
@@ -368,7 +375,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         if (queryParsingState == QUERY_STATE_DONE) {
-            cleanupQueryStates();
+            //final state, but there could still be a small chunk with closing brackets
+            //only finalize and reset if this is the last chunk
+            sectionDone = lastChunk;
+            //if false this will allow next iteration to skip non-relevant automatic
+            //transition to next token (which is desirable since there is no more token).
+            if (sectionDone) {
+                cleanupQueryStates();
+            }
         }
     }
 
@@ -420,18 +434,37 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * Parse the signature section in the N1QL response.
      */
     private void parseQuerySignature(boolean lastChunk) {
-        int openPos = findNextChar(responseContent, '{');
-        if (!isEmptySection(openPos)) { //checks for empty signature
-            int closePos = findSectionClosingPosition(responseContent, '{', '}');
-            if (closePos > 0) {
-                int length = closePos - openPos - responseContent.readerIndex() + 1;
-                responseContent.skipBytes(openPos);
-                ByteBuf signature = responseContent.readSlice(length);
-                querySignatureObservable.onNext(signature.copy());
-            } else {
-                //wait for more data
-                return;
-            }
+        ByteBufProcessor processor = null;
+        //signature can be any valid JSON item, which get tricky to detect
+        //let's try to find out what's the boundary character
+        int openPos = responseContent.forEachByte(new WhitespaceSkipper()) - responseContent.readerIndex();
+        if (openPos < 0) {
+            //only whitespace left in the buffer, need more data
+            return;
+        }
+        char openChar = (char) responseContent.getByte(responseContent.readerIndex() + openPos);
+        if (openChar == '{') {
+            processor = new ClosingPositionBufProcessor('{', '}', true);
+        } else if (openChar == '[') {
+            processor = new ClosingPositionBufProcessor('[', ']', true);
+        } else if (openChar == '"') {
+            processor = new StringClosingPositionBufProcessor();
+        } //else this should be a scalar, skip processor
+
+        int closePos;
+        if (processor != null) {
+            closePos = responseContent.forEachByte(processor) - responseContent.readerIndex();
+        } else {
+            closePos = findNextChar(responseContent, ',') - 1;
+        }
+        if (closePos > 0) {
+            responseContent.skipBytes(openPos);
+            int length = closePos - openPos + 1;
+            ByteBuf signature = responseContent.readSlice(length);
+            querySignatureObservable.onNext(signature.copy());
+        } else {
+            //wait for more data
+            return;
         }
         //note: the signature section could be absent, so we'll make sure to complete the observable
         // when receiving status since this is in every well-formed response.
@@ -577,6 +610,29 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             responseContent.release();
         }
         super.handlerRemoved(ctx);
+    }
+
+    /**
+     * Add basic authentication headers to a {@link HttpRequest}.
+     *
+     * The given information is Base64 encoded and the authorization header is set appropriately. Since this needs
+     * to be done for every request, it is refactored out.
+     *
+     * @param ctx the handler context.
+     * @param request the request where the header should be added.
+     * @param user the username for auth.
+     * @param password the password for auth.
+     */
+    private static void addAuth(final ChannelHandlerContext ctx, final HttpRequest request, final String user,
+        final String password) {
+        final String pw = password == null ? "" : password;
+
+        ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
+        raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
+        ByteBuf encoded = Base64.encode(raw, false);
+        request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
+        encoded.release();
+        raw.release();
     }
 
     @Override

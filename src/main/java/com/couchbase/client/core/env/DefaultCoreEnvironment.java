@@ -22,6 +22,9 @@
 package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
+import com.couchbase.client.core.env.resources.NoOpShutdownHook;
+import com.couchbase.client.core.env.resources.ShutdownHook;
 import com.couchbase.client.core.event.DefaultEventBus;
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
@@ -33,11 +36,10 @@ import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.Scheduler;
-import rx.Subscriber;
+import rx.functions.Action1;
+import rx.functions.Func2;
 
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +83,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
 
     private static final String NAMESPACE = "com.couchbase.";
+
+    /**
+     * The minimum size of the io and computation pools in order to prevent deadlock and resource
+     * starvation.
+     *
+     * Normally this should be higher by default, but if the number of cores are very small or the configuration
+     * is wrong it can even go down to 1.
+     */
+    static final int MIN_POOL_SIZE = 3;
 
     private static final String VERSION_PROPERTIES = "com.couchbase.client.core.properties";
 
@@ -159,7 +170,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
     private final EventBus eventBus;
-    private volatile boolean shutdown;
+
+    private final ShutdownHook ioPoolShutdownHook;
+    private final ShutdownHook coreSchedulerShutdownHook;
 
     protected DefaultCoreEnvironment(final Builder builder) {
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
@@ -178,8 +191,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         bootstrapCarrierEnabled = booleanPropertyOr("bootstrapCarrierEnabled", builder.bootstrapCarrierEnabled());
         bootstrapCarrierDirectPort = intPropertyOr("bootstrapCarrierDirectPort", builder.bootstrapCarrierDirectPort());
         bootstrapCarrierSslPort = intPropertyOr("bootstrapCarrierSslPort", builder.bootstrapCarrierSslPort());
-        ioPoolSize = intPropertyOr("ioPoolSize", builder.ioPoolSize());
-        computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize());
+        int ioPoolSize = intPropertyOr("ioPoolSize", builder.ioPoolSize());
+        int computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize());
         responseBufferSize = intPropertyOr("responseBufferSize", builder.responseBufferSize());
         requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize());
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints());
@@ -196,12 +209,43 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         autoreleaseAfter = longPropertyOr("autoreleaseAfter", builder.autoreleaseAfter());
         bufferPoolingEnabled = booleanPropertyOr("bufferPoolingEnabled", builder.bufferPoolingEnabled());
 
-        this.ioPool = builder.ioPool() == null
-            ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
-        this.coreScheduler = builder.scheduler() == null
-            ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
+        if (ioPoolSize < MIN_POOL_SIZE) {
+            LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
+            this.ioPoolSize = MIN_POOL_SIZE;
+        } else {
+            this.ioPoolSize = ioPoolSize;
+        }
+
+        if (computationPoolSize < MIN_POOL_SIZE) {
+            LOGGER.info("computationPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, computationPoolSize,
+                MIN_POOL_SIZE);
+            this.computationPoolSize = MIN_POOL_SIZE;
+        } else {
+            this.computationPoolSize = computationPoolSize;
+        }
+
+        if (builder.ioPool() == null) {
+            this.ioPool = new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true));
+            this.ioPoolShutdownHook = new IoPoolShutdownHook(this.ioPool);
+        } else {
+            this.ioPool = builder.ioPool();
+            this.ioPoolShutdownHook = builder.ioPoolShutdownHook == null
+                    ? new NoOpShutdownHook()
+                    : builder.ioPoolShutdownHook;
+        }
+
+        if (builder.scheduler == null) {
+            CoreScheduler managed = new CoreScheduler(computationPoolSize());
+            this.coreScheduler = managed;
+            this.coreSchedulerShutdownHook = managed
+            ;
+        } else {
+            this.coreScheduler = builder.scheduler();
+            this.coreSchedulerShutdownHook = builder.schedulerShutdownHook == null
+                    ? new NoOpShutdownHook()
+                    : builder.schedulerShutdownHook;
+        }
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
-        this.shutdown = false;
     }
 
     public static DefaultCoreEnvironment create() {
@@ -249,31 +293,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     @SuppressWarnings("unchecked")
     public Observable<Boolean> shutdown() {
-        if (shutdown) {
-            return Observable.just(true);
-        }
-
-        return Observable.create(new Observable.OnSubscribe<Boolean>() {
+        return Observable.mergeDelayError(
+                ioPoolShutdownHook.shutdown(),
+                coreSchedulerShutdownHook.shutdown()
+        ).reduce(true, new Func2<Boolean, Boolean, Boolean>() {
             @Override
-            public void call(final Subscriber<? super Boolean> subscriber) {
-                if (shutdown) {
-                    subscriber.onNext(true);
-                    subscriber.onCompleted();
-                }
-
-                ioPool.shutdownGracefully().addListener(new GenericFutureListener() {
-                    @Override
-                    public void operationComplete(final Future future) throws Exception {
-                        if (!subscriber.isUnsubscribed()) {
-                            if (future.isSuccess()) {
-                                subscriber.onNext(future.isSuccess());
-                                subscriber.onCompleted();
-                            } else {
-                                subscriber.onError(future.cause());
-                            }
-                        }
-                    }
-                });
+            public Boolean call(Boolean a, Boolean b) {
+                return a && b;
             }
         });
     }
@@ -461,7 +487,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private Delay retryDelay = RETRY_DELAY;
         private RetryStrategy retryStrategy = RETRY_STRATEGY;
         private EventLoopGroup ioPool;
+        private ShutdownHook ioPoolShutdownHook;
         private Scheduler scheduler;
+        private ShutdownHook schedulerShutdownHook;
         private EventBus eventBus;
         private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
         private long keepAliveInterval = KEEPALIVEINTERVAL;
@@ -839,9 +867,22 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         /**
          * Sets the I/O Pool implementation for the underlying IO framework.
          * This is an advanced configuration that should only be used if you know what you are doing.
+         *
+         * @deprecated use {@link #ioPool(EventLoopGroup, ShutdownHook)} to also provide a shutdown hook.
          */
+        @Deprecated
         public Builder ioPool(final EventLoopGroup group) {
+            return ioPool(group, new NoOpShutdownHook());
+        }
+
+        /**
+         * Sets the I/O Pool implementation for the underlying IO framework, along with the action
+         * to execute when this environment is shut down.
+         * This is an advanced configuration that should only be used if you know what you are doing.
+         */
+        public Builder ioPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
             this.ioPool = group;
+            this.ioPoolShutdownHook = shutdownHook;
             return this;
         }
 
@@ -853,9 +894,22 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         /**
          * Sets the Scheduler implementation for the underlying computation framework.
          * This is an advanced configuration that should only be used if you know what you are doing.
+         *
+         * @deprecated use {@link #ioPool(EventLoopGroup, ShutdownHook)} to also provide a shutdown hook.
          */
+        @Deprecated
         public Builder scheduler(final Scheduler scheduler) {
+            return scheduler(scheduler, new NoOpShutdownHook());
+        }
+
+        /**
+         * Sets the Scheduler implementation for the underlying computation framework, along with the action
+         * to execute when this environment is shut down.
+         * This is an advanced configuration that should only be used if you know what you are doing.
+         */
+        public Builder scheduler(final Scheduler scheduler, final ShutdownHook shutdownHook) {
             this.scheduler = scheduler;
+            this.schedulerShutdownHook = shutdownHook;
             return this;
         }
 
@@ -988,7 +1042,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", viewServiceEndpoints=").append(viewServiceEndpoints);
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
+        if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
+            sb.append("!unmanaged");
+        }
         sb.append(", coreScheduler=").append(coreScheduler.getClass().getSimpleName());
+        if (coreSchedulerShutdownHook == null || coreSchedulerShutdownHook instanceof NoOpShutdownHook) {
+            sb.append("!unmanaged");
+        }
         sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);
