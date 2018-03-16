@@ -23,7 +23,6 @@ import com.couchbase.client.core.message.ResponseStatus;
  * @author Sergey Avseyev
  * @since 1.2.6
  */
-@Deprecated
 public class GetLastCheckpointResponse extends AbstractDCPResponse {
     private final long sequenceNumber;
 

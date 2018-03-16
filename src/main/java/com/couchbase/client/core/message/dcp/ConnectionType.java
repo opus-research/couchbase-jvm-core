@@ -31,7 +31,6 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public enum ConnectionType {
     PRODUCER(0),
     CONSUMER(1);
