@@ -75,6 +75,10 @@ public class KeyValueEndpoint extends AbstractEndpoint {
             System.getProperty("com.couchbase.authBeforeHello", "false")
         );
 
+        boolean certAuthEnabled = Boolean.parseBoolean(
+            System.getProperty("com.couchbase.certAuthEnabled", "false")
+        );
+
         pipeline
             .addLast(new BinaryMemcacheClientCodec())
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE));
@@ -82,15 +86,22 @@ public class KeyValueEndpoint extends AbstractEndpoint {
         if (authBeforeHello) {
             LOGGER.info("Manually enforced authentication before \"HELLO\" for backwards " +
                 "compatibility.");
+
+            if (!certAuthEnabled) {
+                pipeline.addLast(new KeyValueAuthHandler(username(), password()));
+            }
+
             pipeline
-                .addLast(new KeyValueAuthHandler(username(), password()))
                 .addLast(new KeyValueFeatureHandler(environment()))
                 .addLast(new KeyValueErrorMapHandler());
         } else {
             pipeline
                 .addLast(new KeyValueFeatureHandler(environment()))
-                .addLast(new KeyValueErrorMapHandler())
-                .addLast(new KeyValueAuthHandler(username(), password()));
+                .addLast(new KeyValueErrorMapHandler());
+
+            if (!certAuthEnabled) {
+                pipeline.addLast(new KeyValueAuthHandler(username(), password()));
+            }
         }
 
         pipeline
