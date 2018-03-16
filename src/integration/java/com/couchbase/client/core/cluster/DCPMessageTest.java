@@ -29,6 +29,7 @@ import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.dcp.MutationMessage;
 import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
 import com.couchbase.client.core.message.dcp.OpenConnectionResponse;
+import com.couchbase.client.core.message.dcp.RemoveMessage;
 import com.couchbase.client.core.message.dcp.SnapshotMarkerMessage;
 import com.couchbase.client.core.message.dcp.StreamRequestRequest;
 import com.couchbase.client.core.message.dcp.StreamRequestResponse;
@@ -40,13 +41,11 @@ import io.netty.util.CharsetUtil;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
-import rx.Observable;
-import rx.Subscriber;
-import rx.observers.TestSubscriber;
+import rx.functions.Action1;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 import static org.junit.Assert.assertEquals;
@@ -59,10 +58,9 @@ import static org.junit.Assert.assertTrue;
  * @since 1.1.0
  */
 public class DCPMessageTest extends ClusterDependentTest {
-
     @Before
-    public void checkIfDCPEnabled() throws Exception {
-        Assume.assumeTrue(isDCPEnabled());
+    public void checkIfDCPEnabled() {
+        Assume.assumeTrue(env().dcpEnabled());
     }
 
     @Test
@@ -81,8 +79,13 @@ public class DCPMessageTest extends ClusterDependentTest {
                 .single();
         assertEquals(ResponseStatus.SUCCESS, addStream.status());
 
-        TestSubscriber<DCPRequest> subscriber = new TestSubscriber<DCPRequest>();
-        addStream.stream().takeUntil(Observable.timer(2, TimeUnit.SECONDS)).subscribe((Subscriber) subscriber);
+        final List<DCPRequest> items = new ArrayList<DCPRequest>();
+        addStream.stream().subscribe(new Action1<DCPRequest>() {
+            @Override
+            public void call(DCPRequest dcpRequest) {
+                items.add(dcpRequest);
+            }
+        });
 
         UpsertResponse foo = cluster()
                 .<UpsertResponse>send(new UpsertRequest("foo", Unpooled.copiedBuffer("bar", CharsetUtil.UTF_8), 1, 0, bucket()))
@@ -90,22 +93,18 @@ public class DCPMessageTest extends ClusterDependentTest {
                 .single();
         assertEquals(ResponseStatus.SUCCESS, foo.status());
 
-        subscriber.awaitTerminalEvent();
-        List<DCPRequest> items = subscriber.getOnNextEvents();
+        Thread.sleep(1100);
+        addStream.stream()
+                .take(Math.max(0, 4 - items.size()))
+                .toList().toBlocking().single();
 
-        boolean seenMutation = false;
-        boolean seenSnapshot = false;
-        for (DCPRequest found : items) {
-            if (found instanceof SnapshotMarkerMessage) {
-                seenSnapshot = true;
-            } else if (found instanceof MutationMessage) {
-                seenMutation = true;
-                assertEquals("foo", ((MutationMessage) found).key());
-            }
-        }
-
-        assertTrue(seenMutation);
-        assertTrue(seenSnapshot);
+        assertEquals(4, items.size());
+        assertTrue(items.get(0) instanceof SnapshotMarkerMessage);
+        MutationMessage mutation = (MutationMessage) items.get(1);
+        assertEquals("foo", mutation.key());
+        assertTrue(items.get(2) instanceof SnapshotMarkerMessage);
+        RemoveMessage remove = (RemoveMessage) items.get(3);
+        assertEquals("foo", remove.key());
     }
 
     private short calculateVBucketForKey(String key) {
