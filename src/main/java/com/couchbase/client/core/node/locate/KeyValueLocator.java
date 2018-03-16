@@ -38,6 +38,7 @@ import com.couchbase.client.core.message.kv.StatRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.state.LifecycleState;
+import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.RingBuffer;
 
 import java.net.InetAddress;
@@ -91,8 +92,8 @@ public class KeyValueLocator implements Locator {
     }
 
 
-    private static void locateByHostname(final CouchbaseRequest request, final InetAddress hostname, List<Node> nodes,
-        CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
+    private static void locateByHostname(final CouchbaseRequest request, final NetworkAddress hostname, List<Node> nodes,
+                                         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         for (Node node : nodes) {
             if (node.isState(LifecycleState.CONNECTED) || node.isState(LifecycleState.DEGRADED)) {
                 if (!hostname.equals(node.hostname())) {
@@ -251,7 +252,7 @@ public class KeyValueLocator implements Locator {
             return;
         }
 
-        InetAddress hostname = config.nodeForId(request.keyBytes());
+        NetworkAddress hostname = config.nodeForId(request.keyBytes());
         request.partition((short) 0);
 
         for (Node node : nodes) {

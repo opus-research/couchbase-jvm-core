@@ -18,6 +18,7 @@ package com.couchbase.client.core.message.kv;
 import java.net.InetAddress;
 
 import com.couchbase.client.core.message.BootstrapMessage;
+import com.couchbase.client.core.utils.NetworkAddress;
 
 /**
  * Request which fetches a bucket configuration through carrier publication.
@@ -33,7 +34,7 @@ public class GetBucketConfigRequest extends AbstractKeyValueRequest implements B
     /**
      * The hostname from where the config should be loaded.
      */
-    private final InetAddress hostname;
+    private final NetworkAddress hostname;
 
     /**
      * Creates a new {@link GetBucketConfigRequest}.
@@ -41,7 +42,7 @@ public class GetBucketConfigRequest extends AbstractKeyValueRequest implements B
      * @param bucket the name of the bucket.
      * @param hostname the hostname of the node.
      */
-    public GetBucketConfigRequest(final String bucket, final InetAddress hostname) {
+    public GetBucketConfigRequest(final String bucket, final NetworkAddress hostname) {
         super(null, bucket);
         this.hostname = hostname;
     }
@@ -51,7 +52,7 @@ public class GetBucketConfigRequest extends AbstractKeyValueRequest implements B
      *
      * @return the hostname.
      */
-    public InetAddress hostname() {
+    public NetworkAddress hostname() {
         return hostname;
     }
 
