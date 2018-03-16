@@ -49,14 +49,11 @@ import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.AddServiceResponse;
 import com.couchbase.client.core.message.internal.GetConfigProviderRequest;
 import com.couchbase.client.core.message.internal.GetConfigProviderResponse;
-import com.couchbase.client.core.message.internal.GetNodesRequest;
-import com.couchbase.client.core.message.internal.GetNodesResponse;
 import com.couchbase.client.core.message.internal.InternalRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeResponse;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceResponse;
-import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.state.LifecycleState;
 import com.lmax.disruptor.EventTranslatorOneArg;
@@ -339,16 +336,6 @@ public class CouchbaseCore implements ClusterFacade {
                     }
                 })
                 .subscribe(request.observable());
-        } else if (request instanceof GetNodesRequest) {
-            requestHandler
-                    .getNodes((GetNodesRequest) request)
-                    .map(new Func1<Node, GetNodesResponse>() {
-                        @Override
-                        public GetNodesResponse call(Node node) {
-                            return new GetNodesResponse(ResponseStatus.SUCCESS, node.hostname());
-                        }
-                    })
-                    .subscribe(request.observable());
         } else if (request instanceof RemoveServiceRequest) {
             requestHandler
                 .removeService((RemoveServiceRequest) request)
