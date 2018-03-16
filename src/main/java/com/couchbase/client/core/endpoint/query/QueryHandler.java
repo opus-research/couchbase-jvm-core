@@ -32,6 +32,8 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
+import com.couchbase.client.core.message.query.RawQueryRequest;
+import com.couchbase.client.core.message.query.RawQueryResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
@@ -229,11 +231,27 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
                 } else {
                     parseQueryResponse(lastChunk);
                 }
-
+            } else if (currentRequest() instanceof RawQueryRequest) {
+                response = handleRawQueryResponse(lastChunk, ctx);
             }
         }
 
         return response;
+    }
+
+    private RawQueryResponse handleRawQueryResponse(boolean lastChunk, ChannelHandlerContext ctx) {
+        if (!lastChunk) {
+            return null;
+        }
+        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ByteBuf responseCopy = ctx.alloc().buffer(responseContent.readableBytes(), responseContent.readableBytes());
+        responseCopy.writeBytes(responseContent);
+
+        cleanupQueryStates();
+
+        return new RawQueryResponse(status, currentRequest(), responseCopy,
+                responseHeader.getStatus().code(),
+                responseHeader.getStatus().reasonPhrase());
     }
 
     /**
