@@ -352,14 +352,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    @Deprecated
-    public Observable<Boolean> shutdown() {
-        return shutdownAsync();
-    }
-
-    @Override
     @SuppressWarnings("unchecked")
-    public Observable<Boolean> shutdownAsync() {
+    public Observable<Boolean> shutdown() {
         if (metricsCollectorSubscription != null && !metricsCollectorSubscription.isUnsubscribed()) {
             metricsCollectorSubscription.unsubscribe();
         }
