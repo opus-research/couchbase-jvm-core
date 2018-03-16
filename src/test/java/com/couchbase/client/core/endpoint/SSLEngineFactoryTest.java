@@ -20,6 +20,8 @@ import org.junit.Test;
 
 import javax.net.ssl.SSLEngine;
 
+import java.util.Arrays;
+
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

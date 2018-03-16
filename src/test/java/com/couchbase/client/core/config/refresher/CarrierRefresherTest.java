@@ -25,31 +25,35 @@ import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
-import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledDirectByteBuf;
 import io.netty.util.CharsetUtil;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import rx.Observable;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -96,7 +100,7 @@ public class CarrierRefresherTest {
                                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                                 "bucket",
                                 content,
-                                NetworkAddress.localhost());
+                                InetAddress.getByName("localhost"));
                         return Observable.just(response);
                     }
                 });
@@ -131,7 +135,7 @@ public class CarrierRefresherTest {
                 ResponseStatus.FAILURE, KeyValueStatus.ERR_NOT_FOUND.code(),
                 "bucket",
                 content,
-                NetworkAddress.localhost()
+                InetAddress.getByName("localhost")
             )
         ));
 
@@ -170,7 +174,7 @@ public class CarrierRefresherTest {
                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                 "bucket",
                 content,
-                NetworkAddress.localhost()
+                InetAddress.getByName("localhost")
             )
         ));
 
@@ -210,7 +214,7 @@ public class CarrierRefresherTest {
                 ResponseStatus.FAILURE, KeyValueStatus.ERR_NOT_FOUND.code(),
                 "bucket",
                 content,
-                NetworkAddress.localhost()
+                InetAddress.getByName("localhost")
             )
         ));
 
@@ -251,7 +255,7 @@ public class CarrierRefresherTest {
                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                 "bucket",
                 content,
-                NetworkAddress.create("1.2.3.4")
+                InetAddress.getByName("1.2.3.4")
             )
         );
         Observable<CouchbaseResponse> badResponse = Observable.error(new CouchbaseException("Woops.."));
@@ -288,7 +292,7 @@ public class CarrierRefresherTest {
             ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
             "bucket",
             content,
-            NetworkAddress.create("1.2.3.4")
+            InetAddress.getByName("1.2.3.4")
         ));
         Observable<CouchbaseResponse> badResponse = Observable.error(new CouchbaseException("Failure"));
         when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(badResponse, goodResponse);
@@ -324,7 +328,7 @@ public class CarrierRefresherTest {
                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                 "bucket",
                 content,
-                NetworkAddress.create("1.2.3.4")
+                InetAddress.getByName("1.2.3.4")
         ));
         Observable<CouchbaseResponse> badResponse = Observable.error(new CouchbaseException("Failure"));
         when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(badResponse, goodResponse);
@@ -379,7 +383,7 @@ public class CarrierRefresherTest {
                                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                                 "bucket",
                                 Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8),
-                                NetworkAddress.localhost()
+                                InetAddress.getByName("localhost")
                         )
                 );
             }
@@ -472,13 +476,13 @@ public class CarrierRefresherTest {
             @Override
             public Observable<GetBucketConfigResponse> answer(InvocationOnMock invocation) throws Throwable {
                 GetBucketConfigRequest request = (GetBucketConfigRequest) invocation.getArguments()[0];
-                nodesRequested.add(request.hostname().address());
+                nodesRequested.add(request.hostname().getHostAddress());
                 return Observable.just(
                         new GetBucketConfigResponse(
                                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                                 "bucket",
                                 Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8),
-                                NetworkAddress.localhost()
+                                InetAddress.getLocalHost()
                         )
                 );
             }
@@ -522,13 +526,13 @@ public class CarrierRefresherTest {
             @Override
             public Observable<GetBucketConfigResponse> answer(InvocationOnMock invocation) throws Throwable {
                 GetBucketConfigRequest request = (GetBucketConfigRequest) invocation.getArguments()[0];
-                nodesRequested.add(request.hostname().address());
+                nodesRequested.add(request.hostname().getHostAddress());
                 return Observable.just(
                         new GetBucketConfigResponse(
                                 ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
                                 "bucket",
                                 Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8),
-                                NetworkAddress.localhost()
+                                InetAddress.getLocalHost()
                         )
                 );
             }

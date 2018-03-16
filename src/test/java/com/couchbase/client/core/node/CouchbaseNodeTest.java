@@ -28,13 +28,14 @@ import com.couchbase.client.core.service.KeyValueService;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
-import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.BehaviorSubject;
+
+import java.net.InetAddress;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -54,11 +55,11 @@ public class CouchbaseNodeTest {
     private static final CoreEnvironment environment = DefaultCoreEnvironment.create();
 
 
-    private static NetworkAddress host;
+    private static InetAddress host;
 
     @BeforeClass
     public static void setup() throws Exception {
-        host = NetworkAddress.localhost();
+        host = InetAddress.getLocalHost();
     }
 
     @Test
@@ -69,16 +70,16 @@ public class CouchbaseNodeTest {
 
     @Test
     public void shouldBeEqualOnSameInetAddr() throws Exception {
-        CouchbaseNode node1 = new CouchbaseNode(NetworkAddress.create("1.2.3.4"), environment, null);
-        CouchbaseNode node2 = new CouchbaseNode(NetworkAddress.create("1.2.3.4"), environment, null);
+        CouchbaseNode node1 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
+        CouchbaseNode node2 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
         assertEquals(node1, node2);
         assertEquals(node1.hashCode(), node2.hashCode());
     }
 
     @Test
     public void shouldNotBeEqualOnDifferentInetAddr() throws Exception {
-        CouchbaseNode node1 = new CouchbaseNode(NetworkAddress.create("1.2.3.4"), environment, null);
-        CouchbaseNode node2 = new CouchbaseNode(NetworkAddress.create("2.3.4.5"), environment, null);
+        CouchbaseNode node1 = new CouchbaseNode(InetAddress.getByName("1.2.3.4"), environment, null);
+        CouchbaseNode node2 = new CouchbaseNode(InetAddress.getByName("2.3.4.5"), environment, null);
         assertNotEquals(node1, node2);
     }
 
