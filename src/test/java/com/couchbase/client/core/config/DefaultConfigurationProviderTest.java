@@ -127,7 +127,6 @@ public class DefaultConfigurationProviderTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     public void shouldEmitNewClusterConfig() throws Exception {
         final ClusterFacade cluster = mock(ClusterFacade.class);
         Environment environment = new CouchbaseEnvironment();
@@ -170,7 +169,6 @@ public class DefaultConfigurationProviderTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     public void shouldFailOpeningBucketIfNoConfigLoaded() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
         Environment environment = new CouchbaseEnvironment();

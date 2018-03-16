@@ -45,54 +45,52 @@ public class BucketLifecycleTest {
 
     @Test
     public void shouldSuccessfullyOpenBucket() {
-        final CouchbaseCore core = new CouchbaseCore();
+        CouchbaseCore core = new CouchbaseCore();
+
         core.send(new SeedNodesRequest(Arrays.asList(TestProperties.seedNode())));
-
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
-        final Observable<OpenBucketResponse> response = core.send(request);
-
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
+        Observable<OpenBucketResponse> response = core.send(request);
         assertEquals(ResponseStatus.SUCCESS, response.toBlocking().single().status());
     }
 
     @Test(expected = ConfigurationException.class)
     public void shouldFailWithNoSeedNodeList() {
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
         new CouchbaseCore().send(request).toBlocking().single();
     }
 
     @Test(expected = ConfigurationException.class)
     public void shouldFailWithEmptySeedNodeList() {
-        final CouchbaseCore core = new CouchbaseCore();
+        CouchbaseCore core = new CouchbaseCore();
         core.send(new SeedNodesRequest(Collections.<String>emptyList()));
-
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password());
         core.send(request).toBlocking().single();
     }
 
     @Test(expected = ConfigurationException.class)
     public void shouldFailOpeningNonExistentBucket() {
-        final CouchbaseCore core = new CouchbaseCore();
-        core.send(new SeedNodesRequest(Arrays.asList(TestProperties.seedNode())));
+        CouchbaseCore core = new CouchbaseCore();
 
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket() + "asd", TestProperties.password());
+        core.send(new SeedNodesRequest(Arrays.asList(TestProperties.seedNode())));
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket() + "asd", TestProperties.password());
         core.send(request).toBlocking().single();
     }
 
     @Test(expected = ConfigurationException.class)
     public void shouldFailOpeningBucketWithWrongPassword() {
-        final CouchbaseCore core = new CouchbaseCore();
-        core.send(new SeedNodesRequest(Arrays.asList(TestProperties.seedNode())));
+        CouchbaseCore core = new CouchbaseCore();
 
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password() + "asd");
+        core.send(new SeedNodesRequest(Arrays.asList(TestProperties.seedNode())));
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password() + "asd");
         core.send(request).toBlocking().single();
     }
 
     @Test(expected = ConfigurationException.class)
     public void shouldFailOpeningWithWrongHost() {
-        final CouchbaseCore core = new CouchbaseCore();
-        core.send(new SeedNodesRequest(Arrays.asList("certainlyInvalidHostname")));
+        CouchbaseCore core = new CouchbaseCore();
 
-        final OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password() + "asd");
+        core.send(new SeedNodesRequest(Arrays.asList("certainlyInvalidHostname")));
+        OpenBucketRequest request = new OpenBucketRequest(TestProperties.bucket(), TestProperties.password() + "asd");
         core.send(request).toBlocking().single();
     }
 

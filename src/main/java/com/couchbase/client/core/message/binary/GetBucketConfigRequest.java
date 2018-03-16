@@ -42,11 +42,11 @@ public class GetBucketConfigRequest extends AbstractBinaryRequest {
     /**
      * Creates a new {@link GetBucketConfigRequest}.
      *
-     * @param bucket   the name of the bucket.
+     * @param bucket the name of the bucket.
      * @param hostname the hostname of the node.
      */
     public GetBucketConfigRequest(final String bucket, final InetAddress hostname) {
-        super(bucket, null);
+        super(null, bucket, null);
         this.hostname = hostname;
     }
 

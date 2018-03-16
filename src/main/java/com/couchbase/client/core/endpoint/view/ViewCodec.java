@@ -31,15 +31,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
 import io.netty.handler.codec.base64.Base64;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 
 import java.util.ArrayDeque;
@@ -104,7 +96,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
     }
 
     @Override
-    protected void encode(final ChannelHandlerContext ctx, final ViewRequest msg, final List<Object> out) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, ViewRequest msg, List<Object> out) throws Exception {
         HttpRequest request;
         if (msg instanceof ViewQueryRequest) {
             request = handleViewQueryRequest((ViewQueryRequest) msg);
@@ -112,7 +104,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
             throw new IllegalArgumentException("Unknown Message to encode: " + msg);
         }
 
-        final ByteBuf encoded = Base64.encode(Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8));
+        ByteBuf encoded = Base64.encode(Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8));
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CharsetUtil.UTF_8));
         encoded.release();
 
@@ -121,7 +113,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
     }
 
     @Override
-    protected void decode(final ChannelHandlerContext ctx, final HttpObject msg, final List<Object> in) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, HttpObject msg, List<Object> in) throws Exception {
         if (currentRequest == null) {
             currentRequest = queue.poll();
             currentChunk = ctx.alloc().buffer();
@@ -141,14 +133,13 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      * @return a converted request to be sent over the wire.
      */
     private HttpRequest handleViewQueryRequest(final ViewQueryRequest msg) {
-        final StringBuilder requestBuilder = new StringBuilder();
+        StringBuilder requestBuilder = new StringBuilder();
         requestBuilder.append("/").append(msg.bucket()).append("/_design/");
         requestBuilder.append(msg.development() ? "dev_" + msg.design() : msg.design());
         requestBuilder.append("/_view/").append(msg.view());
         if (msg.query() != null && !msg.query().isEmpty()) {
             requestBuilder.append("?").append(msg.query());
         }
-
         return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, requestBuilder.toString());
     }
 
@@ -156,29 +147,29 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      * Handles the streaming view query response.
      *
      * @param msg the incoming message.
-     * @param in  the output object list.
+     * @param in the output object list.
      */
-    private void handleViewQueryResponse(final HttpObject msg, final List<Object> in) {
+    private void handleViewQueryResponse(HttpObject msg, List<Object> in) {
         switch (currentState) {
             case INITIAL:
                 if (msg instanceof HttpResponse) {
-                    final HttpResponse response = (HttpResponse) msg;
+                    HttpResponse response = (HttpResponse) msg;
                     currentCode = response.getStatus().code();
-                    currentState = (currentCode == 200) ? ParsingState.PREAMBLE : ParsingState.ERROR;
-
+                    currentState = currentCode == 200 ? ParsingState.PREAMBLE : ParsingState.ERROR;
                     return;
                 } else {
                     throw new IllegalStateException("Only expecting HttpResponse in INITIAL");
                 }
             case ERROR:
                 if (msg instanceof HttpContent) {
-                    final HttpContent content = (HttpContent) msg;
+                    HttpContent content = (HttpContent) msg;
                     if (content.content().readableBytes() > 0) {
                         currentChunk.writeBytes(content.content());
                         content.content().clear();
                     }
+
                     if (msg instanceof LastHttpContent) {
-                        ResponseStatus status = (currentCode == 404) ? ResponseStatus.NOT_EXISTS : ResponseStatus.FAILURE;
+                        ResponseStatus status = currentCode == 404 ? ResponseStatus.NOT_EXISTS : ResponseStatus.FAILURE;
                         in.add(new ViewQueryResponse(status, currentTotalRows, currentChunk.copy(), null));
                         reset();
 
@@ -187,24 +178,24 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
                 }
             case PREAMBLE:
                 if (msg instanceof HttpContent) {
-                    final HttpContent content = (HttpContent) msg;
+                    HttpContent content = (HttpContent) msg;
                     if (content.content().readableBytes() > 0) {
                         currentChunk.writeBytes(content.content());
                         content.content().clear();
                     }
 
-                    final int rowsStart = currentChunk.bytesBefore((byte) '[');
+                    int rowsStart = currentChunk.bytesBefore((byte) '[');
                     if (rowsStart < 0) {
                         return;
                     }
 
                     if (currentChunk.bytesBefore((byte) 't') >= 0) {
-                        final ByteBuf slice = currentChunk.readBytes(rowsStart + 1);
-                        final String[] sliced = slice.toString(CharsetUtil.UTF_8).split(":");
-                        final String[] parts = sliced[1].split(",");
+                        ByteBuf slice = currentChunk.readBytes(rowsStart+1);
+                        String[] sliced = slice.toString(CharsetUtil.UTF_8).split(":");
+                        String[] parts = sliced[1].split(",");
                         currentTotalRows = Integer.parseInt(parts[0]);
                     } else {
-                        currentChunk.readerIndex(currentChunk.readerIndex() + rowsStart + 1);
+                        currentChunk.readerIndex(currentChunk.readerIndex() + rowsStart+1);
                     }
                 } else {
                     throw new IllegalStateException("Only expecting HttpContent in PREAMBLE");
@@ -212,7 +203,7 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
                 currentState = ParsingState.ROWS;
             case ROWS:
                 if (msg instanceof HttpContent) {
-                    final HttpContent content = (HttpContent) msg;
+                    HttpContent content = (HttpContent) msg;
                     if (content.content().readableBytes() > 0) {
                         currentChunk.writeBytes(content.content());
                         content.content().clear();
@@ -220,9 +211,9 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
                     MarkerProcessor processor = new MarkerProcessor();
                     currentChunk.forEachByte(processor);
 
-                    final boolean last = (msg instanceof LastHttpContent);
-                    final ResponseStatus status = last ? ResponseStatus.SUCCESS : ResponseStatus.CHUNKED;
-                    final ByteBuf returnContent = currentChunk.readBytes(processor.marker());
+                    boolean last = msg instanceof LastHttpContent;
+                    ResponseStatus status = last ? ResponseStatus.SUCCESS : ResponseStatus.CHUNKED;
+                    ByteBuf returnContent = currentChunk.readBytes(processor.marker());
                     if (processor.marker() > 0 || last) {
                         in.add(new ViewQueryResponse(status, currentTotalRows, returnContent.copy(), null));
                         currentChunk.discardSomeReadBytes();
@@ -280,17 +271,16 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
      */
     private static class MarkerProcessor implements ByteBufProcessor {
 
-        private static final byte open = '{';
-        private static final byte close = '}';
-        private static final byte stringMarker = '"';
-
         private int marker = 0;
         private int counter = 0;
         private int depth = 0;
+        private byte open = '{';
+        private byte close = '}';
+        private byte stringMarker = '"';
         private boolean inString = false;
 
         @Override
-        public boolean process(final byte value) throws Exception {
+        public boolean process(byte value) throws Exception {
             counter++;
             if (value == stringMarker) {
                 inString = !inString;
