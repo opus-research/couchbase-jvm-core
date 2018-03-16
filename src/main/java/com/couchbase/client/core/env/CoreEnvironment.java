@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Couchbase, Inc.
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,14 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
+import com.couchbase.client.core.node.MemcachedHashingStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
 
+import java.security.KeyStore;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -39,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  * Note that the {@link CoreEnvironment} is stateful, so be sure to call {@link #shutdown()} or
  * {@link #shutdownAsync()} properly.
  */
-public interface CoreEnvironment extends SecureEnvironment, BootstrapEnvironment {
+public interface CoreEnvironment extends SecureEnvironment {
 
     /**
      * Shutdown the {@link CoreEnvironment} with the default timeout.
@@ -413,4 +415,14 @@ public interface CoreEnvironment extends SecureEnvironment, BootstrapEnvironment
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     WaitStrategyFactory requestBufferWaitStrategy();
+
+    /**
+     * Allows to specify a custom strategy to hash memcached bucket documents.
+     *
+     * If you want to use this SDK side by side with 1.x SDKs on memcached buckets, configure the
+     * environment to use the {@link com.couchbase.client.core.node.LegacyMemcachedHashingStrategy} instead.
+     *
+     * @return the memcached hashing strategy.
+     */
+    MemcachedHashingStrategy memcachedHashingStrategy();
 }
