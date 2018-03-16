@@ -51,7 +51,7 @@ public class RoundRobinSelectionStrategy implements SelectionStrategy {
         //attempt to find a CONNECTED endpoint at the offset, or try following ones
         for (int i = offset; i < endpointSize; i++) {
             Endpoint endpoint = endpoints[i];
-            if (endpoint.isState(LifecycleState.CONNECTED)) {
+            if (endpoint.isState(LifecycleState.CONNECTED) && endpoint.isFree()) {
                 return endpoint;
             }
         }
@@ -60,7 +60,7 @@ public class RoundRobinSelectionStrategy implements SelectionStrategy {
         //wrap around and try from the beginning of the array
         for (int i = 0; i < offset; i++) {
             Endpoint endpoint = endpoints[i];
-            if (endpoint.isState(LifecycleState.CONNECTED)) {
+            if (endpoint.isState(LifecycleState.CONNECTED) && endpoint.isFree()) {
                 return endpoint;
             }
         }
