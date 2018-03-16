@@ -41,7 +41,10 @@ import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.state.LifecycleState;
 
 import java.net.InetAddress;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.zip.CRC32;
 
 /**
@@ -249,11 +252,22 @@ public class KeyValueLocator implements Locator {
      */
     private static Node[] locateForMemcacheBucket(final BinaryRequest request, final Set<Node> nodes,
         final MemcachedBucketConfig config) {
-        InetAddress hostname = config.nodeForId(request.keyBytes());
+
+        long hash = calculateKetamaHash(request.keyBytes());
+        if (!config.ketamaNodes().containsKey(hash)) {
+            SortedMap<Long, NodeInfo> tailMap = config.ketamaNodes().tailMap(hash);
+            if (tailMap.isEmpty()) {
+                hash = config.ketamaNodes().firstKey();
+            } else {
+                hash = tailMap.firstKey();
+            }
+        }
+
+        NodeInfo found = config.ketamaNodes().get(hash);
         request.partition((short) 0);
 
         for (Node node : nodes) {
-            if (node.hostname().equals(hostname)) {
+            if (node.hostname().equals(found.hostname())) {
                 return new Node[] { node };
             }
         }
@@ -267,6 +281,27 @@ public class KeyValueLocator implements Locator {
         }
 
         throw new IllegalStateException("Node not found for request" + request);
+    }
+
+    /**
+     * Calculates the ketama hash for the given key.
+     *
+     * @param key the key to calculate.
+     * @return the calculated hash.
+     */
+    private static long calculateKetamaHash(final byte[] key) {
+        try {
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            md5.update(key);
+            byte[] digest = md5.digest();
+            long rv = ((long) (digest[3] & 0xFF) << 24)
+                | ((long) (digest[2] & 0xFF) << 16)
+                | ((long) (digest[1] & 0xFF) << 8)
+                | (digest[0] & 0xFF);
+            return rv & 0xffffffffL;
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Could not encode ketama hash.", e);
+        }
     }
 
 }
