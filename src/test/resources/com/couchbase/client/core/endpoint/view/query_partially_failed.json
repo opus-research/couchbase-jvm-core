@@ -1,0 +1,40 @@
+{
+    "total_rows": 7303,
+    "errors": [
+        {
+            "from": "http://192.168.1.80:9503/_view_merge/?stale=false",
+            "reason": "req_timedout"
+        },
+        {
+            "from": "http://192.168.1.80:9502/_view_merge/?stale=false",
+            "reason": "req_timedout"
+        }
+    ],
+    "rows": [
+        {
+            "id": "21st_amendment_brewery_cafe",
+            "key": ["21st_amendment_brewery_cafe"],
+            "value": null
+        },
+        {
+            "id": "21st_amendment_brewery_cafe-21a_ipa",
+            "key": ["21st_amendment_brewery_cafe", "21st_amendment_brewery_cafe-21a_ipa"],
+            "value": null
+        },
+        {
+            "id": "21st_amendment_brewery_cafe-563_stout",
+            "key": ["21st_amendment_brewery_cafe", "21st_amendment_brewery_cafe-563_stout"],
+            "value": null
+        },
+        {
+            "id": "21st_amendment_brewery_cafe-amendment_pale_ale",
+            "key": ["21st_amendment_brewery_cafe", "21st_amendment_brewery_cafe-amendment_pale_ale"],
+            "value": null
+        },
+        {
+            "id": "21st_amendment_brewery_cafe-bitter_american",
+            "key": ["21st_amendment_brewery_cafe", "21st_amendment_brewery_cafe-bitter_american"],
+            "value": null
+        }
+    ]
+}

@@ -1,0 +1,4 @@
+{
+    "error": "not_found",
+    "reason": "Error opening view `foobar`, from set `default`, design document `_design/dev_pub1`: {not_found, missing_named_view}"
+}
