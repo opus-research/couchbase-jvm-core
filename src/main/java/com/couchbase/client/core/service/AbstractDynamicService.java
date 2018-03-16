@@ -115,13 +115,7 @@ public abstract class AbstractDynamicService extends AbstractStateMachine<Lifecy
         if (request instanceof SignalFlush) {
             int length = endpoints.length;
             for (int i = 0; i < length; i++) {
-                Endpoint endpoint = endpoints[i];
-                // Make sure to only send a flush event
-                // to the endpoint if it is actually set
-                // on the array
-                if (endpoint != null) {
-                    endpoint.send(request);
-                }
+                endpoints[i].send(request);
             }
             return;
         }
