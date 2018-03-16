@@ -191,7 +191,6 @@ public class KeyValueHandler
     @Override
     protected BinaryMemcacheRequest encodeRequest(final ChannelHandlerContext ctx, final BinaryRequest msg)
         throws Exception {
-
         BinaryMemcacheRequest request = encodeCommonRequest(ctx, msg);
 
         if (request == null) {
@@ -349,7 +348,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
         byte extrasLength = (byte) extras.readableBytes();
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content().slice());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
 
         if (msg instanceof InsertRequest) {
             request.setOpcode(OP_INSERT);
@@ -483,7 +482,7 @@ public class KeyValueHandler
     private static BinaryMemcacheRequest handleAppendRequest(final AppendRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
-        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER,  msg.content().slice());
+        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_APPEND);
         request.setKeyLength(keyLength);
@@ -495,7 +494,7 @@ public class KeyValueHandler
     private static BinaryMemcacheRequest handlePrependRequest(final PrependRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
-        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content().slice());
+        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_PREPEND);
         request.setKeyLength(keyLength);
@@ -602,7 +601,7 @@ public class KeyValueHandler
             extras.writeByte(0);
         }
 
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content().slice());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
         request.setOpcode(msg.opcode())
                 .setKeyLength(keyLength)
                 .setExtrasLength(extrasLength)
@@ -617,7 +616,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content().slice());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
         request.setOpcode(OP_SUB_MULTI_LOOKUP)
                 .setKeyLength(keyLength)
                 .setExtrasLength((byte) 0)
@@ -639,8 +638,7 @@ public class KeyValueHandler
             extras.writeInt(msg.expiration());
         }
 
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content().slice());
-
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
         request.setOpcode(OP_SUB_MULTI_MUTATION)
                 .setCAS(msg.cas())
                 .setKeyLength(keyLength)
