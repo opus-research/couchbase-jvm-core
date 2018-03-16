@@ -158,6 +158,13 @@ public class KeyValueHandler
             request.setReserved(msg.partition());
         }
 
+        // Retain just the content, since a response could be "Not my Vbucket".
+        // The response handler checks the status and then releases if needed.
+        // Observe has content, but not external, so it should not be retained.
+        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
+            ((FullBinaryMemcacheRequest) request).content().retain();
+        }
+
         return request;
     }
 
@@ -395,6 +402,17 @@ public class KeyValueHandler
         throws Exception {
         BinaryRequest request = currentRequest();
         ResponseStatus status = convertStatus(msg.getStatus());
+
+        // Release request content from external resources if not retried again.
+        if (!status.equals(ResponseStatus.RETRY)) {
+            if (request instanceof BinaryStoreRequest) {
+                ((BinaryStoreRequest) request).content().release();
+            } else if (request instanceof AppendRequest) {
+                ((AppendRequest) request).content().release();
+            } else if (request instanceof PrependRequest) {
+                ((PrependRequest) request).content().release();
+            }
+        }
 
         CouchbaseResponse response;
         ByteBuf content = msg.content().retain();
