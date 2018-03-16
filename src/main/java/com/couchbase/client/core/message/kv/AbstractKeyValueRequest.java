@@ -56,32 +56,10 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
      *
      * @param key      the key of the document.
      * @param bucket   the bucket of the document.
-     */
-    protected AbstractKeyValueRequest(String key, String bucket) {
-        this(key, bucket, null, null, AsyncSubject.<CouchbaseResponse>create());
-    }
-
-    /**
-     * Creates a new {@link AbstractKeyValueRequest}.
-     *
-     * @param key      the key of the document.
-     * @param bucket   the bucket of the document.
-     * @param password the password for the bucket.
+     * @param password the optional password of the bucket.
      */
     protected AbstractKeyValueRequest(String key, String bucket, String password) {
-        this(key, bucket, null, password, AsyncSubject.<CouchbaseResponse>create());
-    }
-
-    /**
-     * Creates a new {@link AbstractKeyValueRequest}.
-     *
-     * @param key      the key of the document.
-     * @param username the user authorized for bucket access.
-     * @param bucket   the bucket of the document.
-     * @param password the password for the user.
-     */
-    protected AbstractKeyValueRequest(String key, String bucket, String username, String password) {
-        this(key, bucket, username, password, AsyncSubject.<CouchbaseResponse>create());
+        this(key, bucket, password, AsyncSubject.<CouchbaseResponse>create());
     }
 
     /**
@@ -89,13 +67,12 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
      *
      * @param key        the key of the document.
      * @param bucket     the bucket of the document.
-     * @param username   the user authorized for bucket access.
      * @param password   the optional password of the bucket.
      * @param observable the observable which receives responses.
      */
-    protected AbstractKeyValueRequest(String key, String bucket, String username, String password,
+    protected AbstractKeyValueRequest(String key, String bucket, String password,
                                       Subject<CouchbaseResponse, CouchbaseResponse> observable) {
-        super(bucket, username, password, observable);
+        super(bucket, password, observable);
         this.key = key;
         this.keyBytes = key == null || key.isEmpty() ? new byte[] {} : key.getBytes(CharsetUtil.UTF_8);
         opaque = GLOBAL_OPAQUE++;

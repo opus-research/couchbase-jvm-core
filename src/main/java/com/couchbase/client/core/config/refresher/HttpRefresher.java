@@ -51,16 +51,11 @@ public class HttpRefresher extends AbstractRefresher {
 
     @Override
     public Observable<Boolean> registerBucket(final String name, final String password) {
-        return registerBucket(name, name, password);
-    }
-
-        @Override
-    public Observable<Boolean> registerBucket(final String name, final String username, final String password) {
-        Observable<BucketStreamingResponse> response = super.registerBucket(name, username, password).flatMap(new Func1<Boolean, Observable<BucketStreamingResponse>>() {
+        Observable<BucketStreamingResponse> response = super.registerBucket(name, password).flatMap(new Func1<Boolean, Observable<BucketStreamingResponse>>() {
             @Override
             public Observable<BucketStreamingResponse> call(Boolean aBoolean) {
                 return cluster()
-                    .<BucketStreamingResponse>send(new BucketStreamingRequest(TERSE_PATH, name, username, password))
+                    .<BucketStreamingResponse>send(new BucketStreamingRequest(TERSE_PATH, name, password))
                     .doOnNext(new Action1<BucketStreamingResponse>() {
                         @Override
                         public void call(BucketStreamingResponse response) {
@@ -74,7 +69,7 @@ public class HttpRefresher extends AbstractRefresher {
             @Override
             public Observable<BucketStreamingResponse> call(Throwable throwable) {
                 return cluster()
-                    .<BucketStreamingResponse>send(new BucketStreamingRequest(VERBOSE_PATH, name, username, password))
+                    .<BucketStreamingResponse>send(new BucketStreamingRequest(VERBOSE_PATH, name, password))
                     .doOnNext(new Action1<BucketStreamingResponse>() {
                         @Override
                         public void call(BucketStreamingResponse response) {

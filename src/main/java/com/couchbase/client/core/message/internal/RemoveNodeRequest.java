@@ -24,7 +24,7 @@ public class RemoveNodeRequest extends AbstractCouchbaseRequest implements Inter
     private final InetAddress hostname;
 
     public RemoveNodeRequest(final InetAddress hostname) {
-        super(null, null, null);
+        super(null, null);
         this.hostname = hostname;
     }
 
