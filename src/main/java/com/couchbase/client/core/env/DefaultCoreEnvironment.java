@@ -22,6 +22,9 @@
 package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
+import com.couchbase.client.core.env.resources.NoOpShutdownHook;
+import com.couchbase.client.core.env.resources.Shutdownable;
 import com.couchbase.client.core.event.DefaultEventBus;
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
@@ -33,11 +36,10 @@ import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.Scheduler;
-import rx.Subscriber;
+import rx.functions.Action1;
+import rx.functions.Func2;
 
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -170,6 +172,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventBus eventBus;
     private volatile boolean shutdown;
 
+    private final Shutdownable ioPoolShutdownHook;
+    private final Shutdownable coreSchedulerShutdownHook;
+
     protected DefaultCoreEnvironment(final Builder builder) {
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
             LOGGER.warn("More than " + MAX_ALLOWED_INSTANCES + " Couchbase Environments found (" + instanceCounter
@@ -220,10 +225,23 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             this.computationPoolSize = computationPoolSize;
         }
 
-        this.ioPool = builder.ioPool() == null
-            ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
-        this.coreScheduler = builder.scheduler() == null
-            ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
+        if (builder.ioPool() == null) {
+            this.ioPool = new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true));
+            this.ioPoolShutdownHook = new IoPoolShutdownHook(this.ioPool);
+        } else {
+            this.ioPool = builder.ioPool();
+            this.ioPoolShutdownHook = new NoOpShutdownHook(); //TODO allow to set from Builder
+        }
+
+        if (builder.scheduler == null) {
+            CoreScheduler managed = new CoreScheduler(computationPoolSize());
+            this.coreScheduler = managed;
+            this.coreSchedulerShutdownHook = managed
+            ;
+        } else {
+            this.coreScheduler = builder.scheduler();
+            this.coreSchedulerShutdownHook = new NoOpShutdownHook(); //TODO allow to set from Builder
+        }
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
         this.shutdown = false;
     }
@@ -277,27 +295,20 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return Observable.just(true);
         }
 
-        return Observable.create(new Observable.OnSubscribe<Boolean>() {
+        return Observable.mergeDelayError(
+                ioPoolShutdownHook.shutdown(),
+                coreSchedulerShutdownHook.shutdown()
+        ).reduce(true, new Func2<Boolean, Boolean, Boolean>() {
             @Override
-            public void call(final Subscriber<? super Boolean> subscriber) {
-                if (shutdown) {
-                    subscriber.onNext(true);
-                    subscriber.onCompleted();
+            public Boolean call(Boolean a, Boolean b) {
+                return a && b;
+            }
+        }).doOnNext(new Action1<Boolean>() {
+            @Override
+            public void call(Boolean sucessfullyShutdown) {
+                if (sucessfullyShutdown) {
+                    shutdown = true;
                 }
-
-                ioPool.shutdownGracefully().addListener(new GenericFutureListener() {
-                    @Override
-                    public void operationComplete(final Future future) throws Exception {
-                        if (!subscriber.isUnsubscribed()) {
-                            if (future.isSuccess()) {
-                                subscriber.onNext(future.isSuccess());
-                                subscriber.onCompleted();
-                            } else {
-                                subscriber.onError(future.cause());
-                            }
-                        }
-                    }
-                });
             }
         });
     }
