@@ -162,7 +162,7 @@ public class QueryHandlerV2 extends AbstractGenericHandler<HttpObject, HttpReque
             if (currentRequest() instanceof RawQueryRequest) {
                 response = handleRawQueryResponse(lastChunk, ctx);
             } else if (currentRequest() instanceof GenericQueryRequest) {
-                response = parser.parse();
+                response = parser.parse(lastChunk);
                 if (lastChunk) {
                     parser.finishParsingAndReset();
                     finishedDecoding();
