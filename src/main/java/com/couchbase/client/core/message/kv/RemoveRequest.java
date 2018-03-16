@@ -24,7 +24,7 @@ public class RemoveRequest extends AbstractKeyValueRequest {
     }
 
     public RemoveRequest(String key, long cas, String bucket) {
-        super(key, bucket, null, null);
+        super(key, bucket, null);
         this.cas = cas;
     }
 

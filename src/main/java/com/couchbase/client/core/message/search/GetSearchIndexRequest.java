@@ -30,7 +30,7 @@ public class GetSearchIndexRequest extends AbstractCouchbaseRequest implements S
     private final String indexName;
 
     public GetSearchIndexRequest(String indexName, String username, String password) {
-        super(null, username, password);
+        super(username, password);
         this.indexName = indexName;
     }
 
