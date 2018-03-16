@@ -44,10 +44,6 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
 
     private boolean createDocument;
 
-    private boolean addDocument;
-
-    private boolean accessDeleted;
-
     private long cas;
 
     /**
@@ -128,19 +124,5 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
     @Override
     public boolean createDocument() { return this.createDocument; }
 
-    public void createDocument(boolean createDocument) {
-        if (this.addDocument && createDocument) {
-            throw new IllegalArgumentException("Invalid to set createDocument to true along with addDocument");
-        }
-        this.createDocument = createDocument; }
-
-    @Override
-    public boolean addDocument() { return this.addDocument; }
-
-    public void addDocument(boolean addDocument) {
-        if (this.createDocument && addDocument) {
-            throw new IllegalArgumentException("Invalid to set addDocument to true along with createDocument");
-        }
-        this.addDocument = addDocument;
-    }
+    public void createDocument(boolean createDocument) { this.createDocument = createDocument; }
 }
