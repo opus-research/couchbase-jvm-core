@@ -1,17 +1,23 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (C) 2014 Couchbase, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
+ * IN THE SOFTWARE.
  */
 package com.couchbase.client.core.endpoint.query;
 
@@ -55,7 +61,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runners.Parameterized;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
@@ -64,7 +69,6 @@ import rx.subjects.Subject;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -132,6 +136,7 @@ public class QueryHandlerTest {
 
         CoreEnvironment environment = mock(CoreEnvironment.class);
         when(environment.scheduler()).thenReturn(Schedulers.computation());
+        when(environment.queryEnabled()).thenReturn(Boolean.TRUE);
         when(environment.maxRequestLifetime()).thenReturn(10000L);
         when(environment.autoreleaseAfter()).thenReturn(2000L);
         endpoint = mock(AbstractEndpoint.class);
@@ -180,19 +185,6 @@ public class QueryHandlerTest {
         assertGenericQueryRequest(request, true);
     }
 
-    /**
-     *
-     * @param inbound
-     * @param expectedSuccess
-     * @param expectedStatus
-     * @param expectedRequestId
-     * @param expectedClientId
-     * @param expectedFinalStatus
-     * @param expectedSignature
-     * @param assertRows
-     * @param assertErrors
-     * @param metricsToCheck null to expect no metrics
-     */
     private void assertResponse(GenericQueryResponse inbound,
             boolean expectedSuccess, ResponseStatus expectedStatus,
             String expectedRequestId, String expectedClientId,
@@ -211,23 +203,19 @@ public class QueryHandlerTest {
                .forEach(assertRows);
 
         List<ByteBuf> metricList = inbound.info().timeout(1, TimeUnit.SECONDS).toList().toBlocking().single();
-        if (metricsToCheck == null) {
-            assertEquals(0, metricList.size());
-        } else {
-            assertEquals(1, metricList.size());
-            String metricsJson = metricList.get(0).toString(CharsetUtil.UTF_8);
-            metricList.get(0).release();
-            try {
-                Map metrics = mapper.readValue(metricsJson, Map.class);
-                assertEquals(7, metrics.size());
+        assertEquals(1, metricList.size());
+        String metricsJson = metricList.get(0).toString(CharsetUtil.UTF_8);
+        metricList.get(0).release();
+        try {
+            Map metrics = mapper.readValue(metricsJson, Map.class);
+            assertEquals(7, metrics.size());
 
-                for (Map.Entry<String, Object> entry : metricsToCheck.entrySet()) {
-                    assertNotNull(metrics.get(entry.getKey()));
-                    assertEquals(entry.getKey(), entry.getValue(), metrics.get(entry.getKey()));
-                }
-            } catch (IOException e) {
-                fail(e.toString());
+            for (Map.Entry<String, Object> entry : metricsToCheck.entrySet()) {
+                assertNotNull(metrics.get(entry.getKey()));
+                assertEquals(entry.getKey(), entry.getValue(), metrics.get(entry.getKey()));
             }
+        } catch (IOException e) {
+            fail(e.toString());
         }
 
         inbound.errors().timeout(1, TimeUnit.SECONDS).toBlocking()
@@ -459,13 +447,13 @@ public class QueryHandlerTest {
     public void shouldDecodeNRowResponseChunked() throws Exception {
         String response = Resources.read("success_5.json", this.getClass());
         HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
-        HttpContent responseChunk1 = new DefaultHttpContent(Unpooled.copiedBuffer(response.substring(0, 300),
+        HttpContent responseChunk1 = new DefaultLastHttpContent(Unpooled.copiedBuffer(response.substring(0, 300),
             CharsetUtil.UTF_8));
-        HttpContent responseChunk2 = new DefaultHttpContent(Unpooled.copiedBuffer(response.substring(300, 950),
+        HttpContent responseChunk2 = new DefaultLastHttpContent(Unpooled.copiedBuffer(response.substring(300, 950),
             CharsetUtil.UTF_8));
-        HttpContent responseChunk3 = new DefaultHttpContent(Unpooled.copiedBuffer(response.substring(950, 1345),
+        HttpContent responseChunk3 = new DefaultLastHttpContent(Unpooled.copiedBuffer(response.substring(950, 1345),
             CharsetUtil.UTF_8));
-        HttpContent responseChunk4 = new DefaultHttpContent(Unpooled.copiedBuffer(response.substring(1345, 3000),
+        HttpContent responseChunk4 = new DefaultLastHttpContent(Unpooled.copiedBuffer(response.substring(1345, 3000),
             CharsetUtil.UTF_8));
         HttpContent responseChunk5 = new DefaultLastHttpContent(Unpooled.copiedBuffer(response.substring(3000),
             CharsetUtil.UTF_8));
@@ -816,7 +804,7 @@ public class QueryHandlerTest {
         }
         LOGGER.info(sb.toString());
 
-        shouldDecodeChunked(true, chunks);
+        shouldDecodeChunked(chunks);
     }
 
     @Test
@@ -827,7 +815,7 @@ public class QueryHandlerTest {
             String chunk2 = response.substring(i);
 
             try {
-                shouldDecodeChunked(true, chunk1, chunk2);
+                shouldDecodeChunked(chunk1, chunk2);
             } catch (Throwable t) {
                 LOGGER.info("Test failed in decoding response with chunk at position " + i);
                 throw t;
@@ -835,23 +823,7 @@ public class QueryHandlerTest {
         }
     }
 
-    @Test
-    public void shouldDecodeChunkedResponseSplitAtEveryPositionNoMetrics() throws Throwable {
-        String response = Resources.read("chunkedNoMetrics.json", this.getClass());
-        for (int i = 1; i < response.length() - 1; i++) {
-            String chunk1 = response.substring(0, i);
-            String chunk2 = response.substring(i);
-
-            try {
-                shouldDecodeChunked(false, chunk1, chunk2);
-            } catch (Throwable t) {
-                LOGGER.info("Test failed in decoding response with chunk and no metrics at position " + i);
-                throw t;
-            }
-        }
-    }
-
-    private void shouldDecodeChunked(boolean metrics, String... chunks) throws Exception {
+    private void shouldDecodeChunked(String... chunks) throws Exception {
         HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
         Object[] httpChunks = new Object[chunks.length + 1];
         httpChunks[0] = responseHeader;
@@ -870,12 +842,6 @@ public class QueryHandlerTest {
         queue.add(requestMock);
         channel.writeInbound(httpChunks);
         GenericQueryResponse inbound = (GenericQueryResponse) obs.timeout(1, TimeUnit.SECONDS).toBlocking().last();
-        Map<String, Object> expectedMetrics;
-        if (metrics) {
-            expectedMetrics = expectedMetricsCounts(5678, 1234); //these are the numbers parsed from metrics object, not real count
-        } else {
-            expectedMetrics = null;
-        }
 
         final AtomicInteger found = new AtomicInteger(0);
         final AtomicInteger errors = new AtomicInteger(0);
@@ -905,202 +871,10 @@ public class QueryHandlerTest {
                         errors.incrementAndGet();
                     }
                 },
-                expectedMetrics
+                expectedMetricsCounts(5678, 1234) //these are the numbers parsed from metrics object, not real count
         );
         assertEquals(5, found.get());
         assertEquals(4, errors.get());
-    }
-
-    @Test
-    public void shouldDecodeRawJsonResults() throws Exception {
-        String response = Resources.read("raw_success_8.json", this.getClass());
-        HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
-        HttpContent responseChunk = new DefaultLastHttpContent(Unpooled.copiedBuffer(response, CharsetUtil.UTF_8));
-
-        GenericQueryRequest requestMock = mock(GenericQueryRequest.class);
-        queue.add(requestMock);
-        channel.writeInbound(responseHeader, responseChunk);
-        latch.await(1, TimeUnit.SECONDS);
-        assertEquals(1, firedEvents.size());
-        GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
-
-        final List<String> items = Collections.synchronizedList(new ArrayList<String>(11));
-        final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", "\"json\"",
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        String item = buf.toString(CharsetUtil.UTF_8).trim();
-                        System.out.println("item #" + invokeCounter1.incrementAndGet() + " = " + item);
-                        items.add(item);
-                        buf.release();
-                    }
-                },
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        buf.release();
-                        fail("no error expected");
-                    }
-                },
-                //no metrics in this json sample
-                expectedMetricsCounts(0, 8)
-        );
-        List<String> expectedItems = Arrays.asList("\"usertable:userAA\"", "\"usertable:user1\"",
-                "\"usertable:user,2]\"", "null", "\"usertable:user3\"","\"u,s,e,r,t,a,\\\"b,l,e:userBBB\\\\\"","123","\"usertable:user4\"");
-        assertEquals(8, invokeCounter1.get());
-        assertEquals(expectedItems, items);
-    }
-
-    @Test
-    public void shouldDecodeChunkedResponseSplitAtEveryPositionWithRaw() throws Throwable {
-        String response = Resources.read("raw_success_8.json", this.getClass());
-        for (int i = 1; i < response.length() - 1; i++) {
-            String chunk1 = response.substring(0, i);
-            String chunk2 = response.substring(i);
-
-            try {
-                shouldDecodeChunkedWithRaw(8, 0, chunk1, chunk2);
-            } catch (Throwable t) {
-                LOGGER.info("Test failed in decoding response with raw, chunked at position " + i);
-                throw t;
-            }
-        }
-    }
-
-    @Test
-    public void shouldDecodeRawJsonWithOneResult() throws Exception {
-        String response = Resources.read("raw_success_1.json", this.getClass());
-        HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
-        HttpContent responseChunk = new DefaultLastHttpContent(Unpooled.copiedBuffer(response, CharsetUtil.UTF_8));
-
-        GenericQueryRequest requestMock = mock(GenericQueryRequest.class);
-        queue.add(requestMock);
-        channel.writeInbound(responseHeader, responseChunk);
-        latch.await(1, TimeUnit.SECONDS);
-        assertEquals(1, firedEvents.size());
-        GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
-
-        final List<String> items = Collections.synchronizedList(new ArrayList<String>(11));
-        final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", "\"json\"",
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        String item = buf.toString(CharsetUtil.UTF_8).trim();
-                        System.out.println("item #" + invokeCounter1.incrementAndGet() + " = " + item);
-                        items.add(item);
-                        buf.release();
-                    }
-                },
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        buf.release();
-                        fail("no error expected");
-                    }
-                },
-                expectedMetricsCounts(0, 1)
-        );
-        List<String> expectedItems = Arrays.asList("\"u,s,e,r,t,a,\\\"b,l,e:userBBB\\\\\"");
-        assertEquals(1, invokeCounter1.get());
-        assertEquals(expectedItems, items);
-    }
-
-    @Test
-    public void shouldDecodeSuccess1NoMetrics() throws Exception {
-        String response = Resources.read("success_1_noMetrics.json", this.getClass());
-        HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
-        HttpContent responseChunk = new DefaultLastHttpContent(Unpooled.copiedBuffer(response, CharsetUtil.UTF_8));
-
-        GenericQueryRequest requestMock = mock(GenericQueryRequest.class);
-        queue.add(requestMock);
-        channel.writeInbound(responseHeader, responseChunk);
-        latch.await(1, TimeUnit.SECONDS);
-        assertEquals(1, firedEvents.size());
-        GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
-
-        final List<String> items = Collections.synchronizedList(new ArrayList<String>(11));
-        final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, "ff226b49-9d4c-415b-8428-263cb080e184", "", "success", "{\"*\":\"*\"}",
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        String item = buf.toString(CharsetUtil.UTF_8).trim();
-                        System.out.println("item #" + invokeCounter1.incrementAndGet() + " = " + item);
-                        items.add(item);
-                        buf.release();
-                    }
-                },
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        buf.release();
-                        fail("no error expected");
-                    }
-                },
-                null
-        );
-        assertEquals(1, invokeCounter1.get());
-        assertEquals("{\"adHoc_N1qlQuery492841478131758\":{\"item\":\"value\"}}", items.get(0).replaceAll("\\s", ""));
-    }
-
-    private void shouldDecodeChunkedWithRaw(final int expectedResults, final int expectedErrors, String... chunks) throws Exception {
-        HttpResponse responseHeader = new DefaultHttpResponse(HttpVersion.HTTP_1_1, new HttpResponseStatus(200, "OK"));
-        Object[] httpChunks = new Object[chunks.length + 1];
-        httpChunks[0] = responseHeader;
-        for (int i = 1; i <= chunks.length; i++) {
-            String chunk = chunks[i - 1];
-            if (i == chunks.length) {
-                httpChunks[i] = new DefaultLastHttpContent(Unpooled.copiedBuffer(chunk, CharsetUtil.UTF_8));
-            } else {
-                httpChunks[i] = new DefaultHttpContent(Unpooled.copiedBuffer(chunk, CharsetUtil.UTF_8));
-            }
-        }
-
-        Subject<CouchbaseResponse,CouchbaseResponse> obs = AsyncSubject.create();
-        GenericQueryRequest requestMock = mock(GenericQueryRequest.class);
-        when(requestMock.observable()).thenReturn(obs);
-        queue.add(requestMock);
-        channel.writeInbound(httpChunks);
-        GenericQueryResponse inbound = (GenericQueryResponse) obs.timeout(1, TimeUnit.SECONDS).toBlocking().last();
-
-        final AtomicInteger found = new AtomicInteger(0);
-        final AtomicInteger errors = new AtomicInteger(0);
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "1234567890123456789012345678901234567890123456789012345678901234", "success",
-                "\"json\"",
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf byteBuf) {
-                        found.incrementAndGet();
-                        String content = byteBuf.toString(CharsetUtil.UTF_8);
-                        byteBuf.release();
-                        assertNotNull(content);
-                        assertTrue(!content.isEmpty());
-                        try {
-                            Object object = mapper.readValue(content, Object.class);
-                            boolean expected = object instanceof Integer || object == null ||
-                                    (object instanceof String && ((String) object).startsWith("usertable")) ||
-                                    (object instanceof String && ((String) object).startsWith("u,s,e,r"));
-                            assertTrue(expected);
-
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            fail();
-                        }
-                    }
-                },
-                new Action1<ByteBuf>() {
-                    @Override
-                    public void call(ByteBuf buf) {
-                        buf.release();
-                        errors.incrementAndGet();
-                    }
-                },
-                expectedMetricsCounts(expectedErrors, expectedResults) //these are the numbers parsed from metrics object, not real count
-        );
-        assertEquals(expectedResults, found.get());
-        assertEquals(expectedErrors, errors.get());
     }
 
     @Test
