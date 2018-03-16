@@ -34,7 +34,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
-import com.couchbase.client.core.message.internal.GetNodesRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.message.kv.BinaryRequest;
@@ -305,17 +304,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     public Observable<Service> addService(final AddServiceRequest request) {
         LOGGER.debug("Got instructed to add Service {}, to Node {}", request.type(), request.hostname());
         return nodeBy(request.hostname()).addService(request);
-    }
-
-    public Observable<Node> getNodes(final GetNodesRequest request) {
-        LOGGER.debug("Got instructed to get nodes for Service {}", request.type());
-        List<Node> found = new ArrayList<Node>();
-        for (Node node : nodes) {
-            if (node.hasService(request.type(), request.bucket())) {
-                found.add(node);
-            }
-        }
-        return Observable.from(found);
     }
 
     /**

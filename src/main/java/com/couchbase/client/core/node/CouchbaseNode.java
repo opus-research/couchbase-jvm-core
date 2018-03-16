@@ -35,7 +35,6 @@ import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceFactory;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.AbstractStateMachine;
 import com.couchbase.client.core.state.LifecycleState;
 import com.lmax.disruptor.RingBuffer;
@@ -176,11 +175,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     @Override
     public InetAddress hostname() {
         return hostname;
-    }
-
-    @Override
-    public boolean hasService(final ServiceType type, final String bucket) {
-        return serviceRegistry.serviceBy(type, bucket) != null;
     }
 
     @Override
