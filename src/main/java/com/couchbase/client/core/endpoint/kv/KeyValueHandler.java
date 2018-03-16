@@ -25,7 +25,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
@@ -70,16 +69,12 @@ import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMutationRequest;
 import com.couchbase.client.core.message.kv.subdoc.BinarySubdocRequest;
 import com.couchbase.client.core.message.kv.subdoc.multi.Lookup;
 import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommand;
-import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommandBuilder;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiMutationResponse;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiResult;
 import com.couchbase.client.core.message.kv.subdoc.multi.Mutation;
 import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommand;
-import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommandBuilder;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
-import com.couchbase.client.core.message.kv.subdoc.simple.SubExistRequest;
-import com.couchbase.client.core.message.kv.subdoc.simple.SubGetRequest;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
@@ -157,11 +152,6 @@ public class KeyValueHandler
      * creation of missing intermediate nodes in the JSON path.
      */
     public static final byte SUBDOC_BITMASK_MKDIR_P = 1;
-
-    /**
-     * The bitmask for sub-document xattr/hidden section of the document
-     */
-    public static final byte SUBDOC_FLAG_XATTR_PATH = (byte) 0x04;
 
     boolean seqOnMutation = false;
 
@@ -565,38 +555,21 @@ public class KeyValueHandler
         extras.writeShort(msg.pathLength());
 
         long cas = 0L;
+
         if (msg instanceof BinarySubdocMutationRequest) {
             BinarySubdocMutationRequest mut = (BinarySubdocMutationRequest) msg;
             //for now only possible command flag is MKDIR_P (and it makes sense in mutations only)
-            byte flags = 0;
             if (mut.createIntermediaryPath()) {
-                flags |= SUBDOC_BITMASK_MKDIR_P;
+                extras.writeByte(0 | SUBDOC_BITMASK_MKDIR_P);
+            } else {
+                extras.writeByte(0);
             }
-            if (mut.attributeAccess()) {
-                flags |= SUBDOC_FLAG_XATTR_PATH;
-            }
-            extras.writeByte(flags);
-
             if (mut.expiration() != 0L) {
                 extrasLength = 7;
                 extras.writeInt(mut.expiration());
             }
 
             cas = mut.cas();
-        } else if (msg instanceof SubGetRequest) {
-            SubGetRequest req =  (SubGetRequest)msg;
-            if (req.attributeAccess()) {
-                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
-            } else {
-                extras.writeByte(0);
-            }
-        } else if (msg instanceof SubExistRequest) {
-            SubExistRequest req =  (SubExistRequest)msg;
-            if (req.attributeAccess()) {
-                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
-            } else {
-                extras.writeByte(0);
-            }
         } else {
             extras.writeByte(0);
         }
@@ -1107,7 +1080,7 @@ public class KeyValueHandler
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractKeyValueRequest implements KeepAlive {
+    protected static class KeepAliveRequest extends AbstractKeyValueRequest {
 
         protected KeepAliveRequest() {
             super(null, null, null);

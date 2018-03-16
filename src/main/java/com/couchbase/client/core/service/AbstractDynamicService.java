@@ -29,10 +29,6 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 /**
  * Parent implementation of a dynamic {@link Service}.
  *
@@ -191,8 +187,8 @@ public abstract class AbstractDynamicService extends AbstractStateMachine<Lifecy
      *
      * @return the list of endpoints.
      */
-    protected List<Endpoint> endpoints() {
-        return Arrays.asList(endpoints);
+    protected Endpoint[] endpoints() {
+        return endpoints;
     }
 
     /**

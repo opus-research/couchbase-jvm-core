@@ -29,8 +29,6 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubExistRequest extends AbstractSubdocRequest {
-    private boolean attributeAccess;
-
 
     /**
      * Creates a new {@link SubExistRequest}. The {@link SimpleSubdocResponse} will only denote
@@ -47,9 +45,7 @@ public class SubExistRequest extends AbstractSubdocRequest {
         if (path.isEmpty()) {
             cleanUpAndThrow(EXCEPTION_EMPTY_PATH);
         }
-        this.attributeAccess = false;
     }
-
 
     /**
      * {@inheritDoc}
@@ -58,13 +54,5 @@ public class SubExistRequest extends AbstractSubdocRequest {
     @Override
     public byte opcode() {
         return KeyValueHandler.OP_SUB_EXIST;
-    }
-
-    public boolean attributeAccess() {
-        return this.attributeAccess;
-    }
-
-    public void attributeAccess(boolean attributeAccess) {
-        this.attributeAccess = attributeAccess;
     }
 }

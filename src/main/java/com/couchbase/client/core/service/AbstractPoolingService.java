@@ -48,7 +48,7 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
 
     @Override
     protected void dispatch(final CouchbaseRequest request) {
-        if (endpoints().size() == maxEndpoints) {
+        if (endpoints().length == maxEndpoints) {
             Endpoint endpoint = strategy.select(request, endpoints());
             if (endpoint == null) {
                 RetryHelper.retryOrCancel(env, request, responseBuffer);
