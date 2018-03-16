@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.endpoint.query;
+package com.couchbase.client.core.endpoint.analytics;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
@@ -26,14 +26,14 @@ import io.netty.handler.timeout.IdleStateHandler;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This endpoint defines the pipeline for query requests and responses (N1QL).
+ * This endpoint defines the pipeline for analytics requests and responses.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.4.3
  */
-public class QueryEndpoint extends AbstractEndpoint {
+public class AnalyticsEndpoint extends AbstractEndpoint {
 
-    public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
+    public AnalyticsEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
         RingBuffer<ResponseEvent> responseBuffer) {
         super(hostname, bucket, password, port, environment, responseBuffer, false,
                 environment.queryIoPool() == null ? environment.ioPool() : environment.queryIoPool(), false);
@@ -42,15 +42,13 @@ public class QueryEndpoint extends AbstractEndpoint {
     @Override
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         if (environment().keepAliveInterval() > 0) {
-            pipeline.addLast(new IdleStateHandler(environment().keepAliveInterval(), 0, 0, TimeUnit.MILLISECONDS));
+            pipeline.addLast(
+                new IdleStateHandler(environment().keepAliveInterval(), 0, 0, TimeUnit.MILLISECONDS)
+            );
         }
 
-        pipeline.addLast(new HttpClientCodec());
-        boolean enableV2 = Boolean.parseBoolean(System.getProperty("com.couchbase.enableYasjlQueryResponseParser", "false"));
-        if (!enableV2) {
-            pipeline.addLast(new QueryHandler(this, responseBuffer(), false, false));
-        } else {
-            pipeline.addLast(new QueryHandlerV2(this, responseBuffer(), false, false));
-        }
+        pipeline
+            .addLast(new HttpClientCodec())
+            .addLast(new AnalyticsHandler(this, responseBuffer(), false, false));
     }
 }
