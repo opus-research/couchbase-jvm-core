@@ -38,6 +38,7 @@ import rx.subjects.AsyncSubject;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -67,7 +68,7 @@ public class DefaultConfigurationProviderTest {
         Loader loader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(loader.loadConfig(any(InetAddress.class), anyString(), anyString()))
+        when(loader.loadConfig(any(Set.class), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
 
         final Refresher refresher = mock(Refresher.class);
@@ -98,10 +99,10 @@ public class DefaultConfigurationProviderTest {
         Loader errorLoader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(successLoader.loadConfig(any(InetAddress.class), anyString(), anyString()))
+        when(successLoader.loadConfig(any(Set.class), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
         AsyncSubject<BucketConfig> errorSubject = AsyncSubject.create();
-        when(errorLoader.loadConfig(any(InetAddress.class), anyString(), anyString())).thenReturn((Observable) errorSubject);
+        when(errorLoader.loadConfig(any(Set.class), anyString(), anyString())).thenReturn((Observable) errorSubject);
         errorSubject.onError(new IllegalStateException());
 
         final Refresher refresher = mock(Refresher.class);
@@ -131,7 +132,7 @@ public class DefaultConfigurationProviderTest {
         Loader loader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(loader.loadConfig(any(InetAddress.class), anyString(), anyString()))
+        when(loader.loadConfig(any(Set.class), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
 
 
@@ -172,7 +173,7 @@ public class DefaultConfigurationProviderTest {
         ClusterFacade cluster = mock(ClusterFacade.class);
         Loader errorLoader = mock(Loader.class);
         AsyncSubject<Tuple2<LoaderType, BucketConfig>> errorSubject = AsyncSubject.create();
-        when(errorLoader.loadConfig(any(InetAddress.class), anyString(), anyString())).thenReturn(errorSubject);
+        when(errorLoader.loadConfig(any(Set.class), anyString(), anyString())).thenReturn(errorSubject);
         errorSubject.onError(new IllegalStateException());
 
         final Refresher refresher = mock(Refresher.class);
