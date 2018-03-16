@@ -29,40 +29,31 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
 
 /**
- * The result corresponding to an individual {@link LookupCommand} or {@link MutationCommand}.
- * It contains the command's path and operation for reference.
+ * The result corresponding to an individual {@link LookupCommand}. It contains the command's path and operation
+ * for reference.
  *
- * The value only makes sense for some commands (like {@link Lookup#GET} or {@link Mutation#COUNTER}).
- * If it does make sense, it is represented as an UTF-8 encoded {@link ByteBuf}.
- * It is the responsibility of the caller to consume and {@link ByteBuf#release()} this ByteBuf.
+ * The value only makes sense for {@link Lookup#GET} commands. If it could be found, it is represented as an UTF-8
+ * encoded {@link ByteBuf}. It is the responsibility of the caller to consume and {@link ByteBuf#release()} this ByteBuf.
  *
  * @author Simon Baslé
  * @since 1.2
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
-public class MultiResult<OPERATION> {
+public class LookupResult {
 
     private final short statusCode;
     private final ResponseStatus status;
     private final String path;
-    private final OPERATION operation;
+    private final Lookup operation;
     private final ByteBuf value;
 
-    private MultiResult(short statusCode, ResponseStatus status, String path, OPERATION operation, ByteBuf value) {
+    public LookupResult(short statusCode, ResponseStatus status, String path, Lookup operation, ByteBuf value) {
         this.statusCode = statusCode;
         this.status = status;
         this.path = path;
         this.operation = operation;
         this.value = value;
-    }
-
-    public static MultiResult<Lookup> create(short statusCode, ResponseStatus status, String path, Lookup operation, ByteBuf value) {
-        return new MultiResult<Lookup>(statusCode, status, path, operation, value);
-    }
-
-    public static MultiResult<Mutation> create(short statusCode, ResponseStatus status, String path, Mutation operation, ByteBuf value) {
-        return new MultiResult<Mutation>(statusCode, status, path, operation, value);
     }
 
     /**
@@ -86,22 +77,22 @@ public class MultiResult<OPERATION> {
     }
 
     /**
-     * @return the path asked for in the original {@link LookupCommand} or {@link MutationCommand}, for reference.
+     * @return the path asked for in the original {@link LookupCommand}, for reference.
      */
     public String path() {
         return path;
     }
 
     /**
-     * @return the {@link Lookup}/{@link Mutation} operation of the original {@link LookupCommand}/{@link MutationCommand}, for reference.
+     * @return the {@link Lookup} operation of the original {@link LookupCommand}, for reference.
      */
-    public OPERATION operation() {
+    public Lookup operation() {
         return operation;
     }
 
     /**
      * @return the value as a {@link ByteBuf} (that you must consume and {@link ByteBuf#release()}). Can be empty
-     * in case of error or if the operation doesn't return a value.
+     * in case of error or if the operation is EXIST.
      */
     public ByteBuf value() {
         return value;
@@ -112,7 +103,7 @@ public class MultiResult<OPERATION> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        MultiResult that = (MultiResult) o;
+        LookupResult that = (LookupResult) o;
 
         if (statusCode != that.statusCode) return false;
         if (status != that.status) return false;
@@ -140,10 +131,10 @@ public class MultiResult<OPERATION> {
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append(operation())
-                .append('(').append(path()).append("): ")
+                .append('(').append(path()).append(") = ")
                 .append(status());
         if (value.readableBytes() > 0) {
-            builder.append(" = ").append(value().toString(CharsetUtil.UTF_8));
+            builder.append(": ").append(value().toString(CharsetUtil.UTF_8));
         }
         return builder.toString();
     }

@@ -108,7 +108,6 @@ public class SearchHandler extends AbstractGenericHandler<HttpObject, HttpReques
         }
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, content.readableBytes());
 
-        addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
         return request;
     }
 
