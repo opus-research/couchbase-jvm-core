@@ -126,7 +126,7 @@ dependencies {
 
 idea {
     module {
-        scopes.PROVIDED.minus += [ configurations.compile ]
+        scopes.PROVIDED.minus += configurations.compile
     }
 }
 
