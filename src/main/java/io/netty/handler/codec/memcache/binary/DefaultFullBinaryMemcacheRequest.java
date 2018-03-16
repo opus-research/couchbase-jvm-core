@@ -21,7 +21,8 @@ import io.netty.buffer.Unpooled;
 /**
  * The default implementation of a {@link FullBinaryMemcacheRequest}.
  */
-public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheRequest implements FullBinaryMemcacheRequest {
+public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheRequest
+    implements FullBinaryMemcacheRequest {
 
     private final ByteBuf content;
 
@@ -31,7 +32,7 @@ public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheReque
      * @param key    the key to use.
      * @param extras the extras to use.
      */
-    public DefaultFullBinaryMemcacheRequest(final String key, final ByteBuf extras) {
+    public DefaultFullBinaryMemcacheRequest(String key, ByteBuf extras) {
         this(key, extras, Unpooled.buffer(0));
     }
 
@@ -42,7 +43,8 @@ public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheReque
      * @param extras  the extras to use.
      * @param content the content of the full request.
      */
-    public DefaultFullBinaryMemcacheRequest(final String key, final ByteBuf extras, final ByteBuf content) {
+    public DefaultFullBinaryMemcacheRequest(String key, ByteBuf extras,
+                                            ByteBuf content) {
         super(key, extras);
         if (content == null) {
             throw new NullPointerException("Supplied content is null.");
@@ -68,7 +70,7 @@ public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheReque
     }
 
     @Override
-    public FullBinaryMemcacheRequest retain(final int increment) {
+    public FullBinaryMemcacheRequest retain(int increment) {
         content.retain(increment);
         return this;
     }
@@ -79,7 +81,7 @@ public class DefaultFullBinaryMemcacheRequest extends DefaultBinaryMemcacheReque
     }
 
     @Override
-    public boolean release(final int decrement) {
+    public boolean release(int decrement) {
         return content.release(decrement);
     }
 

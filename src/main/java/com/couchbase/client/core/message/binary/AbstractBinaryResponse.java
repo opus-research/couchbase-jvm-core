@@ -3,41 +3,30 @@ package com.couchbase.client.core.message.binary;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.document.CoreDocument;
+import io.netty.buffer.ByteBuf;
 
 /**
- * @author Michael Nitschinger
- * @author David Sondermann
- * @since 2.0
+ * Created by michael on 22/05/14.
  */
 public abstract class AbstractBinaryResponse extends AbstractCouchbaseResponse implements BinaryResponse {
 
-    private final CoreDocument coreDocument;
+    private final ByteBuf content;
     private final String bucket;
 
-    protected AbstractBinaryResponse(final CoreDocument coreDocument, final String bucket, final CouchbaseRequest request) {
-        super(null, request);
-        this.coreDocument = coreDocument;
+    protected AbstractBinaryResponse(ResponseStatus status, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, request);
+        this.content = content;
         this.bucket = bucket;
     }
 
     @Override
-    public ResponseStatus status() {
-        return coreDocument.status();
-    }
-
-    @Override
-    public CoreDocument document() {
-        return coreDocument;
+    public ByteBuf content() {
+        return content;
     }
 
     @Override
     public String bucket() {
         return bucket;
-    }
-
-    public long cas() {
-        return document().cas();
     }
 
     @Override
@@ -46,7 +35,7 @@ public abstract class AbstractBinaryResponse extends AbstractCouchbaseResponse i
         sb.append("bucket='").append(bucket).append('\'');
         sb.append(", status=").append(status());
         sb.append(", request=").append(request());
-        sb.append(", coreDocument=").append(coreDocument);
+        sb.append(", content=").append(content);
         sb.append('}');
         return sb.toString();
     }

@@ -2,11 +2,11 @@ package com.couchbase.client.core.util;
 
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.CouchbaseCore;
+import com.couchbase.client.core.message.cluster.DisconnectRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
-import com.couchbase.client.core.message.config.FlushRequest;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import rx.Observable;
@@ -36,16 +36,13 @@ public class ClusterDependentTest {
                 }
             }
         ).toBlocking().single();
+
+        //cluster.send(new FlushRequest(bucket, password)).toBlocking().single();
     }
 
     @AfterClass
     public static void disconnect() throws InterruptedException {
-        // FIXME DisconnectRequest doesn't work anymore :(
-        //cluster.send(new DisconnectRequest()).toBlocking().first();
-    }
-
-    public static void flush() {
-        cluster.send(new FlushRequest(bucket, password)).toBlocking().single();
+        cluster.send(new DisconnectRequest()).toBlocking().first();
     }
 
     public static String password() {
