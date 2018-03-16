@@ -101,7 +101,20 @@ public abstract class AbstractLoader implements Loader {
      * @param hostname the hostname of the seed node list.
      * @return a raw config if discovered.
      */
-    protected abstract Observable<String> discoverConfig(String bucket, String password, InetAddress hostname);
+    protected Observable<String> discoverConfig(String bucket, String password, InetAddress hostname) {
+        return discoverConfig(bucket, bucket, password, hostname);
+    }
+
+    /**
+     * Run the {@link BucketConfig} discovery process.
+     *
+     * @param bucket the name of the bucket.
+     * @param username user authorized for bucket access.
+     * @param password the password of the bucket.
+     * @param hostname the hostname of the seed node list.
+     * @return a raw config if discovered.
+     */
+    protected abstract Observable<String> discoverConfig(String bucket, String username, String password, InetAddress hostname);
 
     /**
      * Initiate the config loading process.
@@ -112,9 +125,23 @@ public abstract class AbstractLoader implements Loader {
      * @return a valid {@link BucketConfig}.
      */
     public Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final InetAddress seedNode, final String bucket,
-        final String password) {
+                                                                   final String password) {
+       return loadConfig(seedNode, bucket, bucket, password);
+    }
+
+    /**
+     * Initiate the config loading process.
+     *
+     * @param seedNode the seed node.
+     * @param bucket the name of the bucket.
+     * @param username the user authorized for bu
+     * @param password the password of the bucket.
+     * @return a valid {@link BucketConfig}.
+     */
+    public Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final InetAddress seedNode, final String bucket,
+                                                                   final String username, final String password) {
         LOGGER.debug("Loading Config for bucket {}", bucket);
-        return loadConfigAtAddr(seedNode, bucket, password);
+        return loadConfigAtAddr(seedNode, bucket, username, password);
     }
 
     /**
@@ -129,8 +156,10 @@ public abstract class AbstractLoader implements Loader {
      * @param password the password of the bucket.
      * @return a valid {@link BucketConfig} or an errored {@link Observable}.
      */
-    private Observable<Tuple2<LoaderType, BucketConfig>> loadConfigAtAddr(final InetAddress node, final String bucket,
-        final String password) {
+    private Observable<Tuple2<LoaderType, BucketConfig>> loadConfigAtAddr(final InetAddress node,
+                                                                          final String bucket,
+                                                                          final String username,
+                                                                          final String password) {
         return Observable
             .just(node)
             .flatMap(new Func1<InetAddress, Observable<AddNodeResponse>>() {
@@ -146,7 +175,7 @@ public abstract class AbstractLoader implements Loader {
                     }
                     LOGGER.debug("Successfully added Node {}", response.hostname());
                     return cluster.send(
-                        new AddServiceRequest(serviceType, bucket, password, port(), response.hostname())
+                        new AddServiceRequest(serviceType, bucket, username, password, port(), response.hostname())
                     );
                 }
             }).flatMap(new Func1<AddServiceResponse, Observable<String>>() {
@@ -156,7 +185,7 @@ public abstract class AbstractLoader implements Loader {
                         return Observable.error(new IllegalStateException("Could not add service for config loading."));
                     }
                     LOGGER.debug("Successfully enabled Service {} on Node {}", serviceType, response.hostname());
-                    return discoverConfig(bucket, password, response.hostname());
+                    return discoverConfig(bucket, username, password, response.hostname());
                 }
             })
             .map(new Func1<String, Tuple2<LoaderType, BucketConfig>>() {
