@@ -36,7 +36,6 @@ import rx.Subscriber;
  */
 public class LoggingConsumer extends Subscriber<CouchbaseEvent> {
 
-    public static final OutputFormat DEFAULT_FORMAT = OutputFormat.JSON;
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(LoggingConsumer.class);
 
     private final CouchbaseLogLevel level;
@@ -49,7 +48,7 @@ public class LoggingConsumer extends Subscriber<CouchbaseEvent> {
     }
 
     public static LoggingConsumer create() {
-        return create(CouchbaseLogLevel.INFO, DEFAULT_FORMAT);
+        return create(CouchbaseLogLevel.INFO, OutputFormat.JSON_PRETTY);
     }
 
     public static LoggingConsumer create(CouchbaseLogLevel level, OutputFormat outputFormat) {
