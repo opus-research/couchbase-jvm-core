@@ -21,8 +21,6 @@
  */
 package com.couchbase.client.core.env;
 
-import com.couchbase.client.core.message.observe.Observe;
-import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
@@ -123,19 +121,6 @@ public interface CoreEnvironment {
 
     int computationPoolSize();
 
-    /**
-     * Returns the {@link Delay} for {@link Observe} poll operations.
-     *
-     * @return the observe interval delay.
-     */
-    Delay observeIntervalDelay();
-
-    /**
-     * Returns the {@link Delay} for node reconnects.
-     *
-     * @return the node reconnect delay.
-     */
-    Delay reconnectDelay();
 
     /**
      * Returns the size of the request ringbuffer.

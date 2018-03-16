@@ -56,7 +56,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
-
 import javax.net.ssl.SSLEngine;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -72,6 +71,16 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0
  */
 public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleState> implements Endpoint {
+
+    /**
+     * The maximum reconnect delay in milliseconds, so it does not grow out of bounds.
+     */
+    public static final int MAX_RECONNECT_DELAY = 4096;
+
+    /**
+     * The minimum reconnect delay in milliseconds, so it does not retry immediately.
+     */
+    public static final int MIN_RECONNECT_DELAY = 128;
 
     /**
      * The logger used.
@@ -267,18 +276,17 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
                         } else {
-                            long delay = env.reconnectDelay().calculate(reconnectAttempt++);
-                            TimeUnit delayUnit = env.reconnectDelay().unit();
+                            long delay = reconnectDelay();
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                    + "Could not connect to endpoint, retrying with delay " + delay + " "
-                                    + delayUnit + ": ", future.cause());
+                                    + "Could not connect to endpoint, retrying with delay " + delay + "ms: ",
+                                future.cause());
                             transitionState(LifecycleState.CONNECTING);
                             future.channel().eventLoop().schedule(new Runnable() {
                                 @Override
                                 public void run() {
                                     doConnect(observable);
                                 }
-                            }, delay, delayUnit);
+                            }, delay, TimeUnit.MILLISECONDS);
                         }
                     }
                 }
@@ -360,6 +368,23 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             transitionState(LifecycleState.DISCONNECTED);
             connect();
         }
+    }
+
+    /**
+     * Returns the reconnect retry delay in  milliseconds.
+     *
+     * It uses an exponential back-off algorithm (2^attempt) until a fixed
+     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}). If the computed delay is below
+     * {@link #MIN_RECONNECT_DELAY}, then this one is returned instead.
+     *
+     * @return the retry delay.
+     */
+    private long reconnectDelay() {
+        int delay = 1 << (reconnectAttempt++);
+        if (delay <= MIN_RECONNECT_DELAY) {
+            return MIN_RECONNECT_DELAY;
+        }
+        return delay >= MAX_RECONNECT_DELAY ? MAX_RECONNECT_DELAY : delay;
     }
 
     /**
