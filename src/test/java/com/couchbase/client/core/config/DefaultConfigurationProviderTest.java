@@ -22,7 +22,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.lang.Tuple;
 import com.couchbase.client.core.lang.Tuple2;
-import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.internal.util.collections.Sets;
@@ -65,7 +64,7 @@ public class DefaultConfigurationProviderTest {
         Loader loader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(loader.loadConfig(any(NetworkAddress.class), anyString(), anyString(), anyString()))
+        when(loader.loadConfig(any(InetAddress.class), anyString(), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
 
         final Refresher refresher = mock(Refresher.class);
@@ -81,7 +80,7 @@ public class DefaultConfigurationProviderTest {
             }}
         );
 
-        provider.seedHosts(Sets.newSet(NetworkAddress.localhost()), true);
+        provider.seedHosts(Sets.newSet(InetAddress.getByName("localhost")), true);
         Observable<ClusterConfig> configObservable = provider.openBucket("bucket", "password");
         ClusterConfig config = configObservable.toBlocking().first();
         assertTrue(config.hasBucket("bucket"));
@@ -96,10 +95,10 @@ public class DefaultConfigurationProviderTest {
         Loader errorLoader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(successLoader.loadConfig(any(NetworkAddress.class), anyString(), anyString(), anyString()))
+        when(successLoader.loadConfig(any(InetAddress.class), anyString(), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
         AsyncSubject<BucketConfig> errorSubject = AsyncSubject.create();
-        when(errorLoader.loadConfig(any(NetworkAddress.class), anyString(), anyString(), anyString())).thenReturn((Observable) errorSubject);
+        when(errorLoader.loadConfig(any(InetAddress.class), anyString(), anyString(), anyString())).thenReturn((Observable) errorSubject);
         errorSubject.onError(new IllegalStateException());
 
         final Refresher refresher = mock(Refresher.class);
@@ -116,7 +115,7 @@ public class DefaultConfigurationProviderTest {
             }}
         );
 
-        provider.seedHosts(Sets.newSet(NetworkAddress.localhost()), true);
+        provider.seedHosts(Sets.newSet(InetAddress.getByName("localhost")), true);
         Observable<ClusterConfig> configObservable = provider.openBucket("bucket", "password");
         ClusterConfig config = configObservable.toBlocking().first();
         assertTrue(config.hasBucket("bucket"));
@@ -134,19 +133,19 @@ public class DefaultConfigurationProviderTest {
         Loader carrierLoader = mock(Loader.class);
         Loader httpLoader = mock(Loader.class);
 
-        final NetworkAddress goodNode = NetworkAddress.create("5.6.7.8");
-        NetworkAddress badNode = NetworkAddress.create("1.2.3.4");
+        final InetAddress goodNode = InetAddress.getByName("5.6.7.8");
+        InetAddress badNode = InetAddress.getByName("1.2.3.4");
 
 
-        when(carrierLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(carrierLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
             .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                 @Override
                 public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
-                    NetworkAddress target = (NetworkAddress) in.getArguments()[0];
+                    InetAddress target = (InetAddress) in.getArguments()[0];
 
                     if (target.equals(goodNode)) {
                         final BucketConfig bucketConfig = mock(BucketConfig.class);
-                        when(bucketConfig.name()).thenReturn("bucket-carrier-"+target.address());
+                        when(bucketConfig.name()).thenReturn("bucket-carrier-"+target.getHostAddress());
                         return Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig));
                     } else {
                         return Observable.error(new Exception("Could not load config for some reason."));
@@ -154,15 +153,15 @@ public class DefaultConfigurationProviderTest {
                 }
             });
 
-        when(httpLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(httpLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
                 .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                     @Override
                     public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
-                        NetworkAddress target = (NetworkAddress) in.getArguments()[0];
+                        InetAddress target = (InetAddress) in.getArguments()[0];
 
                         if (target.equals(goodNode)) {
                             final BucketConfig bucketConfig = mock(BucketConfig.class);
-                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.address());
+                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.getHostAddress());
                             return Observable.just(Tuple.create(LoaderType.HTTP, bucketConfig));
                         } else {
                             return Observable.error(new Exception("Could not load config for some reason."));
@@ -186,7 +185,7 @@ public class DefaultConfigurationProviderTest {
         ClusterConfig config = configObservable.toBlocking().first();
 
         assertEquals(1, config.bucketConfigs().size());
-        assertTrue(config.hasBucket("bucket-carrier-" + goodNode.address()));
+        assertTrue(config.hasBucket("bucket-carrier-" + goodNode.getHostAddress()));
     }
 
     @Test
@@ -200,10 +199,10 @@ public class DefaultConfigurationProviderTest {
         Loader carrierLoader = mock(Loader.class);
         Loader httpLoader = mock(Loader.class);
 
-        final NetworkAddress goodNode = NetworkAddress.create("5.6.7.8");
-        NetworkAddress badNode = NetworkAddress.create("1.2.3.4");
+        final InetAddress goodNode = InetAddress.getByName("5.6.7.8");
+        InetAddress badNode = InetAddress.getByName("1.2.3.4");
 
-        when(carrierLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(carrierLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
                 .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                     @Override
                     public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
@@ -211,15 +210,15 @@ public class DefaultConfigurationProviderTest {
                     }
                 });
 
-        when(httpLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(httpLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
                 .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                     @Override
                     public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
-                        NetworkAddress target = (NetworkAddress) in.getArguments()[0];
+                        InetAddress target = (InetAddress) in.getArguments()[0];
 
                         if (target.equals(goodNode)) {
                             final BucketConfig bucketConfig = mock(BucketConfig.class);
-                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.address());
+                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.getHostAddress());
                             return Observable.just(Tuple.create(LoaderType.HTTP, bucketConfig));
                         } else {
                             return Observable.error(new Exception("Could not load config for some reason."));
@@ -243,7 +242,7 @@ public class DefaultConfigurationProviderTest {
         ClusterConfig config = configObservable.toBlocking().first();
 
         assertEquals(1, config.bucketConfigs().size());
-        assertTrue(config.hasBucket("bucket-http-" + goodNode.address()));
+        assertTrue(config.hasBucket("bucket-http-" + goodNode.getHostAddress()));
     }
 
     @Test
@@ -257,19 +256,19 @@ public class DefaultConfigurationProviderTest {
         Loader carrierLoader = mock(Loader.class);
         Loader httpLoader = mock(Loader.class);
 
-        final NetworkAddress goodNode = NetworkAddress.create("5.6.7.8");
-        NetworkAddress badNode = NetworkAddress.create("1.2.3.4");
+        final InetAddress goodNode = InetAddress.getByName("5.6.7.8");
+        InetAddress badNode = InetAddress.getByName("1.2.3.4");
 
 
-        when(carrierLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(carrierLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
                 .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                     @Override
                     public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
-                        NetworkAddress target = (NetworkAddress) in.getArguments()[0];
+                        InetAddress target = (InetAddress) in.getArguments()[0];
 
                         if (target.equals(goodNode)) {
                             final BucketConfig bucketConfig = mock(BucketConfig.class);
-                            when(bucketConfig.name()).thenReturn("bucket-carrier-"+target.address());
+                            when(bucketConfig.name()).thenReturn("bucket-carrier-"+target.getHostAddress());
                             return Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig));
                         } else {
                             return Observable.timer(1, TimeUnit.MINUTES).map(new Func1<Long, Tuple2<LoaderType, BucketConfig>>() {
@@ -282,15 +281,15 @@ public class DefaultConfigurationProviderTest {
                     }
                 });
 
-        when(httpLoader.loadConfig(any(NetworkAddress.class), any(String.class), any(String.class), any(String.class)))
+        when(httpLoader.loadConfig(any(InetAddress.class), any(String.class), any(String.class), any(String.class)))
                 .thenAnswer(new Answer<Observable<Tuple2<LoaderType, BucketConfig>>>() {
                     @Override
                     public Observable<Tuple2<LoaderType, BucketConfig>> answer(InvocationOnMock in) throws Throwable {
-                        NetworkAddress target = (NetworkAddress) in.getArguments()[0];
+                        InetAddress target = (InetAddress) in.getArguments()[0];
 
                         if (target.equals(goodNode)) {
                             final BucketConfig bucketConfig = mock(BucketConfig.class);
-                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.address());
+                            when(bucketConfig.name()).thenReturn("bucket-http-"+target.getHostAddress());
                             return Observable.just(Tuple.create(LoaderType.HTTP, bucketConfig));
                         } else {
                             return Observable.timer(1, TimeUnit.MINUTES).map(new Func1<Long, Tuple2<LoaderType, BucketConfig>>() {
@@ -319,7 +318,7 @@ public class DefaultConfigurationProviderTest {
         ClusterConfig config = configObservable.toBlocking().first();
 
         assertEquals(1, config.bucketConfigs().size());
-        assertTrue(config.hasBucket("bucket-carrier-" + goodNode.address()));
+        assertTrue(config.hasBucket("bucket-carrier-" + goodNode.getHostAddress()));
     }
 
     @Test
@@ -328,7 +327,7 @@ public class DefaultConfigurationProviderTest {
         Loader loader = mock(Loader.class);
         BucketConfig bucketConfig = mock(BucketConfig.class);
         when(bucketConfig.name()).thenReturn("bucket");
-        when(loader.loadConfig(any(NetworkAddress.class), anyString(), anyString(), anyString()))
+        when(loader.loadConfig(any(InetAddress.class), anyString(), anyString(), anyString()))
             .thenReturn(Observable.just(Tuple.create(LoaderType.Carrier, bucketConfig)));
 
 
@@ -354,7 +353,7 @@ public class DefaultConfigurationProviderTest {
             }
         });
 
-        provider.seedHosts(Sets.newSet(NetworkAddress.localhost()), true);
+        provider.seedHosts(Sets.newSet(InetAddress.getByName("localhost")), true);
         Observable<ClusterConfig> configObservable = provider.openBucket("bucket", "password");
         ClusterConfig config = configObservable.toBlocking().first();
         assertTrue(config.hasBucket("bucket"));
@@ -369,7 +368,7 @@ public class DefaultConfigurationProviderTest {
         ClusterFacade cluster = mock(ClusterFacade.class);
         Loader errorLoader = mock(Loader.class);
         AsyncSubject<Tuple2<LoaderType, BucketConfig>> errorSubject = AsyncSubject.create();
-        when(errorLoader.loadConfig(any(NetworkAddress.class), anyString(), anyString(), anyString())).thenReturn(errorSubject);
+        when(errorLoader.loadConfig(any(InetAddress.class), anyString(), anyString(), anyString())).thenReturn(errorSubject);
         errorSubject.onError(new IllegalStateException());
 
         final Refresher refresher = mock(Refresher.class);
@@ -385,7 +384,7 @@ public class DefaultConfigurationProviderTest {
             }}
         );
 
-        provider.seedHosts(Sets.newSet(NetworkAddress.localhost()), true);
+        provider.seedHosts(Sets.newSet(InetAddress.getByName("localhost")), true);
         Observable<ClusterConfig> configObservable = provider.openBucket("bucket", "password");
         try {
             configObservable.toBlocking().single();

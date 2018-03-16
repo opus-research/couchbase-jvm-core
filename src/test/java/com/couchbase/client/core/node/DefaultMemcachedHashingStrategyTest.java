@@ -16,7 +16,6 @@
 package com.couchbase.client.core.node;
 
 import com.couchbase.client.core.config.NodeInfo;
-import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.Test;
 
 import java.net.InetAddress;
@@ -38,7 +37,7 @@ public class DefaultMemcachedHashingStrategyTest {
         MemcachedHashingStrategy strategy = DefaultMemcachedHashingStrategy.INSTANCE;
 
         NodeInfo infoMock = mock(NodeInfo.class);
-        when(infoMock.hostname()).thenReturn(NetworkAddress.localhost());
+        when(infoMock.hostname()).thenReturn(InetAddress.getByName("localhost"));
         assertEquals("localhost-0", strategy.hash(infoMock,0));
     }
 

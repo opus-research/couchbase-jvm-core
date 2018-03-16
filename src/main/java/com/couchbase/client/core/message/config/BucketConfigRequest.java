@@ -16,7 +16,6 @@
 package com.couchbase.client.core.message.config;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.utils.NetworkAddress;
 
 import java.net.InetAddress;
 
@@ -24,20 +23,20 @@ public class BucketConfigRequest extends AbstractCouchbaseRequest implements Con
 
     private static final String PATH = "/pools/default/b/";
 
-    private final NetworkAddress hostname;
+    private final InetAddress hostname;
     private final String path;
 
-    public BucketConfigRequest(String path, NetworkAddress hostname, String bucket, String password) {
+    public BucketConfigRequest(String path, InetAddress hostname, String bucket, String password) {
         this(path, hostname, bucket, bucket, password);
     }
 
-    public BucketConfigRequest(String path, NetworkAddress hostname, String bucket, String username, String password) {
+    public BucketConfigRequest(String path, InetAddress hostname, String bucket, String username, String password) {
         super(bucket, username, password);
         this.hostname = hostname;
         this.path = path;
     }
 
-    public NetworkAddress hostname() {
+    public InetAddress hostname() {
         return hostname;
     }
 
