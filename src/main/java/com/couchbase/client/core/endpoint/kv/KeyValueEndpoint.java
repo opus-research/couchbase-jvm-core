@@ -28,6 +28,9 @@ import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheClientCodec;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheObjectAggregator;
+import io.netty.handler.timeout.IdleStateHandler;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * This endpoint defines the pipeline for binary requests and responses.
@@ -52,6 +55,7 @@ public class KeyValueEndpoint extends AbstractEndpoint {
     @Override
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         pipeline
+            .addLast(new IdleStateHandler(0, 0, environment().keepAliveInterval(), TimeUnit.MILLISECONDS))
             .addLast(new BinaryMemcacheClientCodec())
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
             .addLast(new KeyValueAuthHandler(bucket(), password()))
