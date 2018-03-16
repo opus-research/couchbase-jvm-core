@@ -41,7 +41,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.ReferenceCountUtil;
 import org.junit.Before;
 import org.junit.Test;
 import rx.observers.TestSubscriber;
@@ -187,9 +186,9 @@ public class SearchHandlerTest {
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
         LastHttpContent responseEnd = new DefaultLastHttpContent();
         channel.writeInbound(response, responseEnd);
-        SearchHandler.KeepAliveResponse keepAliveResponse = ReferenceCountUtil.releaseLater(keepAliveRequest.observable()
+        SearchHandler.KeepAliveResponse keepAliveResponse = keepAliveRequest.observable()
                 .cast(SearchHandler.KeepAliveResponse.class)
-                .timeout(1, TimeUnit.SECONDS).toBlocking().single());
+                .timeout(1, TimeUnit.SECONDS).toBlocking().single();
 
         channel.pipeline().remove(searchKeepAliveHandler);
         assertEquals(2, keepAliveEventCounter.get());
