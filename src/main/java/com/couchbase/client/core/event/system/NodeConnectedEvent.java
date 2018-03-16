@@ -23,10 +23,8 @@ package com.couchbase.client.core.event.system;
 
 import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.EventType;
-import com.couchbase.client.core.utils.Events;
 
 import java.net.InetAddress;
-import java.util.Map;
 
 /**
  * Event published when a node is connected.
@@ -36,10 +34,10 @@ import java.util.Map;
  */
 public class NodeConnectedEvent implements CouchbaseEvent {
 
-    private final InetAddress host;
+    private final InetAddress node;
 
-    public NodeConnectedEvent(InetAddress host) {
-        this.host = host;
+    public NodeConnectedEvent(InetAddress node) {
+        this.node = node;
     }
 
     @Override
@@ -53,21 +51,14 @@ public class NodeConnectedEvent implements CouchbaseEvent {
      * @return the inet address of the connected node.
      */
     public InetAddress host() {
-        return host;
+        return node;
     }
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("NodeConnectedEvent{");
-        sb.append("host=").append(host);
+        sb.append("node=").append(node);
         sb.append('}');
         return sb.toString();
-    }
-
-    @Override
-    public Map<String, Object> toMap() {
-        Map<String, Object> result = Events.identityMap(this);
-        result.put("host", host().toString());
-        return result;
     }
 }
