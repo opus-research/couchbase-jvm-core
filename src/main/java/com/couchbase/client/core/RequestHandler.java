@@ -38,6 +38,7 @@ import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
+import com.couchbase.client.core.message.search.SearchRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
@@ -46,6 +47,7 @@ import com.couchbase.client.core.node.locate.DCPLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
+import com.couchbase.client.core.node.locate.SearchLocator;
 import com.couchbase.client.core.node.locate.ViewLocator;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
@@ -102,6 +104,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * The node locator for DCP service.
      */
     private final Locator dcpLocator = new DCPLocator();
+
+    /**
+     * The node locator for the query service.
+     */
+    private final Locator searchLocator = new SearchLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -228,6 +235,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             throw new ServiceNotAvailableException("The View service is not enabled or no node in the cluster supports it.");
         } else if (request instanceof QueryRequest && !(environment.queryEnabled() || config.serviceEnabled(ServiceType.QUERY))) {
             throw new ServiceNotAvailableException("The Query service is not enabled or no node in the cluster supports it.");
+        } else if (request instanceof SearchRequest && !(environment.searchEnabled() || config.serviceEnabled(ServiceType.SEARCH))) {
+            throw new ServiceNotAvailableException("The Search service is not enabled or no node in the cluster supports it.");
         } else if (request instanceof  DCPRequest && !(environment.dcpEnabled() || config.serviceEnabled(ServiceType.DCP))) {
             throw new ServiceNotAvailableException("The DCP service is not enabled or no node in the cluster supports it.");
         }
@@ -352,6 +361,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return configLocator;
         } else if (request instanceof DCPRequest) {
             return dcpLocator;
+        } else if (request instanceof SearchRequest) {
+            return searchLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -454,6 +465,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                         }
                         if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
                             services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
+                        }
+                        if (!services.containsKey(ServiceType.SEARCH) && environment.searchEnabled()) {
+                            services.put(ServiceType.SEARCH, environment.searchPort());
                         }
                         return Observable.just(services);
                     }

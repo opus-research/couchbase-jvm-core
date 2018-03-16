@@ -115,6 +115,20 @@ public interface CoreEnvironment {
     int queryPort();
 
     /**
+     * True if full text search should be enabled manually.
+     *
+     * @return true if manual N1QL querying is enabled.
+     */
+    boolean searchEnabled();
+
+    /**
+     * If manual full text search enabled, this defines the CBFT port to use.
+     *
+     * @return the query port.
+     */
+    int searchPort();
+
+    /**
      * If bootstrapping through HTTP is enabled.
      *
      * @return true if enabled.
@@ -225,6 +239,13 @@ public interface CoreEnvironment {
      * @return amount of endpoints per service.
      */
     int queryEndpoints();
+
+    /**
+     * The number of search service endpoints.
+     *
+     * @return amount of endpoints per service.
+     */
+    int searchEndpoints();
 
     /**
      * Library identification string, which can be used as User-Agent header in HTTP requests.
