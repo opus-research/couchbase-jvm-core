@@ -73,6 +73,7 @@ public class ThreadCleanupTest {
         env = DefaultCoreEnvironment
                 .builder()
                 .dcpEnabled(true)
+                .mutationTokensEnabled(true)
                 .build();
         cluster = new CouchbaseCore(env);
         cluster.<SeedNodesResponse>send(new SeedNodesRequest(seedNode)).flatMap(
