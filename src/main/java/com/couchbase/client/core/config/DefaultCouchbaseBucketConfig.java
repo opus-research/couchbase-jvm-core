@@ -15,9 +15,6 @@
  */
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.endpoint.Endpoint;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -30,10 +27,6 @@ import java.util.Set;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implements CouchbaseBucketConfig {
-
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(CouchbaseBucketConfig.class);
-
-    public static final int PARTITION_NOT_EXISTENT = -2;
 
     private final CouchbasePartitionInfo partitionInfo;
     private final List<NodeInfo> partitionHosts;
@@ -139,12 +132,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         }
 
         List<Partition> partitions = useFastForward ? partitionInfo.forwardPartitions() : partitionInfo.partitions();
-        try {
-            return partitions.get(partition).master();
-        } catch (IndexOutOfBoundsException ex) {
-            LOGGER.debug("Out of bounds on index for master " + partition + ".", ex);
-            return PARTITION_NOT_EXISTENT;
-        }
+        return partitions.get(partition).master();
     }
 
     @Override
@@ -154,13 +142,7 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         }
 
         List<Partition> partitions = useFastForward ? partitionInfo.forwardPartitions() : partitionInfo.partitions();
-
-        try {
-            return partitions.get(partition).replica(replica);
-        } catch (IndexOutOfBoundsException ex) {
-            LOGGER.debug("Out of bounds on index for replica " + partition + ".", ex);
-            return PARTITION_NOT_EXISTENT;
-        }
+        return partitions.get(partition).replica(replica);
     }
 
     @Override

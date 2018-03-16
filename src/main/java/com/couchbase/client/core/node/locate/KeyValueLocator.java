@@ -21,7 +21,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
-import com.couchbase.client.core.config.DefaultCouchbaseBucketConfig;
 import com.couchbase.client.core.config.MemcachedBucketConfig;
 import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
@@ -182,22 +181,17 @@ public class KeyValueLocator implements Locator {
      */
     private static void errorObservables(int nodeId, BinaryRequest request, String name, CoreEnvironment env,
         RingBuffer<ResponseEvent> responseBuffer) {
-        if (nodeId == DefaultCouchbaseBucketConfig.PARTITION_NOT_EXISTENT) {
+        if (nodeId == -2) {
             if (request instanceof ReplicaGetRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ReplicaGetRequest) request).replica() + " not configured for bucket " + name));
-                return;
             } else if (request instanceof ObserveRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ObserveRequest) request).replica() + " not configured for bucket " + name));
-                return;
             } else if (request instanceof ObserveSeqnoRequest) {
                 request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ObserveSeqnoRequest) request).replica() + " not configured for bucket " + name));
-                return;
             }
-
-            RetryHelper.retryOrCancel(env, request, responseBuffer);
             return;
         }
 
