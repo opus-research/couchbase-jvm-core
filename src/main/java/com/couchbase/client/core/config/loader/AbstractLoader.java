@@ -24,18 +24,13 @@ import com.couchbase.client.core.lang.Tuple;
 import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.AddServiceResponse;
-import com.couchbase.client.core.message.internal.RemoveServiceRequest;
-import com.couchbase.client.core.message.internal.RemoveServiceResponse;
 import com.couchbase.client.core.service.ServiceType;
-import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
-import rx.functions.Action1;
 import rx.functions.Func1;
 
 import java.net.InetAddress;
@@ -192,27 +187,6 @@ public abstract class AbstractLoader implements Loader {
                     config.username(username);
                     config.password(password);
                     return Tuple.create(loaderType, config);
-                }
-            }).onErrorResumeNext(new Func1<Throwable, Observable<? extends Tuple2<LoaderType, BucketConfig>>>() {
-                @Override
-                public Observable<? extends Tuple2<LoaderType, BucketConfig>> call(final Throwable throwable) {
-                    LOGGER.warn("Could not load initial config from node {}, because of {} ignoring.",
-                        node, throwable);
-
-                    return cluster
-                        .<RemoveServiceResponse>send(new RemoveServiceRequest(serviceType, bucket, node))
-                        .flatMap(new Func1<RemoveServiceResponse, Observable<LifecycleState>>() {
-                            @Override
-                            public Observable<LifecycleState> call(RemoveServiceResponse response) {
-                                return response.service().disconnect();
-                            }
-                        })
-                        .flatMap(new Func1<LifecycleState, Observable<Tuple2<LoaderType, BucketConfig>>>() {
-                            @Override
-                            public Observable<Tuple2<LoaderType, BucketConfig>> call(LifecycleState lifecycleState) {
-                                return Observable.error(throwable);
-                            }
-                        });
                 }
             });
     }
