@@ -43,6 +43,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 import java.net.SocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -61,22 +62,20 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(KeyValueFeatureHandler.class);
     private static final byte HELLO_CMD = 0x1f;
 
-    private final List<ServerFeatures> features;
-    private final String userAgent;
+    private static final ServerFeatures[] FEATURES = {
+        ServerFeatures.MUTATION_SEQNO,
+        ServerFeatures.TCPNODELAY
+    };
 
     /**
      * The connect promise issued by the connect process.
      */
     private ChannelPromise originalPromise;
 
+    private final CoreEnvironment environment;
+
     public KeyValueFeatureHandler(CoreEnvironment environment) {
-        userAgent = environment.userAgent();
-        boolean tcpNodelay = environment.tcpNodelayEnabled();
-
-        features = new ArrayList<ServerFeatures>();
-        features.add(ServerFeatures.MUTATION_SEQNO);
-        features.add(tcpNodelay ? ServerFeatures.TCPNODELAY : ServerFeatures.TCPDELAY);
-
+        this.environment = environment;
     }
 
     @Override
@@ -110,15 +109,15 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
      * @return the request to send over the wire
      */
     private FullBinaryMemcacheRequest helloRequest() {
-        String key = userAgent;
+        String key = environment.userAgent();
         short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
 
-        ByteBuf wanted = Unpooled.buffer(features.size() * 2);
-        for (ServerFeatures feature : features) {
+        ByteBuf wanted = Unpooled.buffer(FEATURES.length * 2);
+        for (ServerFeatures feature : FEATURES) {
             wanted.writeShort(feature.value());
         }
 
-        LOGGER.debug("Requesting supported features: {}", features);
+        LOGGER.debug("Requesting supported features: {}", Arrays.asList(FEATURES));
         FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, wanted);
         request.setOpcode(HELLO_CMD);
         request.setKeyLength(keyLength);
