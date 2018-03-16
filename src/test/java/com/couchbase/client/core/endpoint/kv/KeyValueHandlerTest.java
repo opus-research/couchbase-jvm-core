@@ -56,7 +56,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 
 import java.net.InetAddress;
@@ -96,13 +95,6 @@ public class KeyValueHandlerTest {
      */
     private static final byte[] KEY = "key".getBytes(CHARSET);
 
-    private static final CoreEnvironment ENVIRONMENT;
-
-    static {
-        ENVIRONMENT = mock(CoreEnvironment.class);
-        when(ENVIRONMENT.scheduler()).thenReturn(Schedulers.computation());
-    }
-
     /**
      * The channel in which the handler is tested.
      */
@@ -118,18 +110,11 @@ public class KeyValueHandlerTest {
      */
     private CollectingResponseEventSink eventSink;
 
-    /**
-     *  A mock endpoint.
-     */
-    private AbstractEndpoint endpoint;
-
     @Before
     public void setup() {
         eventSink = new CollectingResponseEventSink();
         requestQueue = new ArrayDeque<BinaryRequest>();
-        endpoint = mock(AbstractEndpoint.class);
-        when(endpoint.environment()).thenReturn(ENVIRONMENT);
-        channel = new EmbeddedChannel(new KeyValueHandler(endpoint, eventSink, requestQueue, false));
+        channel = new EmbeddedChannel(new KeyValueHandler(mock(AbstractEndpoint.class), eventSink, requestQueue, false));
     }
 
     @After

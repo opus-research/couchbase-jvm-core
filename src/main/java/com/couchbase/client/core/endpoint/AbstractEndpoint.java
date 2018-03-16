@@ -51,11 +51,15 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.EventExecutor;
 import rx.Observable;
+import rx.Observer;
 import rx.Single;
 import rx.SingleSubscriber;
 import rx.Subscriber;
+import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.observables.AsyncOnSubscribe;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -66,8 +70,6 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static com.couchbase.client.core.utils.Observables.failSafe;
 
 /**
  * The common parent implementation for all {@link Endpoint}s.
@@ -484,7 +486,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             if (request instanceof SignalFlush) {
                 return;
             }
-            failSafe(env.scheduler(), true, request.observable(), NOT_CONNECTED_EXCEPTION);
+            request.observable().onError(NOT_CONNECTED_EXCEPTION);
         }
     }
 
@@ -501,10 +503,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * endpoint is in a connected or connecting state).
      */
     public void notifyChannelInactive() {
-        LOGGER.debug(logIdent(channel, this) + "Got notified from Channel as inactive.");
         if (isTransient) {
             return;
         }
+        LOGGER.info(logIdent(channel, this) + "Got notified from Channel as inactive, " +
+                "attempting reconnect.");
 
         if (state() != LifecycleState.DISCONNECTED && state() != LifecycleState.DISCONNECTING) {
             signalConfigReload();
