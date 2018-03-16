@@ -55,7 +55,7 @@ public class KeyValueEndpoint extends AbstractEndpoint {
         pipeline
             .addLast(new BinaryMemcacheClientCodec())
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
-            .addLast(new KeyValueFeatureHandler(environment()))
+            .addLast("featureHandler", new KeyValueFeatureHandler(environment()))
             .addLast(new KeyValueAuthHandler(bucket(), password()))
             .addLast(new KeyValueHandler(this, responseBuffer(), false, true));
     }

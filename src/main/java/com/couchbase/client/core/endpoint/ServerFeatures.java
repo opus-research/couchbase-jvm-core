@@ -61,7 +61,14 @@ public enum ServerFeatures {
      *
      * @since  Couchbase Server Spock (5.0)
      */
-    XATTR((short) 0x06);
+    XATTR((short) 0x06),
+
+    /**
+     * Enable extended error map support.
+     *
+     * @since Couchbase Server Spock (5.0)
+     */
+    XERROR((short) 0x07);
 
     /**
      * The actual byte representation on the wire.
@@ -88,6 +95,7 @@ public enum ServerFeatures {
             case 0x04: return MUTATION_SEQNO;
             case 0x05: return TCPDELAY;
             case 0x06: return XATTR;
+            case 0x07: return XERROR;
             default: throw new IllegalStateException("Unrequested server feature: " + input);
         }
     }
