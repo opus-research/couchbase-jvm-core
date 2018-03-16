@@ -30,24 +30,18 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
     private final String design;
     private final String view;
     private final String query;
-    private final boolean spatial;
     private final boolean development;
 
     public ViewQueryRequest(String design, String view, boolean development, String bucket, String password) {
-        this(design, view, development, false, null, bucket, password);
+        this(design, view, development, null, bucket, password);
     }
 
     public ViewQueryRequest(String design, String view, boolean development, String query, String bucket, String password) {
-        this(design, view, development, false, query, bucket, password);
-    }
-
-    public ViewQueryRequest(String design, String view, boolean development, boolean spatial, String query, String bucket, String password) {
         super(bucket, password, ReplaySubject.<CouchbaseResponse>create());
         this.design = design;
         this.view = view;
         this.query = query;
         this.development = development;
-        this.spatial = spatial;
     }
 
     public String design() {
@@ -64,9 +58,5 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
 
     public boolean development() {
         return development;
-    }
-
-    public boolean spatial() {
-        return spatial;
     }
 }
