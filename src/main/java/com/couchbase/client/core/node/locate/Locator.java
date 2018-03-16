@@ -21,13 +21,17 @@
  */
 package com.couchbase.client.core.node.locate;
 
+import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.config.ClusterConfig;
+import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
+import com.lmax.disruptor.RingBuffer;
 
 import java.util.List;
 
 public interface Locator {
 
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+    void locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config, CoreEnvironment env,
+                RingBuffer<ResponseEvent> responseBuffer);
 }
