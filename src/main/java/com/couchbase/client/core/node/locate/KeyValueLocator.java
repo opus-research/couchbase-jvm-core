@@ -27,6 +27,7 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.config.MemcachedBucketConfig;
 import com.couchbase.client.core.config.NodeInfo;
+import com.couchbase.client.core.config.Partition;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -99,16 +100,19 @@ public class KeyValueLocator implements Locator {
             e.printStackTrace();
         }
         long rv = (crc32.getValue() >> 16) & 0x7fff;
-        int partitionId = (int) rv & config.numberOfPartitions() - 1;
+        int partitionId = (int) rv & config.partitions().size() - 1;
         request.partition((short) partitionId);
+
+
+        Partition partition = config.partitions().get(partitionId);
 
         int nodeId;
         if (request instanceof ReplicaGetRequest) {
-            nodeId = config.nodeIndexForReplica(partitionId, ((ReplicaGetRequest) request).replica() - 1);
+            nodeId = partition.replica(((ReplicaGetRequest) request).replica() - 1);
         } else if (request instanceof ObserveRequest && ((ObserveRequest) request).replica() > 0){
-            nodeId = config.nodeIndexForReplica(partitionId, ((ObserveRequest) request).replica() - 1);
+            nodeId = partition.replica(((ObserveRequest) request).replica() - 1);
         } else {
-            nodeId = config.nodeIndexForMaster(partitionId);
+            nodeId = partition.master();
         }
 
         if (nodeId == -2) {
@@ -126,12 +130,12 @@ public class KeyValueLocator implements Locator {
             return new Node[] { };
         }
 
-        NodeInfo nodeInfo = config.nodeAtIndex(nodeId);
+        NodeInfo nodeInfo = config.partitionHosts().get(nodeId);
 
-        if (config.nodes().size() != nodes.size()) {
+        if (config.partitionHosts().size() != nodes.size()) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Node list and configuration's partition hosts sizes : {} <> {}, rescheduling",
-                        nodes.size(), config.nodes().size());
+                        nodes.size(), config.partitionHosts().size());
             }
             return new Node[] { };
         }

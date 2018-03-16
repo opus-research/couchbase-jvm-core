@@ -25,22 +25,19 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.message.kv.GetRequest;
-import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.state.LifecycleState;
 import org.junit.Test;
 import rx.Observable;
+
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -146,94 +143,6 @@ public class RequestHandlerTest {
         handler.onEvent(mockEvent, 0, true);
         verify(mockNode).send(mockRequest);
         verify(mockNode).send(SignalFlush.INSTANCE);
-        verify(mockEvent).setRequest(null);
-    }
-
-    private void assertFeatureForRequest(RequestHandler handler, CouchbaseRequest request, boolean expectedOk) {
-        try {
-            handler.checkFeaturesForRequest(request);
-            if (!expectedOk) {
-                fail();
-            }
-        } catch (UnsupportedOperationException e) {
-            if (expectedOk) {
-                fail();
-            }
-            assertTrue(e.getMessage().startsWith("Request type needs a feature to be enabled in environment"));
-        }
-    }
-
-    @Test
-    public void shouldPreventFeatureDependentRequestsWhenFeatureDisabled() {
-        String dcpWasEnabled = System.getProperty("com.couchbase.dcpEnabled");
-        String queryWasEnabled = System.getProperty("com.couchbase.queryEnabled");
-        try {
-            System.getProperties().remove("com.couchbase.dcpEnabled");
-            System.getProperties().remove("com.couchbase.queryEnabled");
-            QueryRequest mockQueryRequest = mock(QueryRequest.class);
-            DCPRequest mockDcpRequest = mock(DCPRequest.class);
-            CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
-            CoreEnvironment env = DefaultCoreEnvironment.builder()
-                    .queryEnabled(false)
-                    .dcpEnabled(false)
-                    .build();
-            RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
-
-            assertFeatureForRequest(handler, mockQueryRequest, false);
-            assertFeatureForRequest(handler, mockDcpRequest, false);
-            assertFeatureForRequest(handler, mockKeyValueRequest, true);
-        } finally {
-            if (dcpWasEnabled != null) {
-                System.setProperty("com.couchbase.dcpEnabled", dcpWasEnabled);
-            }
-            if (queryWasEnabled != null) {
-                System.setProperty("com.couchbase.queryEnabled", queryWasEnabled);
-            }
-        }
-    }
-
-    @Test
-    public void shouldAllowQueryWhenQueryFeatureEnabled() {
-        String dcpWasEnabled = System.getProperty("com.couchbase.dcpEnabled");
-        String queryWasEnabled = System.getProperty("com.couchbase.queryEnabled");
-        try {
-            System.getProperties().remove("com.couchbase.dcpEnabled");
-            System.getProperties().remove("com.couchbase.queryEnabled");
-            QueryRequest mockQueryRequest = mock(QueryRequest.class);
-            DCPRequest mockDcpRequest = mock(DCPRequest.class);
-            CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
-            CoreEnvironment env = DefaultCoreEnvironment.builder()
-                    .queryEnabled(true)
-                    .dcpEnabled(true)
-                    .build();
-            RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
-
-            assertFeatureForRequest(handler, mockQueryRequest, true);
-            assertFeatureForRequest(handler, mockDcpRequest, true);
-            assertFeatureForRequest(handler, mockKeyValueRequest, true);
-        } finally {
-            if (dcpWasEnabled != null) {
-                System.setProperty("com.couchbase.dcpEnabled", dcpWasEnabled);
-            }
-            if (queryWasEnabled != null) {
-                System.setProperty("com.couchbase.queryEnabled", queryWasEnabled);
-            }
-        }
-    }
-
-    @Test
-    public void shouldAllowDcpWhenDcpFeatureEnabled() {
-        QueryRequest mockQueryRequest = mock(QueryRequest.class);
-        DCPRequest mockDcpRequest = mock(DCPRequest.class);
-        CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
-        CoreEnvironment env = DefaultCoreEnvironment.builder()
-                                                    .dcpEnabled(true)
-                                                    .build();
-        RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
-
-        assertFeatureForRequest(handler, mockQueryRequest, false);
-        assertFeatureForRequest(handler, mockDcpRequest, true);
-        assertFeatureForRequest(handler, mockKeyValueRequest, true);
     }
 
     /**
