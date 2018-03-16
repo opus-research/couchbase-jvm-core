@@ -381,7 +381,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      *
      * @param newConfig the configuration of the bucket.
      */
-    private void upsertBucketConfig(final BucketConfig newConfig) {
+    private void upsertBucketConfig(BucketConfig newConfig) {
+        if (System.getProperty("overrideConfig") != null) {
+          newConfig = BucketConfigParser.parse(System.getProperty("overrideConfig"));
+        }
+
         ClusterConfig cluster = currentConfig;
         BucketConfig oldConfig = cluster.bucketConfig(newConfig.name());
 
