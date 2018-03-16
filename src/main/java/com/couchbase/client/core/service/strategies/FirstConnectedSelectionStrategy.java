@@ -19,36 +19,31 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.endpoint.view;
 
-import com.couchbase.client.core.ResponseEvent;
-import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.CoreEnvironment;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.HttpClientCodec;
+package com.couchbase.client.core.service.strategies;
+
+import com.couchbase.client.core.endpoint.Endpoint;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.state.LifecycleState;
 
 /**
- * This endpoint defines the pipeline for binary requests and responses.
+ * Simple strategy which selects first connected endpoint.
+ *
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public class ViewEndpoint extends AbstractEndpoint {
-
-    /**
-     * Create a new {@link ViewEndpoint}.
-     *
-     * @param hostname the hostname to connect on this endpoint.
-     * @param env the couchbase environment.
-     */
-    public ViewEndpoint(final String hostname, String bucket, String password, int port, final CoreEnvironment env,
-        final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, responseBuffer);
-    }
-
+public class FirstConnectedSelectionStrategy implements SelectionStrategy {
     @Override
-    protected void customEndpointHandlers(final ChannelPipeline pipeline) {
-        pipeline
-            .addLast(new HttpClientCodec())
-            .addLast(new ViewHandler(this, responseBuffer()));
+    public Endpoint select(CouchbaseRequest request, Endpoint[] endpoints) {
+        int numEndpoints = endpoints.length;
+        if (numEndpoints == 0) {
+            return null;
+        }
+        for (Endpoint endpoint : endpoints) {
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
+                return endpoint;
+            }
+        }
+        return null;
     }
-
 }
