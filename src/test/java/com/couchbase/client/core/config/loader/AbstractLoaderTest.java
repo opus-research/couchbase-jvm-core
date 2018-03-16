@@ -38,8 +38,15 @@ import com.couchbase.client.core.util.Resources;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import rx.Observable;
+import rx.Subscriber;
 
 import java.net.InetAddress;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -74,14 +81,36 @@ public class AbstractLoaderTest {
         when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("localhost"));
 
         InstrumentedLoader loader = new InstrumentedLoader(99, localhostConfig, cluster, environment);
-        Observable<Tuple2<LoaderType, BucketConfig>> configObservable =
-            loader.loadConfig(InetAddress.getByName("localhost"), "default", "password");
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
 
         BucketConfig loadedConfig = configObservable.toBlocking().single().value2();
         assertEquals("default", loadedConfig.name());
         assertEquals(1, loadedConfig.nodes().size());
+    }
+
+    @Test
+    public void shouldLoadConfigsFromMoreSeedNodes() throws Exception {
+        ClusterFacade cluster = mock(ClusterFacade.class);
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
+                Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
+        );
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
+                Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
+        );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("10.1.1.1"));
+        seedNodes.add(InetAddress.getByName("10.1.1.2"));
+        seedNodes.add(InetAddress.getByName("10.1.1.3"));
+
+        InstrumentedLoader loader = new InstrumentedLoader(99, localhostConfig, cluster, environment);
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
+
+        List<Tuple2<LoaderType, BucketConfig>> loadedConfigs = configObservable.toList().toBlocking().single();
+        assertEquals(1, loadedConfigs.size());
     }
 
     @Test
@@ -93,10 +122,11 @@ public class AbstractLoaderTest {
         when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
         );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("localhost"));
 
         InstrumentedLoader loader = new InstrumentedLoader(0, localhostConfig, cluster, environment);
-        Observable<Tuple2<LoaderType, BucketConfig>> configObservable =
-            loader.loadConfig(InetAddress.getByName("localhost"), "default", "password");
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
 
         try {
             configObservable.toBlocking().single();
@@ -109,15 +139,59 @@ public class AbstractLoaderTest {
     }
 
     @Test
+    public void shouldIgnoreFailingConfigOnManySeedNodes() throws Exception {
+        ClusterFacade cluster = mock(ClusterFacade.class);
+        when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
+                Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.SUCCESS, host))
+        );
+        when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
+                Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.SUCCESS, host))
+        );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("10.1.1.1"));
+        seedNodes.add(InetAddress.getByName("10.1.1.2"));
+        seedNodes.add(InetAddress.getByName("10.1.1.3"));
+
+        InstrumentedLoader loader = new InstrumentedLoader(2, localhostConfig, cluster, environment);
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
+
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicInteger success = new AtomicInteger();
+        final AtomicInteger failure = new AtomicInteger();
+        configObservable.subscribe(new Subscriber<Tuple2<LoaderType, BucketConfig>>() {
+            @Override
+            public void onCompleted() {
+                latch.countDown();
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                failure.incrementAndGet();
+                latch.countDown();
+            }
+
+            @Override
+            public void onNext(Tuple2<LoaderType, BucketConfig> bucketConfigs) {
+                success.incrementAndGet();
+
+            }
+        });
+        assertTrue(latch.await(2, TimeUnit.SECONDS));
+        assertEquals(1, success.get());
+        assertEquals(0, failure.get());
+    }
+
+    @Test
     public void shouldFailIfNodeCouldNotBeAdded() throws Exception {
         ClusterFacade cluster = mock(ClusterFacade.class);
         when(cluster.send(isA(AddNodeRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddNodeResponse(ResponseStatus.FAILURE, host))
         );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("localhost"));
 
         InstrumentedLoader loader = new InstrumentedLoader(0, localhostConfig, cluster, environment);
-        Observable<Tuple2<LoaderType, BucketConfig>> configObservable =
-            loader.loadConfig(InetAddress.getByName("localhost"), "default", "password");
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
 
         try {
             configObservable.toBlocking().single();
@@ -138,10 +212,11 @@ public class AbstractLoaderTest {
         when(cluster.send(isA(AddServiceRequest.class))).thenReturn(
                 Observable.just((CouchbaseResponse) new AddServiceResponse(ResponseStatus.FAILURE, host))
         );
+        Set<InetAddress> seedNodes = new HashSet<InetAddress>();
+        seedNodes.add(InetAddress.getByName("localhost"));
 
         InstrumentedLoader loader = new InstrumentedLoader(0, localhostConfig, cluster, environment);
-        Observable<Tuple2<LoaderType, BucketConfig>> configObservable =
-            loader.loadConfig(InetAddress.getByName("localhost"), "default", "password");
+        Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
 
         try {
             configObservable.toBlocking().single();

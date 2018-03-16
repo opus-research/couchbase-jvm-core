@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.endpoint;
 
-import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.ResponseStatus;
@@ -31,8 +30,6 @@ import com.couchbase.client.core.message.ResponseStatus;
  *
  * @author Michael Nitschinger
  * @since 1.1.2
- * @see ResponseStatus
- * @see KeyValueStatus
  */
 public class ResponseStatusConverter {
 
@@ -46,80 +43,60 @@ public class ResponseStatusConverter {
     public static final int HTTP_ACCEPTED = 202;
     public static final int HTTP_BAD_REQUEST = 400;
     public static final int HTTP_NOT_FOUND = 404;
-    public static final int HTTP_INTERNAL_ERROR = 500;
+
+    public static final short BINARY_SUCCESS = 0x00;
+    public static final short BINARY_ERR_NOT_FOUND = 0x01;
+    public static final short BINARY_ERR_EXISTS = 0x02;
+    public static final short BINARY_ERR_2BIG = 0x03;
+    public static final short BINARY_ERR_INVAL = 0x04;
+    public static final short BINARY_ERR_NOT_STORED = 0x05;
+    public static final short BINARY_ERR_DELTA_BADVAL = 0x06;
+    public static final short BINARY_ERR_NOT_MY_VBUCKET = 0x07;
+    public static final short BINARY_ERR_UNKNOWN_COMMAND = 0x81;
+    public static final short BINARY_ERR_NO_MEM = 0x82;
+    public static final short BINARY_ERR_NOT_SUPPORTED = 0x83;
+    public static final short BINARY_ERR_INTERNAL = 0x84;
+    public static final short BINARY_ERR_BUSY = 0x85;
+    public static final short BINARY_ERR_TEMP_FAIL = 0x86;
 
     /**
      * Convert the binary protocol status in a typesafe enum that can be acted upon later.
      *
-     * @param code the status to convert.
+     * @param status the status to convert.
      * @return the converted response status.
      */
-    public static ResponseStatus fromBinary(final short code) {
-        KeyValueStatus status = KeyValueStatus.valueOf(code);
+    public static ResponseStatus fromBinary(final short status) {
         switch (status) {
-            case SUCCESS:
+            case BINARY_SUCCESS:
                 return ResponseStatus.SUCCESS;
-            case ERR_EXISTS:
+            case BINARY_ERR_EXISTS:
                 return ResponseStatus.EXISTS;
-            case ERR_NOT_FOUND:
+            case BINARY_ERR_NOT_FOUND:
                 return ResponseStatus.NOT_EXISTS;
-            case ERR_NOT_MY_VBUCKET:
+            case BINARY_ERR_NOT_MY_VBUCKET:
                 return ResponseStatus.RETRY;
-            case ERR_NOT_STORED:
+            case BINARY_ERR_NOT_STORED:
                 return ResponseStatus.NOT_STORED;
-            case ERR_TOO_BIG:
+            case BINARY_ERR_2BIG:
                 return ResponseStatus.TOO_BIG;
-            case ERR_TEMP_FAIL:
+            case BINARY_ERR_TEMP_FAIL:
                 return ResponseStatus.TEMPORARY_FAILURE;
-            case ERR_BUSY:
+            case BINARY_ERR_BUSY:
                 return ResponseStatus.SERVER_BUSY;
-            case ERR_NO_MEM:
+            case BINARY_ERR_NO_MEM:
                 return ResponseStatus.OUT_OF_MEMORY;
-            case ERR_UNKNOWN_COMMAND:
+            case BINARY_ERR_UNKNOWN_COMMAND:
                 return ResponseStatus.COMMAND_UNAVAILABLE;
-            case ERR_NOT_SUPPORTED:
+            case BINARY_ERR_NOT_SUPPORTED:
                 return ResponseStatus.COMMAND_UNAVAILABLE;
-            case ERR_INTERNAL:
+            case BINARY_ERR_INTERNAL:
                 return ResponseStatus.INTERNAL_ERROR;
-            case ERR_INVALID:
+            case BINARY_ERR_INVAL:
                 return ResponseStatus.INVALID_ARGUMENTS;
-            case ERR_DELTA_BADVAL:
+            case BINARY_ERR_DELTA_BADVAL:
                 return ResponseStatus.INVALID_ARGUMENTS;
-            case ERR_RANGE:
-                return ResponseStatus.RANGE_ERROR;
-            case ERR_ROLLBACK:
-                return ResponseStatus.ROLLBACK;
-            //== the following codes are for subdocument API ==
-            case ERR_SUBDOC_PATH_NOT_FOUND:
-                return ResponseStatus.SUBDOC_PATH_NOT_FOUND;
-            case ERR_SUBDOC_PATH_MISMATCH:
-                return ResponseStatus.SUBDOC_PATH_MISMATCH;
-            case ERR_SUBDOC_PATH_INVALID:
-                return ResponseStatus.SUBDOC_PATH_INVALID;
-            case ERR_SUBDOC_PATH_TOO_BIG:
-                return ResponseStatus.SUBDOC_PATH_TOO_BIG;
-            case ERR_SUBDOC_DOC_TOO_DEEP:
-                return ResponseStatus.SUBDOC_DOC_TOO_DEEP;
-            case ERR_SUBDOC_VALUE_CANTINSERT:
-                return ResponseStatus.SUBDOC_VALUE_CANTINSERT;
-            case ERR_SUBDOC_DOC_NOT_JSON:
-                return ResponseStatus.SUBDOC_DOC_NOT_JSON;
-            case ERR_SUBDOC_NUM_RANGE:
-                return ResponseStatus.SUBDOC_NUM_RANGE;
-            case ERR_SUBDOC_DELTA_RANGE:
-                return ResponseStatus.SUBDOC_DELTA_RANGE;
-            case ERR_SUBDOC_PATH_EXISTS:
-                return ResponseStatus.SUBDOC_PATH_EXISTS;
-            case ERR_SUBDOC_VALUE_TOO_DEEP:
-                return ResponseStatus.SUBDOC_VALUE_TOO_DEEP;
-            case ERR_SUBDOC_INVALID_COMBO:
-                return ResponseStatus.SUBDOC_INVALID_COMBO;
-            case ERR_SUBDOC_MULTI_PATH_FAILURE:
-                return ResponseStatus.SUBDOC_MULTI_PATH_FAILURE;
-            //== end of subdocument API codes ==
             default:
-                LOGGER.warn("Unexpected ResponseStatus with Protocol KeyValue: {} (0x{}, {})",
-                        status, Integer.toHexString(status.code()), status.description());
+                LOGGER.warn("Unknown ResponseStatus with Protocol KeyValue: {}", Integer.toHexString(status));
                 return ResponseStatus.FAILURE;
         }
     }
@@ -143,9 +120,6 @@ public class ResponseStatusConverter {
                 break;
             case HTTP_BAD_REQUEST:
                 status = ResponseStatus.INVALID_ARGUMENTS;
-                break;
-            case HTTP_INTERNAL_ERROR:
-                status = ResponseStatus.INTERNAL_ERROR;
                 break;
             default:
                 LOGGER.warn("Unknown ResponseStatus with Protocol HTTP: {}", code);

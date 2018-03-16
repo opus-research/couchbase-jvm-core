@@ -39,13 +39,6 @@ public interface BinaryRequest extends CouchbaseRequest {
     String key();
 
     /**
-     * The raw byte representation of the key.
-     *
-     * @return the bytes of the key.
-     */
-    byte[] keyBytes();
-
-    /**
      * The partition (vbucket) to use for this request.
      *
      * @return the partition to use.

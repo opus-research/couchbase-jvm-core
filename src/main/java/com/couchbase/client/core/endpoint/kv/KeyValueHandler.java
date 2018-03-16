@@ -25,8 +25,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.ServerFeatures;
-import com.couchbase.client.core.endpoint.ServerFeaturesEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -40,20 +38,14 @@ import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.kv.BinaryStoreRequest;
 import com.couchbase.client.core.message.kv.CounterRequest;
 import com.couchbase.client.core.message.kv.CounterResponse;
-import com.couchbase.client.core.message.kv.FailoverObserveSeqnoResponse;
-import com.couchbase.client.core.message.kv.GetAllMutationTokensRequest;
-import com.couchbase.client.core.message.kv.GetAllMutationTokensResponse;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
 import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.message.kv.GetResponse;
 import com.couchbase.client.core.message.kv.InsertRequest;
 import com.couchbase.client.core.message.kv.InsertResponse;
-import com.couchbase.client.core.message.kv.MutationToken;
-import com.couchbase.client.core.message.kv.NoFailoverObserveSeqnoResponse;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveResponse;
-import com.couchbase.client.core.message.kv.ObserveSeqnoRequest;
 import com.couchbase.client.core.message.kv.PrependRequest;
 import com.couchbase.client.core.message.kv.PrependResponse;
 import com.couchbase.client.core.message.kv.RemoveRequest;
@@ -61,24 +53,12 @@ import com.couchbase.client.core.message.kv.RemoveResponse;
 import com.couchbase.client.core.message.kv.ReplaceRequest;
 import com.couchbase.client.core.message.kv.ReplaceResponse;
 import com.couchbase.client.core.message.kv.ReplicaGetRequest;
-import com.couchbase.client.core.message.kv.StatRequest;
-import com.couchbase.client.core.message.kv.StatResponse;
 import com.couchbase.client.core.message.kv.TouchRequest;
 import com.couchbase.client.core.message.kv.TouchResponse;
 import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMultiLookupRequest;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMultiMutationRequest;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMutationRequest;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocRequest;
-import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommand;
-import com.couchbase.client.core.message.kv.subdoc.multi.LookupResult;
-import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
-import com.couchbase.client.core.message.kv.subdoc.multi.MultiMutationResponse;
-import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
@@ -90,10 +70,9 @@ import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.CharsetUtil;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Queue;
 
 /**
@@ -127,35 +106,10 @@ public class KeyValueHandler
     public static final byte OP_COUNTER_DECR = BinaryMemcacheOpcodes.DECREMENT;
     public static final byte OP_UNLOCK = (byte) 0x95;
     public static final byte OP_OBSERVE = (byte) 0x92;
-    public static final byte OP_OBSERVE_SEQ = (byte) 0x91;
     public static final byte OP_TOUCH = BinaryMemcacheOpcodes.TOUCH;
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
     public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
-    public static final byte OP_STAT = BinaryMemcacheOpcodes.STAT;
-    public static final byte OP_GET_ALL_MUTATION_TOKENS = (byte) 0x48;
-
-    public static final byte OP_SUB_GET = (byte) 0xc5;
-    public static final byte OP_SUB_EXIST = (byte) 0xc6;
-    public static final byte OP_SUB_DICT_ADD = (byte) 0xc7;
-    public static final byte OP_SUB_DICT_UPSERT = (byte) 0xc8;
-    public static final byte OP_SUB_DELETE = (byte) 0xc9;
-    public static final byte OP_SUB_REPLACE = (byte) 0xca;
-    public static final byte OP_SUB_ARRAY_PUSH_LAST = (byte) 0xcb;
-    public static final byte OP_SUB_ARRAY_PUSH_FIRST = (byte) 0xcc;
-    public static final byte OP_SUB_ARRAY_INSERT = (byte) 0xcd;
-    public static final byte OP_SUB_ARRAY_ADD_UNIQUE = (byte) 0xce;
-    public static final byte OP_SUB_COUNTER = (byte) 0xcf;
-    public static final byte OP_SUB_MULTI_LOOKUP = (byte) 0xd0;
-    public static final byte OP_SUB_MULTI_MUTATION = (byte) 0xd1;
-
-    /**
-     * The bitmask for sub-document extras "command" section (third byte of the extras) that activates the
-     * creation of missing intermediate nodes in the JSON path.
-     */
-    public static final byte SUBDOC_BITMASK_MKDIR_P = 1;
-
-    boolean seqOnMutation = false;
 
 
     /**
@@ -200,8 +154,6 @@ public class KeyValueHandler
             request = handleUnlockRequest((UnlockRequest) msg);
         } else if (msg instanceof ObserveRequest) {
             request = handleObserveRequest(ctx, (ObserveRequest) msg);
-        } else if (msg instanceof ObserveSeqnoRequest) {
-            request = handleObserveSeqnoRequest(ctx, (ObserveSeqnoRequest) msg);
         } else if (msg instanceof GetBucketConfigRequest) {
             request = handleGetBucketConfigRequest();
         } else if (msg instanceof AppendRequest) {
@@ -210,16 +162,6 @@ public class KeyValueHandler
             request = handlePrependRequest((PrependRequest) msg);
         } else if (msg instanceof KeepAliveRequest) {
             request = handleKeepAliveRequest((KeepAliveRequest) msg);
-        } else if (msg instanceof StatRequest) {
-            request = handleStatRequest((StatRequest) msg);
-        } else if (msg instanceof GetAllMutationTokensRequest) {
-            request = handleGetAllMutationTokensRequest(ctx, (GetAllMutationTokensRequest) msg);
-        } else if (msg instanceof BinarySubdocRequest) {
-            request = handleSubdocumentRequest(ctx, (BinarySubdocRequest) msg);
-        } else if (msg instanceof BinarySubdocMultiLookupRequest) {
-            request = handleSubdocumentMultiLookupRequest(ctx, (BinarySubdocMultiLookupRequest) msg);
-        } else if (msg instanceof BinarySubdocMultiMutationRequest) {
-            request = handleSubdocumentMultiMutationRequest(ctx, (BinarySubdocMultiMutationRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown incoming BinaryRequest type "
                 + msg.getClass());
@@ -234,9 +176,7 @@ public class KeyValueHandler
         // Retain just the content, since a response could be "Not my Vbucket".
         // The response handler checks the status and then releases if needed.
         // Observe has content, but not external, so it should not be retained.
-        if (!(msg instanceof ObserveRequest)
-            && !(msg instanceof ObserveSeqnoRequest)
-            && (request instanceof FullBinaryMemcacheRequest)) {
+        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
             ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
@@ -269,7 +209,7 @@ public class KeyValueHandler
         }
 
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         byte extrasLength = (byte) extras.readableBytes();
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
         request
@@ -299,7 +239,7 @@ public class KeyValueHandler
      */
     private static BinaryMemcacheRequest handleReplicaGetRequest(final ReplicaGetRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
 
         request.setOpcode(OP_GET_REPLICA)
@@ -327,7 +267,7 @@ public class KeyValueHandler
         extras.writeInt(msg.expiration());
 
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         byte extrasLength = (byte) extras.readableBytes();
         FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
 
@@ -356,7 +296,7 @@ public class KeyValueHandler
      */
     private static BinaryMemcacheRequest handleRemoveRequest(final RemoveRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
 
         request.setOpcode(OP_REMOVE);
@@ -382,7 +322,7 @@ public class KeyValueHandler
         extras.writeInt(msg.expiry());
 
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         byte extrasLength = (byte) extras.readableBytes();
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key, extras);
         request.setOpcode(msg.delta() < 0 ? OP_COUNTER_DECR : OP_COUNTER_INCR);
@@ -399,7 +339,7 @@ public class KeyValueHandler
      */
     private static BinaryMemcacheRequest handleUnlockRequest(final UnlockRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
         request.setOpcode(OP_UNLOCK);
         request.setKeyLength(keyLength);
@@ -418,7 +358,7 @@ public class KeyValueHandler
         extras.writeInt(msg.expiry());
 
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         byte extrasLength = (byte) extras.readableBytes();
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
         request.setExtras(extras);
@@ -437,7 +377,7 @@ public class KeyValueHandler
     private static BinaryMemcacheRequest handleObserveRequest(final ChannelHandlerContext ctx,
         final ObserveRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         ByteBuf content = ctx.alloc().buffer();
         content.writeShort(msg.partition());
         content.writeShort(keyLength);
@@ -449,20 +389,9 @@ public class KeyValueHandler
         return request;
     }
 
-    private static BinaryMemcacheRequest handleObserveSeqnoRequest(final ChannelHandlerContext ctx,
-        final ObserveSeqnoRequest msg) {
-        ByteBuf content = ctx.alloc().buffer();
-        content.writeLong(msg.vbucketUUID());
-
-        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest("", Unpooled.EMPTY_BUFFER, content);
-        request.setOpcode(OP_OBSERVE_SEQ);
-        request.setTotalBodyLength(content.readableBytes());
-        return request;
-    }
-
     private static BinaryMemcacheRequest handleAppendRequest(final AppendRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_APPEND);
@@ -474,7 +403,7 @@ public class KeyValueHandler
 
     private static BinaryMemcacheRequest handlePrependRequest(final PrependRequest msg) {
         String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
         BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_PREPEND);
@@ -501,117 +430,6 @@ public class KeyValueHandler
         return request;
     }
 
-    private static BinaryMemcacheRequest handleStatRequest(StatRequest msg) {
-        String key = msg.key();
-        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
-        short keyLength = (short) msg.keyBytes().length;
-        request
-                .setOpcode(OP_STAT)
-                .setKeyLength(keyLength)
-                .setTotalBodyLength(keyLength);
-        return request;
-    }
-
-    private static BinaryMemcacheRequest handleGetAllMutationTokensRequest(ChannelHandlerContext ctx, GetAllMutationTokensRequest msg) {
-        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest("");
-
-        ByteBuf extras;
-        switch (msg.partitionState()) {
-            case ANY:
-                extras = Unpooled.EMPTY_BUFFER;
-                break;
-            case ACTIVE:
-            case REPLICA:
-            case PENDING:
-            case DEAD:
-            default:
-                extras = ctx.alloc().buffer().writeInt(msg.partitionState().value());
-        }
-        byte extrasLength = (byte) extras.readableBytes();
-
-        request
-                .setOpcode(OP_GET_ALL_MUTATION_TOKENS)
-                .setExtras(extras)
-                .setExtrasLength(extrasLength)
-                .setTotalBodyLength(extrasLength);
-        return request;
-    }
-
-    private static BinaryMemcacheRequest handleSubdocumentRequest(ChannelHandlerContext ctx, BinarySubdocRequest msg) {
-        String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
-
-        ByteBuf extras = ctx.alloc().buffer(3, 7); //extras can be 7 bytes if there is an expiry
-        byte extrasLength = 3; //by default 2 bytes for pathLength + 1 byte for "command" flags
-        extras.writeShort(msg.pathLength());
-
-        long cas = 0L;
-
-        if (msg instanceof BinarySubdocMutationRequest) {
-            BinarySubdocMutationRequest mut = (BinarySubdocMutationRequest) msg;
-            //for now only possible command flag is MKDIR_P (and it makes sense in mutations only)
-            if (mut.createIntermediaryPath()) {
-                extras.writeByte(0 | SUBDOC_BITMASK_MKDIR_P);
-            } else {
-                extras.writeByte(0);
-            }
-            if (mut.expiration() != 0L) {
-                extrasLength = 7;
-                extras.writeInt(mut.expiration());
-            }
-
-            cas = mut.cas();
-        } else {
-            extras.writeByte(0);
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
-        request.setOpcode(msg.opcode())
-                .setKeyLength(keyLength)
-                .setExtrasLength(extrasLength)
-                .setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength)
-                .setCAS(cas);
-
-        return request;
-    }
-
-    private static BinaryMemcacheRequest handleSubdocumentMultiLookupRequest(ChannelHandlerContext ctx,
-                                                                             BinarySubdocMultiLookupRequest msg) {
-        String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
-        request.setOpcode(OP_SUB_MULTI_LOOKUP)
-                .setKeyLength(keyLength)
-                .setExtrasLength((byte) 0)
-                .setTotalBodyLength(keyLength + msg.content().readableBytes());
-
-        return request;
-    }
-
-    private static BinaryMemcacheRequest handleSubdocumentMultiMutationRequest(ChannelHandlerContext ctx,
-                                                                             BinarySubdocMultiMutationRequest msg) {
-        String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
-
-        byte extrasLength = 0;
-        ByteBuf extras = Unpooled.EMPTY_BUFFER;
-        if (msg.expiration() != 0L) {
-            extrasLength = 4;
-            extras = ctx.alloc().buffer(4, 4);
-            extras.writeInt(msg.expiration());
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
-        request.setOpcode(OP_SUB_MULTI_MUTATION)
-                .setCAS(msg.cas())
-                .setKeyLength(keyLength)
-                .setExtrasLength(extrasLength)
-                .setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength);
-
-        return request;
-    }
-
     @Override
     protected CouchbaseResponse decodeResponse(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg)
         throws Exception {
@@ -622,268 +440,57 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
+
+        // Release request content from external resources if not retried again.
         if (!status.equals(ResponseStatus.RETRY)) {
-           maybeFreeContent(request);
-        }
-
-        msg.content().retain();
-        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
-
-        if (response == null) {
-            response = handleSubdocumentResponseMessages(request, msg, ctx, status, seqOnMutation);
-        }
-
-        if (response == null) {
-            response = handleSubdocumentMultiLookupResponseMessages(request, msg, ctx, status);
-        }
-
-        if (response == null) {
-            response = handleSubdocumentMultiMutationResponseMessages(request, msg, ctx, status, seqOnMutation);
-        }
-
-        if (response == null) {
-            response = handleOtherResponseMessages(request, msg, status, seqOnMutation, remoteHostname());
-        }
-
-        if (response == null) {
-            throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
-                    + msg.getClass());
-        }
-
-        // STAT request produces multiple responses followed by response with NULL key,
-        // therefore it should be finished manually
-        if (request instanceof StatRequest) {
-            ((StatRequest)request).add((StatResponse) response);
-            if (((StatResponse) response).key() == null) {
-                finishedDecoding();
+            ByteBuf content = null;
+            if (request instanceof BinaryStoreRequest) {
+                content = ((BinaryStoreRequest) request).content();
+            } else if (request instanceof AppendRequest) {
+                content = ((AppendRequest) request).content();
+            } else if (request instanceof PrependRequest) {
+                content = ((PrependRequest) request).content();
             }
-            // Do not use default publish mechanism for STAT responses, instead accumulate
-            // them into List and publish all at once in {@link StatRequest#add()}
-            return null;
-        } else {
-            finishedDecoding();
+            if (content != null && content.refCnt() > 0) {
+                content.release();
+            }
         }
-        return response;
-    }
 
-    /**
-     * Helper method to decode all common response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param ctx the handler context.
-     * @param status the response status code.
-     * @return the decoded response or null if none did match.
-     */
-    private static CouchbaseResponse handleCommonResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
-        CouchbaseResponse response = null;
-        ByteBuf content = msg.content();
+        CouchbaseResponse response;
+        ByteBuf content = msg.content().retain();
         long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
         String bucket = request.bucket();
-
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
-            int flags = extractFlagsFromGetResponse(ctx, msg.getExtras(), msg.getExtrasLength());
-            response = new GetResponse(status, statusCode, cas, flags, bucket, content, request);
-        } else if (request instanceof GetBucketConfigRequest) {
-            response = new GetBucketConfigResponse(status, statusCode, bucket, content,
-                    ((GetBucketConfigRequest) request).hostname());
-        } else if (request instanceof InsertRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new InsertResponse(status, statusCode, cas, bucket, content, descr, request);
-        } else if (request instanceof UpsertRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new UpsertResponse(status, statusCode, cas, bucket, content, descr, request);
-        } else if (request instanceof ReplaceRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new ReplaceResponse(status, statusCode, cas, bucket, content, descr, request);
-        } else if (request instanceof RemoveRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new RemoveResponse(status, statusCode, cas, bucket, content, descr, request);
-        }
-
-        return response;
-    }
-
-    /**
-     * Helper method to decode all simple subdocument response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param ctx the handler context.
-     * @param status the response status code.
-     * @return the decoded response or null if none did match.
-     */
-    private static CouchbaseResponse handleSubdocumentResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
-        if (!(request instanceof BinarySubdocRequest))
-            return null;
-        BinarySubdocRequest subdocRequest = (BinarySubdocRequest) request;
-        long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        MutationToken mutationToken = null;
-        if (msg.getExtrasLength() > 0) {
-            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-        }
-
-        ByteBuf fragment;
-        if (msg.content() != null && msg.content().readableBytes() > 0) {
-            fragment = msg.content();
-        } else if (msg.content() != null) {
-            msg.content().release();
-            fragment = Unpooled.EMPTY_BUFFER;
-        } else {
-            fragment = Unpooled.EMPTY_BUFFER;
-        }
-
-        return new SimpleSubdocResponse(status, statusCode, bucket, fragment, subdocRequest, cas, mutationToken);
-    }
-
-    /**
-     * Helper method to decode all multi lookup response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param ctx the handler context.
-     * @param status the response status code.
-     * @return the decoded response or null if it wasn't a subdocument multi lookup.
-     */
-    private static CouchbaseResponse handleSubdocumentMultiLookupResponseMessages(BinaryRequest request,
-            FullBinaryMemcacheResponse msg, ChannelHandlerContext ctx, ResponseStatus status) {
-        if (!(request instanceof BinarySubdocMultiLookupRequest))
-            return null;
-        BinarySubdocMultiLookupRequest subdocRequest = (BinarySubdocMultiLookupRequest) request;
-
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        ByteBuf body = msg.content();
-        List<LookupResult> responses;
-        if (status.isSuccess() || ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
-            long bodyLength = body.readableBytes();
-            List<LookupCommand> commands = subdocRequest.commands();
-            responses = new ArrayList<LookupResult>(commands.size());
-            for (LookupCommand cmd : commands) {
-                if (msg.content().readableBytes() < 6) {
-                    body.release();
-                    throw new IllegalStateException("Expected " + commands.size() + " lookup responses, only got " +
-                            responses.size() + ", total of " + bodyLength + " bytes");
-                }
-                short cmdStatus = body.readShort();
-                int valueLength = body.readInt();
-                ByteBuf value = ctx.alloc().buffer(valueLength, valueLength);
-                value.writeBytes(body, valueLength);
-
-                responses.add(new LookupResult(cmdStatus, ResponseStatusConverter.fromBinary(cmdStatus),
-                        cmd.path(), cmd.lookup(), value));
+            int flags = 0;
+            if (msg.getExtrasLength() > 0) {
+                final ByteBuf extrasReleased = msg.getExtras();
+                final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
+                extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
+                flags = extras.getInt(0);
+                extras.release();
             }
-        } else {
-            responses = Collections.emptyList();
-        }
-        body.release();
-
-        return new MultiLookupResponse(status, statusCode, bucket, responses, subdocRequest);
-    }
-
-    /**
-     * Helper method to decode all multi mutation response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param ctx the handler context.
-     * @param status the response status code.
-     * @return the decoded response or null if it wasn't a subdocument multi lookup.
-     */
-    private static CouchbaseResponse handleSubdocumentMultiMutationResponseMessages(BinaryRequest request,
-            FullBinaryMemcacheResponse msg, ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
-        if (!(request instanceof BinarySubdocMultiMutationRequest))
-            return null;
-        BinarySubdocMultiMutationRequest subdocRequest = (BinarySubdocMultiMutationRequest) request;
-
-        long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        MutationToken mutationToken = null;
-        if (msg.getExtrasLength() > 0) {
-            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-        }
-
-        ByteBuf body = msg.content();
-        MultiMutationResponse response;
-        if (status.isSuccess()) {
-            response = new MultiMutationResponse(bucket, subdocRequest, cas, mutationToken);
-        } else if (ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
-            short firstErrorCode = body.readShort();
-            byte firstErrorIndex = body.readByte();
-            response = new MultiMutationResponse(status, statusCode, bucket, firstErrorIndex, firstErrorCode,
-                    subdocRequest, cas, mutationToken);
-        } else {
-            response = new MultiMutationResponse(status, statusCode, bucket, subdocRequest, cas, mutationToken);
-        }
-        body.release();
-        return response;
-    }
-
-    private static MutationToken extractToken(String bucket, boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
-        if (success && seqOnMutation) {
-            return new MutationToken(vbid, extras.readLong(), extras.readLong(), bucket);
-        }
-        return null;
-    }
-
-    /**
-     * Helper method to decode all other response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param status the response status code.
-     * @return the decoded response or null if none did match.
-     */
-    private static CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-        ResponseStatus status, boolean seqOnMutation, String remoteHostname) {
-        CouchbaseResponse response = null;
-        ByteBuf content = msg.content();
-        long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        if (request instanceof UnlockRequest) {
-            response = new UnlockResponse(status, statusCode, bucket, content, request);
-        } else if (request instanceof TouchRequest) {
-            response = new TouchResponse(status, statusCode, bucket, content, request);
-        } else if (request instanceof AppendRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new AppendResponse(status, statusCode, cas, bucket, content, descr, request);
-        } else if (request instanceof PrependRequest) {
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new PrependResponse(status, statusCode, cas, bucket, content, descr, request);
-        } else if (request instanceof KeepAliveRequest) {
-            releaseContent(content);
-            response = new KeepAliveResponse(status, statusCode, request);
+            response = new GetResponse(status, cas, flags, bucket, content, request);
+        } else if (request instanceof GetBucketConfigRequest) {
+            response = new GetBucketConfigResponse(status, bucket, content,
+                ((GetBucketConfigRequest) request).hostname());
+        } else if (request instanceof InsertRequest) {
+            response = new InsertResponse(status, cas, bucket, content, request);
+        } else if (request instanceof UpsertRequest) {
+            response = new UpsertResponse(status, cas, bucket, content, request);
+        } else if (request instanceof ReplaceRequest) {
+            response = new ReplaceResponse(status, cas, bucket, content, request);
+        } else if (request instanceof RemoveRequest) {
+            response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
             long value = status.isSuccess() ? content.readLong() : 0;
-            releaseContent(content);
-
-            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-            response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
-        } else if (request instanceof StatRequest) {
-            String key = msg.getKey();
-            String value = content.toString(CHARSET);
-            releaseContent(content);
-
-            response = new StatResponse(status, statusCode, remoteHostname, key, value, bucket, request);
-        } else if (request instanceof GetAllMutationTokensRequest) {
-            // 2 bytes for partition ID, and 8 bytes for sequence number
-            MutationToken[] mutationTokens = new MutationToken[content.readableBytes() / 10];
-            for (int i = 0; i < mutationTokens.length; i++) {
-                mutationTokens[i] = new MutationToken((long)content.readShort(), 0, content.readLong(), request.bucket());
+            if (content != null && content.refCnt() > 0) {
+                content.release();
             }
-            releaseContent(content);
-            response = new GetAllMutationTokensResponse(mutationTokens, status, statusCode, bucket, request);
+            response = new CounterResponse(status, bucket, value, cas, request);
+        } else if (request instanceof UnlockRequest) {
+            response = new UnlockResponse(status, bucket, content, request);
+        } else if (request instanceof TouchRequest) {
+            response = new TouchResponse(status, bucket, content, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
             long observedCas = 0;
@@ -892,108 +499,27 @@ public class KeyValueHandler
                 observed = content.getByte(keyLength + 4);
                 observedCas = content.getLong(keyLength + 5);
             }
-            releaseContent(content);
-            response = new ObserveResponse(status, statusCode, observed, ((ObserveRequest) request).master(),
-                    observedCas, bucket, request);
-        } else if (request instanceof ObserveSeqnoRequest) {
-            if (status.isSuccess()) {
-                byte format = content.readByte();
-                switch(format) {
-                    case 0:
-                        response = new NoFailoverObserveSeqnoResponse(
-                            ((ObserveSeqnoRequest) request).master(),
-                            content.readShort(),
-                            content.readLong(),
-                            content.readLong(),
-                            content.readLong(),
-                            status,
-                            statusCode,
-                            bucket,
-                            request
-                        );
-                        break;
-                    case 1:
-                        response = new FailoverObserveSeqnoResponse(
-                            ((ObserveSeqnoRequest) request).master(),
-                            content.readShort(),
-                            content.readLong(),
-                            content.readLong(),
-                            content.readLong(),
-                            content.readLong(),
-                            content.readLong(),
-                            status,
-                            statusCode,
-                            bucket,
-                            request
-                        );
-                        break;
-                    default:
-                        throw new IllegalStateException("Unknown format for observe-seq: " + format);
-                }
-            } else {
-                response = new NoFailoverObserveSeqnoResponse(((ObserveSeqnoRequest) request).master(), (short) 0, 0,
-                    0, 0, status, statusCode, bucket, request);
+            if (content != null && content.refCnt() > 0) {
+                content.release();
             }
-            releaseContent(content);
-        }
-
-        return response;
-    }
-
-    /**
-     * Helper method to release content from external resources.
-     *
-     * This method should be called when it is clear that the request is not tried again.
-     *
-     * @param request the request where to free the content.
-     */
-    private static void maybeFreeContent(BinaryRequest request) {
-        ByteBuf content = null;
-        if (request instanceof BinaryStoreRequest) {
-            content = ((BinaryStoreRequest) request).content();
+            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), observedCas,
+                bucket, request);
         } else if (request instanceof AppendRequest) {
-            content = ((AppendRequest) request).content();
+            response = new AppendResponse(status, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
-            content = ((PrependRequest) request).content();
-        } else if (request instanceof BinarySubdocRequest) {
-            content = ((BinarySubdocRequest) request).content();
-        } else if (request instanceof BinarySubdocMultiLookupRequest) {
-            content = ((BinarySubdocMultiLookupRequest) request).content();
-        } else if (request instanceof BinarySubdocMultiMutationRequest) {
-            content = ((BinarySubdocMultiMutationRequest) request).content();
+            response = new PrependResponse(status, cas, bucket, content, request);
+        } else if (request instanceof KeepAliveRequest) {
+            if (content != null && content.refCnt() > 0) {
+                content.release();
+            }
+            response = new KeepAliveResponse(status, request);
+        } else {
+            throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
+                + msg.getClass());
         }
-        releaseContent(content);
-    }
 
-    /**
-     * Helper method to safely release the content.
-     *
-     * @param content the content to safely release if needed.
-     */
-    private static void releaseContent(ByteBuf content) {
-        if (content != null && content.refCnt() > 0) {
-            content.release();
-        }
-    }
-
-    /**
-     * Helper method to extract the flags from the extras buffer.
-     *
-     * @param ctx the handler context.
-     * @param extrasReleased the extras of the msg.
-     * @param extrasLength the extras length.
-     * @return the extracted flags.
-     */
-    private static int extractFlagsFromGetResponse(ChannelHandlerContext ctx, ByteBuf extrasReleased,
-        int extrasLength) {
-        int flags = 0;
-        if (extrasLength > 0) {
-            final ByteBuf extras = ctx.alloc().buffer(extrasLength);
-            extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-            flags = extras.getInt(0);
-            extras.release();
-        }
-        return flags;
+        finishedDecoding();
+        return response;
     }
 
     /**
@@ -1016,11 +542,10 @@ public class KeyValueHandler
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof ServerFeaturesEvent) {
-            seqOnMutation = env().mutationTokensEnabled() &&
-                ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
+        if (evt instanceof IdleStateEvent) {
+            LOGGER.debug(logIdent(ctx, endpoint()) + "Identified Idle State, signalling config reload.");
+            endpoint().signalConfigReload();
         }
-
         super.userEventTriggered(ctx, evt);
     }
 
@@ -1039,13 +564,8 @@ public class KeyValueHandler
 
     protected static class KeepAliveResponse extends AbstractKeyValueResponse {
 
-        public KeepAliveResponse(ResponseStatus status, short serverStatusCode, CouchbaseRequest request) {
-            super(status, serverStatusCode, null, null, request);
+        public KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
+            super(status, null, null, request);
         }
-    }
-
-    @Override
-    protected ServiceType serviceType() {
-        return ServiceType.BINARY;
     }
 }

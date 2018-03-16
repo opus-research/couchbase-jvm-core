@@ -42,6 +42,7 @@ import rx.subjects.AsyncSubject;
 import rx.subjects.BehaviorSubject;
 
 import java.net.InetAddress;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -93,7 +94,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
@@ -107,7 +108,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTING));
         CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
@@ -121,7 +122,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTING));
         CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
@@ -134,7 +135,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
@@ -148,7 +149,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTING));
         when(service2Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
 
@@ -169,7 +170,7 @@ public class CouchbaseNodeTest {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
         Service service1Mock = mock(Service.class);
         Service service2Mock = mock(Service.class);
-        when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
+        when(registryMock.services()).thenReturn(Arrays.asList(service1Mock, service2Mock));
         when(service1Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);

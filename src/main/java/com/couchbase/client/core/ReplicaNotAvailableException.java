@@ -27,7 +27,7 @@ package com.couchbase.client.core;
  *
  *
  * @author Michael Nitschinger
- * @since 1.2.0
+ * @since 1.1.4
  */
 public class ReplicaNotAvailableException extends CouchbaseException {
 
