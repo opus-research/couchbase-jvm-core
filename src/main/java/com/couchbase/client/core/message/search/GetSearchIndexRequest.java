@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,15 +19,29 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.node.Node;
+package com.couchbase.client.core.message.search;
 
-import java.util.List;
+import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import com.couchbase.client.core.message.BootstrapMessage;
 
-public interface Locator {
+/**
+ * Retrieves full text index definition.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.4
+ */
+public class GetSearchIndexRequest extends AbstractCouchbaseRequest implements SearchRequest, BootstrapMessage {
 
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+    private final String indexName;
+
+    public GetSearchIndexRequest(String indexName, String username, String password) {
+        super(username, password);
+        this.indexName = indexName;
+    }
+
+    @Override
+    public String path() {
+        return "/api/index/" + indexName;
+    }
 }

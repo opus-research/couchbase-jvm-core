@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,15 +19,36 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.node.Node;
+package com.couchbase.client.core.message.search;
 
-import java.util.List;
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.ResponseStatus;
 
-public interface Locator {
+/**
+ * Carries full text index definition as a payload.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.4
+ */
+public class GetSearchIndexResponse extends AbstractCouchbaseResponse {
 
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+    private final String payload;
+
+    public GetSearchIndexResponse(String payload, ResponseStatus status) {
+        super(status, null);
+        this.payload = payload;
+    }
+
+    public String payload() {
+        return payload;
+    }
+
+    @Override
+    public String toString() {
+        return "InsertSearchIndexResponse{"
+                + "status=" + status()
+                + ", payload='" + payload + '\''
+                + '}';
+    }
 }

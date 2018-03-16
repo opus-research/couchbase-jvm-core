@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Couchbase, Inc.
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,13 +21,20 @@
  */
 package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.service.ServiceType;
 
-import java.util.List;
+/**
+ * Round robin node locator for CBFT.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.4
+ */
+public class SearchLocator extends QueryLocator {
 
-public interface Locator {
+    @Override
+    protected boolean checkNode(Node node) {
+        return node.serviceEnabled(ServiceType.SEARCH);
+    }
 
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
 }

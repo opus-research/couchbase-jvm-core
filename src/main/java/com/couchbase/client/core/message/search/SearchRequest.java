@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,15 +19,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.config.ClusterConfig;
+package com.couchbase.client.core.message.search;
+
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.node.Node;
 
-import java.util.List;
-
-public interface Locator {
-
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+/**
+ * Common marker interface for all {@link SearchRequest}s.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.4
+ */
+public interface SearchRequest extends CouchbaseRequest {
+    String path();
 }

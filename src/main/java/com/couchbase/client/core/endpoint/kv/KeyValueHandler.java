@@ -76,7 +76,6 @@ import com.couchbase.client.core.message.kv.subdoc.BinarySubdocRequest;
 import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommand;
 import com.couchbase.client.core.message.kv.subdoc.multi.LookupResult;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
-import com.couchbase.client.core.message.kv.subdoc.multi.MultiMutationResponse;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
@@ -627,7 +626,7 @@ public class KeyValueHandler
         }
 
         msg.content().retain();
-        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
+        CouchbaseResponse response = handleCommonResponseMessages(request, msg, status, seqOnMutation);
 
         if (response == null) {
             response = handleSubdocumentResponseMessages(request, msg, ctx, status, seqOnMutation);
@@ -671,12 +670,11 @@ public class KeyValueHandler
      *
      * @param request the current request.
      * @param msg the current response message.
-     * @param ctx the handler context.
      * @param status the response status code.
      * @return the decoded response or null if none did match.
      */
     private static CouchbaseResponse handleCommonResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
+        ResponseStatus status, boolean seqOnMutation) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
         long cas = msg.getCAS();
@@ -684,22 +682,22 @@ public class KeyValueHandler
         String bucket = request.bucket();
 
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
-            int flags = extractFlagsFromGetResponse(ctx, msg.getExtras(), msg.getExtrasLength());
+            int flags = msg.getExtrasLength() > 0 ? msg.getExtras().getInt(0) : 0;
             response = new GetResponse(status, statusCode, cas, flags, bucket, content, request);
         } else if (request instanceof GetBucketConfigRequest) {
             response = new GetBucketConfigResponse(status, statusCode, bucket, content,
                     ((GetBucketConfigRequest) request).hostname());
         } else if (request instanceof InsertRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new InsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof UpsertRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new UpsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof ReplaceRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new ReplaceResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof RemoveRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new RemoveResponse(status, statusCode, cas, bucket, content, descr, request);
         }
 
@@ -726,7 +724,7 @@ public class KeyValueHandler
 
         MutationToken mutationToken = null;
         if (msg.getExtrasLength() > 0) {
-            mutationToken = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
         }
 
         ByteBuf fragment;
@@ -801,36 +799,40 @@ public class KeyValueHandler
             FullBinaryMemcacheResponse msg, ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
         if (!(request instanceof BinarySubdocMultiMutationRequest))
             return null;
-        BinarySubdocMultiMutationRequest subdocRequest = (BinarySubdocMultiMutationRequest) request;
 
-        long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        MutationToken mutationToken = null;
-        if (msg.getExtrasLength() > 0) {
-            mutationToken = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-        }
-
-        ByteBuf body = msg.content();
-        MultiMutationResponse response;
-        if (status.isSuccess()) {
-            response = new MultiMutationResponse(bucket, subdocRequest, cas, mutationToken);
-        } else if (ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
-            short firstErrorCode = body.readShort();
-            byte firstErrorIndex = body.readByte();
-            response = new MultiMutationResponse(status, statusCode, bucket, firstErrorIndex, firstErrorCode,
-                    subdocRequest, cas, mutationToken);
-        } else {
-            response = new MultiMutationResponse(status, statusCode, bucket, subdocRequest, cas, mutationToken);
-        }
-        body.release();
-        return response;
+        //TODO remove and uncomment/modify original code once mutateIn protocol has been stabilized
+        msg.release();
+        return null;
+//        BinarySubdocMultiMutationRequest subdocRequest = (BinarySubdocMultiMutationRequest) request;
+//
+//        long cas = msg.getCAS();
+//        short statusCode = msg.getStatus();
+//        String bucket = request.bucket();
+//
+//        MutationToken mutationToken = null;
+//        if (msg.getExtrasLength() > 0) {
+//            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+//        }
+//
+//        ByteBuf body = msg.content();
+//        MultiMutationResponse response;
+//        if (status.isSuccess()) {
+//            response = new MultiMutationResponse(bucket, subdocRequest, cas, mutationToken);
+//        } else if (ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
+//            short firstErrorCode = body.readShort();
+//            byte firstErrorIndex = body.readByte();
+//            response = new MultiMutationResponse(status, statusCode, bucket, firstErrorIndex, firstErrorCode,
+//                    subdocRequest, cas, mutationToken);
+//        } else {
+//            response = new MultiMutationResponse(status, statusCode, bucket, subdocRequest, cas, mutationToken);
+//        }
+//        body.release();
+//        return response;
     }
 
-    private static MutationToken extractToken(boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
+    private static MutationToken extractToken(String bucket, boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
         if (success && seqOnMutation) {
-            return new MutationToken(vbid, extras.readLong(), extras.readLong());
+            return new MutationToken(vbid, extras.readLong(), extras.readLong(), bucket);
         }
         return null;
     }
@@ -856,10 +858,10 @@ public class KeyValueHandler
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, statusCode, bucket, content, request);
         } else if (request instanceof AppendRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new AppendResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof PrependRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new PrependResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof KeepAliveRequest) {
             releaseContent(content);
@@ -868,7 +870,7 @@ public class KeyValueHandler
             long value = status.isSuccess() ? content.readLong() : 0;
             releaseContent(content);
 
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
         } else if (request instanceof StatRequest) {
             String key = msg.getKey();
@@ -880,7 +882,7 @@ public class KeyValueHandler
             // 2 bytes for partition ID, and 8 bytes for sequence number
             MutationToken[] mutationTokens = new MutationToken[content.readableBytes() / 10];
             for (int i = 0; i < mutationTokens.length; i++) {
-                mutationTokens[i] = new MutationToken((long)content.readShort(), 0, content.readLong());
+                mutationTokens[i] = new MutationToken((long)content.readShort(), 0, content.readLong(), request.bucket());
             }
             releaseContent(content);
             response = new GetAllMutationTokensResponse(mutationTokens, status, statusCode, bucket, request);
@@ -974,26 +976,6 @@ public class KeyValueHandler
         if (content != null && content.refCnt() > 0) {
             content.release();
         }
-    }
-
-    /**
-     * Helper method to extract the flags from the extras buffer.
-     *
-     * @param ctx the handler context.
-     * @param extrasReleased the extras of the msg.
-     * @param extrasLength the extras length.
-     * @return the extracted flags.
-     */
-    private static int extractFlagsFromGetResponse(ChannelHandlerContext ctx, ByteBuf extrasReleased,
-        int extrasLength) {
-        int flags = 0;
-        if (extrasLength > 0) {
-            final ByteBuf extras = ctx.alloc().buffer(extrasLength);
-            extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-            flags = extras.getInt(0);
-            extras.release();
-        }
-        return flags;
     }
 
     /**

@@ -29,17 +29,17 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.service.ServiceType;
 import org.junit.Test;
 import rx.observers.TestSubscriber;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
+
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
@@ -68,11 +68,13 @@ public class ViewLocatorTest {
         CouchbaseBucketConfig bucketConfigMock = mock(CouchbaseBucketConfig.class);
         when(bucketConfigMock.hasPrimaryPartitionsOnNode(any(InetAddress.class))).thenReturn(true);
         when(configMock.bucketConfig("default")).thenReturn(bucketConfigMock);
-        Set<Node> nodes = new HashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         Node node1Mock = mock(Node.class);
         when(node1Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.101"));
+        when(node1Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         Node node2Mock = mock(Node.class);
         when(node2Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
+        when(node2Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock));
 
         Node[] located = locator.locate(request, nodes, configMock);
@@ -103,24 +105,77 @@ public class ViewLocatorTest {
         when(bucketConfigMock.hasPrimaryPartitionsOnNode(InetAddress.getByName("192.168.56.102"))).thenReturn(true);
 
         when(configMock.bucketConfig("default")).thenReturn(bucketConfigMock);
-        Set<Node> nodes = new LinkedHashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         Node node1Mock = mock(Node.class);
         when(node1Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.101"));
+        when(node1Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         Node node2Mock = mock(Node.class);
         when(node2Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
+        when(node2Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock));
 
         Node[] located = locator.locate(request, nodes, configMock);
-        assertEquals(0, located.length);
+        assertEquals(1, located.length);
+        InetAddress foundFirst = located[0].hostname();
 
         located = locator.locate(request, nodes, configMock);
         assertEquals(1, located.length);
         InetAddress foundSecond = located[0].hostname();
 
         located = locator.locate(request, nodes, configMock);
-        assertEquals(0, located.length);
+        assertEquals(1, located.length);
+        InetAddress foundThird = located[0].hostname();
 
+        assertEquals(foundFirst, InetAddress.getByName("192.168.56.102"));
         assertEquals(foundSecond, InetAddress.getByName("192.168.56.102"));
+        assertEquals(foundThird, InetAddress.getByName("192.168.56.102"));
+    }
+
+    @Test
+    public void shouldSkipNodeWithoutServiceEnabled() throws Exception {
+        Locator locator = new ViewLocator();
+
+        ViewQueryRequest request = mock(ViewQueryRequest.class);
+        when(request.bucket()).thenReturn("default");
+        ClusterConfig configMock = mock(ClusterConfig.class);
+        CouchbaseBucketConfig bucketConfigMock = mock(CouchbaseBucketConfig.class);
+        when(bucketConfigMock.hasPrimaryPartitionsOnNode(InetAddress.getByName("192.168.56.101"))).thenReturn(true);
+        when(bucketConfigMock.hasPrimaryPartitionsOnNode(InetAddress.getByName("192.168.56.102"))).thenReturn(false);
+        when(bucketConfigMock.hasPrimaryPartitionsOnNode(InetAddress.getByName("192.168.56.103"))).thenReturn(true);
+
+        when(configMock.bucketConfig("default")).thenReturn(bucketConfigMock);
+        List<Node> nodes = new ArrayList<Node>();
+        Node node1Mock = mock(Node.class);
+        when(node1Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.101"));
+        when(node1Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
+        Node node2Mock = mock(Node.class);
+        when(node2Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
+        when(node2Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(false);
+        Node node3Mock = mock(Node.class);
+        when(node3Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.103"));
+        when(node3Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
+        nodes.addAll(Arrays.asList(node1Mock, node2Mock, node3Mock));
+
+        Node[] located = locator.locate(request, nodes, configMock);
+        assertEquals(1, located.length);
+        InetAddress foundFirst = located[0].hostname();
+
+        located = locator.locate(request, nodes, configMock);
+        assertEquals(1, located.length);
+        InetAddress foundSecond = located[0].hostname();
+
+        located = locator.locate(request, nodes, configMock);
+        assertEquals(1, located.length);
+        InetAddress foundThird = located[0].hostname();
+
+        located = locator.locate(request, nodes, configMock);
+        assertEquals(1, located.length);
+        InetAddress foundFourth = located[0].hostname();
+
+        assertEquals(foundFirst, InetAddress.getByName("192.168.56.101"));
+        assertEquals(foundSecond, InetAddress.getByName("192.168.56.103"));
+        assertEquals(foundThird, InetAddress.getByName("192.168.56.103"));
+        assertEquals(foundFourth, InetAddress.getByName("192.168.56.101"));
     }
 
     @Test
@@ -138,7 +193,7 @@ public class ViewLocatorTest {
         TestSubscriber<CouchbaseResponse> subscriber = new TestSubscriber<CouchbaseResponse>();
         response.subscribe(subscriber);
 
-        Node[] located = locator.locate(request, Collections.<Node>emptySet(), config);
+        Node[] located = locator.locate(request, Collections.<Node>emptyList(), config);
 
         assertNull(located);
 

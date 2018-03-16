@@ -38,6 +38,7 @@ import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
+import com.couchbase.client.core.message.search.SearchRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
@@ -46,6 +47,7 @@ import com.couchbase.client.core.node.locate.DCPLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
+import com.couchbase.client.core.node.locate.SearchLocator;
 import com.couchbase.client.core.node.locate.ViewLocator;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
@@ -63,7 +65,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The {@link RequestHandler} handles the overall concept of {@link Node}s and manages them concurrently.
@@ -104,9 +106,14 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     private final Locator dcpLocator = new DCPLocator();
 
     /**
+     * The node locator for the query service.
+     */
+    private final Locator searchLocator = new SearchLocator();
+
+    /**
      * The list of currently managed nodes against the cluster.
      */
-    private final Set<Node> nodes;
+    private final CopyOnWriteArrayList<Node> nodes;
 
     /**
      * The shared couchbase environment.
@@ -133,7 +140,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(new CopyOnWriteArraySet<Node>(), environment, configObservable, responseBuffer);
+        this(new CopyOnWriteArrayList<Node>(), environment, configObservable, responseBuffer);
     }
 
     /**
@@ -142,7 +149,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * This constructor should only be used for testing purposes.
      * @param nodes the node list to start with.
      */
-    RequestHandler(Set<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
+    RequestHandler(CopyOnWriteArrayList<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
         this.nodes = nodes;
         this.environment = environment;
@@ -175,14 +182,15 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             ClusterConfig config = configuration;
             //prevent non-bootstrap requests to go through if bucket not part of config
             if (!(request instanceof BootstrapMessage)) {
-                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
+                BucketConfig bucketConfig = config == null ? null : config.bucketConfig(request.bucket());
+                if (config == null || (request.bucket() != null  && bucketConfig == null)) {
                     request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
                     return;
                 }
 
                 //short-circuit some kind of requests for which we know there won't be any handler to respond.
                 try {
-                    checkFeaturesForRequest(request, config.bucketConfig(request.bucket()));
+                    checkFeaturesForRequest(request, bucketConfig);
                 } catch (ServiceNotAvailableException e) {
                     request.observable().onError(e);
                     return;
@@ -228,7 +236,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             throw new ServiceNotAvailableException("The View service is not enabled or no node in the cluster supports it.");
         } else if (request instanceof QueryRequest && !(environment.queryEnabled() || config.serviceEnabled(ServiceType.QUERY))) {
             throw new ServiceNotAvailableException("The Query service is not enabled or no node in the cluster supports it.");
-        } else if (request instanceof  DCPRequest && !(environment.dcpEnabled() || config.serviceEnabled(ServiceType.DCP))) {
+        } else if (request instanceof SearchRequest && !config.serviceEnabled(ServiceType.SEARCH)) {
+            throw new ServiceNotAvailableException("The Search service is not enabled or no node in the cluster supports it.");
+        } else if (request instanceof DCPRequest && !(environment.dcpEnabled() || config.serviceEnabled(ServiceType.DCP))) {
             throw new ServiceNotAvailableException("The DCP service is not enabled or no node in the cluster supports it.");
         }
     }
@@ -267,7 +277,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             @Override
             public LifecycleState call(LifecycleState lifecycleState) {
                 LOGGER.debug("Connect finished, registering for use.");
-                nodes.add(node);
+                nodes.addIfAbsent(node);
                 return lifecycleState;
             }
         });
@@ -352,6 +362,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return configLocator;
         } else if (request instanceof DCPRequest) {
             return dcpLocator;
+        } else if (request instanceof SearchRequest) {
+            return searchLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -370,9 +382,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             LOGGER.debug("No open bucket found in config, disconnecting all nodes.");
             //JVMCBC-231: a race condition can happen where the nodes set is seen as
             // not empty, while the subsequent Observable.from is not, failing in calling last()
-            Set<Node> snapshotNodes;
+            List<Node> snapshotNodes;
             synchronized (nodes) {
-                snapshotNodes = new HashSet<Node>(nodes);
+                snapshotNodes = new ArrayList<Node>(nodes);
             }
             if (snapshotNodes.isEmpty()) {
                 return Observable.just(config);
@@ -452,7 +464,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
                         }
-                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
+                        if (services.containsKey(ServiceType.BINARY) && environment.dcpEnabled()) {
                             services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);

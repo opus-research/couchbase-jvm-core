@@ -27,7 +27,9 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
-import java.util.Set;
+import com.couchbase.client.core.service.ServiceType;
+
+import java.util.List;
 
 public class ViewLocator implements Locator {
 
@@ -37,21 +39,34 @@ public class ViewLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config) {
+    public Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config) {
         BucketConfig bucketConfig = config.bucketConfig(request.bucket());
         if (!(bucketConfig instanceof CouchbaseBucketConfig)) {
             request.observable().onError(NOT_AVAILABLE);
             return null;
         }
 
-        int item = (int) counter++ % nodes.size();
-        int i = 0;
-        for (Node node : nodes) {
-            if (i++ == item && ((CouchbaseBucketConfig) bucketConfig).hasPrimaryPartitionsOnNode(node.hostname())) {
+        int nodeSize = nodes.size();
+        int offset = (int) counter++ % nodeSize;
+
+        for (int i = offset; i < nodeSize; i++) {
+            Node node = nodes.get(i);
+            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
+                return new Node[] { node };
+            }
+        }
+
+        for (int i = 0; i < offset; i++) {
+            Node node = nodes.get(i);
+            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
                 return new Node[] { node };
             }
         }
 
         return new Node[] {};
+    }
+
+    protected boolean checkNode(final Node node, CouchbaseBucketConfig config) {
+        return node.serviceEnabled(ServiceType.VIEW) && config.hasPrimaryPartitionsOnNode(node.hostname());
     }
 }
