@@ -62,6 +62,12 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
         this(feeds, NULL_LISTENER);
     }
 
+    /**
+     * Creates a new {@link BucketStreamAggregatorState}.
+     *
+     * @param feeds    list containing state of each vBucket
+     * @param listener object used to notify about state changes
+     */
     public BucketStreamAggregatorState(final BucketStreamState[] feeds,
                                        final BucketStreamAggregatorStateListener listener) {
         this.feeds = feeds;
@@ -89,7 +95,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * the underlying container.
      *
      * @param numPartitions total number of states.
-     * @param listener      object used to serialize state
+     * @param listener      object used to notify about state changes
      */
     public BucketStreamAggregatorState(int numPartitions, final BucketStreamAggregatorStateListener listener) {
         this.listener = listener;
@@ -123,13 +129,13 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
-     * @param dump      false if state serialization should be skipped
+     * @param notify    false if state notification should be skipped
      * @throws IndexOutOfBoundsException if the state holder is BLANK, or allocated less
      *                                   partition slots then requested index.
      */
-    public void set(int partition, final BucketStreamState state, boolean dump) {
+    public void set(int partition, final BucketStreamState state, boolean notify) {
         feeds[partition] = state;
-        if (dump) {
+        if (notify) {
             listener.onDump(this, partition, state);
         }
     }
@@ -146,12 +152,12 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     /**
      * Replaces whole aggregator state and optionally notifies listener.
      *
-     * @param feeds new state of partitions.
-     * @param dump  false if state serialization should be skipped
+     * @param feeds  new state of partitions.
+     * @param notify false if state notification should be skipped
      */
-    public void replace(final BucketStreamState[] feeds, boolean dump) {
+    public void replace(final BucketStreamState[] feeds, boolean notify) {
         this.feeds = feeds;
-        if (dump) {
+        if (notify) {
             listener.onDump(this);
         }
     }
