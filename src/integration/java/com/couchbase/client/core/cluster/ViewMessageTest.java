@@ -26,6 +26,10 @@ import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
 import org.junit.Test;
+import rx.Observable;
+import rx.functions.Func1;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,10 +44,26 @@ public class ViewMessageTest extends ClusterDependentTest {
     @Test
     public void shouldQueryNonExistentView() {
         ViewQueryResponse single = cluster()
-            .<ViewQueryResponse>send(new ViewQueryRequest("beer", "brewery_beers", false, "debug=true", bucket(), password()))
+            .<ViewQueryResponse>send(new ViewQueryRequest("designdoc", "foobar", false, "debug=true", bucket(), password()))
             .toBlocking()
             .single();
         assertEquals(ResponseStatus.NOT_EXISTS, single.status());
+    }
+
+    @Test
+    public void foo() {
+
+            Observable
+                .interval(1, TimeUnit.MILLISECONDS)
+                .flatMap(new Func1<Long, Observable<ViewQueryResponse>>() {
+                    @Override
+                    public Observable<ViewQueryResponse> call(Long aLong) {
+                        return cluster().send(new ViewQueryRequest("beer", "brewery_beers", false, "limit=5", bucket(), password()));
+                    }
+                })
+                .take(Integer.MAX_VALUE)
+                .toBlocking()
+                .last();
     }
 
 }

@@ -19,53 +19,32 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.util;
+package com.couchbase.client.core.endpoint;
 
 /**
- * Helper class to centralize test properties that can be modified through system properties.
+ * Describes the states of the decoding process.
+ *
+ * This is used internally by the handler implementations to signal their current decoding state. It has impact on
+ * which actions need to be performed in each state.
  *
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class TestProperties {
-
-    private static String seedNode;
-    private static String bucket;
-    private static String password;
+public enum DecodingState {
 
     /**
-     * Initialize static the properties.
+     * Decoding is not currently taking place.
      */
-    static {
-        seedNode = System.getProperty("seedNode", "127.0.0.1");
-        bucket = System.getProperty("bucket", "beer-sample");
-        password = System.getProperty("password", "");
-    }
+    INITIAL,
 
     /**
-     * The seed node to bootstrap from.
-     *
-     * @return the seed node.
+     * Decoding has started and is currently taking place.
      */
-    public static String seedNode() {
-        return seedNode;
-    }
+    STARTED,
 
     /**
-     * The bucket to work against.
-     *
-     * @return the name of the bucket.
+     * Decoding is finished.
      */
-    public static String bucket() {
-        return bucket;
-    }
+    FINISHED
 
-    /**
-     * The password of the bucket.
-     *
-     * @return the password of the bucket.
-     */
-    public static String password() {
-        return password;
-    }
 }
