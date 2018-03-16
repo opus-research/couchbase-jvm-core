@@ -21,11 +21,10 @@
  */
 package com.couchbase.client.core.endpoint.query;
 
-import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.*;
-
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
+import com.couchbase.client.core.endpoint.util.ClosingPositionBufProcessor;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
@@ -207,6 +206,18 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
+     * Shorthand for bytesBeforeInResponse(c)), finds the number of bytes until next occurrence of
+     * the character c from the current readerIndex() in responseContent.
+     *
+     * @param c the character to search for.
+     * @return the number of bytes before the character or -1 if not found.
+     * @see ByteBuf#bytesBefore(byte)
+     */
+    private int bytesBeforeInResponse(char c) {
+        return responseContent.bytesBefore((byte) c);
+    }
+
+    /**
      * Checks if there's not another section opened before the current one,
      * which starts at openBracketPos
      *
@@ -215,8 +226,21 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * section opening
      */
     private boolean isEmptySection(int openBracketPos) {
-        int nextColon = findNextChar(responseContent, ':');
+        int nextColon = bytesBeforeInResponse(':');
         return nextColon > -1 && nextColon < openBracketPos;
+    }
+
+    /**
+     * Finds the position of the correct closing character, taking into account the fact that before the correct one,
+     * other sub section with same opening and closing characters can be encountered.
+     *
+     * @param buf the {@link ByteBuf} where to search for the end of a section enclosed in openingChar and closingChar.
+     * @param openingChar the section opening char, used to detect a sub-section.
+     * @param closingChar the section closing char, used to detect the end of a sub-section / this section.
+     * @return
+     */
+    private static int findSectionClosingPosition(ByteBuf buf, char openingChar, char closingChar) {
+        return buf.forEachByte(new ClosingPositionBufProcessor(openingChar, closingChar));
     }
 
     /**
@@ -232,9 +256,9 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         String clientId = "";
 
         if (responseContent.readableBytes() >= MINIMUM_WINDOW_FOR_REQUESTID) {
-            responseContent.skipBytes(findNextChar(responseContent, ':'));
-            responseContent.skipBytes(findNextChar(responseContent, '"') + 1);
-            int endOfId = findNextChar(responseContent, '"');
+            responseContent.skipBytes(bytesBeforeInResponse(':'));
+            responseContent.skipBytes(bytesBeforeInResponse('"') + 1);
+            int endOfId = bytesBeforeInResponse('"');
             ByteBuf slice = responseContent.readSlice(endOfId);
             requestId = slice.toString(CHARSET);
         } else {
@@ -242,14 +266,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         if (responseContent.readableBytes() >= MINIMUM_WINDOW_FOR_CLIENTID_TOKEN
-                && findNextChar(responseContent, ':') < MINIMUM_WINDOW_FOR_CLIENTID_TOKEN) {
+                && bytesBeforeInResponse(':') < MINIMUM_WINDOW_FOR_CLIENTID_TOKEN) {
             responseContent.markReaderIndex();
-            ByteBuf slice = responseContent.readSlice(findNextChar(responseContent, ':'));
+            ByteBuf slice = responseContent.readSlice(bytesBeforeInResponse(':'));
             if (slice.toString(CHARSET).contains("clientContextID")) {
                 //find the size of the client id
-                responseContent.skipBytes(findNextChar(responseContent, '"') + 1); //opening of clientId
+                responseContent.skipBytes(bytesBeforeInResponse('"') + 1); //opening of clientId
                 //TODO this doesn't account for the fact that the id can contain an escaped " !!!
-                int clientIdSize = findNextChar(responseContent, '"');
+                int clientIdSize = bytesBeforeInResponse('"');
                 if (clientIdSize < 0) {
                     return null;
                 }
@@ -257,7 +281,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
                 clientId = responseContent.readSlice(clientIdSize).toString(CHARSET);
                 //advance to next token
                 responseContent.skipBytes(1);//closing quote
-                responseContent.skipBytes(findNextChar(responseContent, '"')); //next token's quote
+                responseContent.skipBytes(bytesBeforeInResponse('"')); //next token's quote
             } else {
                 //reset the cursor, there was no client id
                 responseContent.resetReaderIndex();
@@ -343,7 +367,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @returns the next QUERY_STATE
      */
     private byte transitionToNextToken() {
-        int endNextToken = findNextChar(responseContent, ':');
+        int endNextToken = bytesBeforeInResponse(':');
         ByteBuf peekSlice = responseContent.readSlice(endNextToken + 1);
         String peek = peekSlice.toString(CHARSET);
         if (peek.contains("\"signature\":")) {
@@ -371,7 +395,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * For now skip the signature.
      */
     private void skipQuerySignature() {
-        int openPos = findNextChar(responseContent, '{');
+        int openPos = bytesBeforeInResponse('{');
         if (!isEmptySection(openPos)) { //checks for empty signature
             int closePos = findSectionClosingPosition(responseContent, '{', '}');
             if (closePos > 0) {
@@ -389,7 +413,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      */
     private void parseQueryRows() {
         while (true) {
-            int openBracketPos = findNextChar(responseContent, '{');
+            int openBracketPos = bytesBeforeInResponse('{');
             if (isEmptySection(openBracketPos)) {
                 queryParsingState = transitionToNextToken();
                 break;
@@ -414,7 +438,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      */
     private void parseQueryError() {
         while (true) {
-            int openBracketPos = findNextChar(responseContent, '{');
+            int openBracketPos = bytesBeforeInResponse('{');
             if (isEmptySection(openBracketPos)) {
                 queryParsingState = transitionToNextToken(); //warnings or status
                 break;
@@ -442,8 +466,8 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryRowObservable.onCompleted();
         queryErrorObservable.onCompleted();
 
-        responseContent.skipBytes(findNextChar(responseContent, '"') + 1);
-        ByteBuf resultSlice = responseContent.readSlice(findNextChar(responseContent, '"'));
+        responseContent.skipBytes(bytesBeforeInResponse('"') + 1);
+        ByteBuf resultSlice = responseContent.readSlice(bytesBeforeInResponse('"'));
         queryStatusObservable.onNext(resultSlice.toString(CHARSET));
         queryStatusObservable.onCompleted();
         queryParsingState = transitionToNextToken();
@@ -462,11 +486,11 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             return;
         }
 
-        int initColon = findNextChar(responseContent, ':');
+        int initColon = bytesBeforeInResponse(':');
         responseContent.readerIndex(initColon);
 
         while (true) {
-            int openBracketPos = findNextChar(responseContent, '{');
+            int openBracketPos = bytesBeforeInResponse('{');
             int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
             if (closeBracketPos == -1) {
                 break;
