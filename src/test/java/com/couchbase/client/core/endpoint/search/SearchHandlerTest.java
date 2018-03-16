@@ -20,7 +20,6 @@ import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -174,12 +173,6 @@ public class SearchHandlerTest {
             @Override
             protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
                 assertEquals(2, keepAliveEventCounter.incrementAndGet());
-            }
-
-            @Override
-            protected CoreEnvironment env() {
-                return DefaultCoreEnvironment.builder()
-                        .continuousKeepAliveEnabled(false).build();
             }
         };
         EmbeddedChannel channel = new EmbeddedChannel(searchKeepAliveHandler);
