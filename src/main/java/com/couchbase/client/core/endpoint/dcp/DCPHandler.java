@@ -232,6 +232,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     flags = extras.readInt();
                 }
                 request = new SnapshotMarkerMessage(msg.getStatus(), startSequenceNumber, endSequenceNumber, flags, connection.bucket());
+                updateConnectionStats(ctx, connection, msg);
                 break;
 
             case OP_MUTATION:
@@ -248,7 +249,9 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                 }
                 request = new MutationMessage(msg.getStatus(), msg.getKey(), msg.content().retain(), expiration,
                         bySeqno, revSeqno, flags, lockTime, msg.getCAS(), connection.bucket());
+                updateConnectionStats(ctx, connection, msg);
                 break;
+
             case OP_REMOVE:
                 if (msg.getExtrasLength() > 0) {
                     final ByteBuf extras = msg.getExtras();
@@ -256,7 +259,9 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     revSeqno = extras.readLong();
                 }
                 request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), bySeqno, revSeqno, connection.bucket());
+                updateConnectionStats(ctx, connection, msg);
                 break;
+
             case OP_STREAM_END:
                 final ByteBuf extrasReleased = msg.getExtras();
                 final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
@@ -265,14 +270,15 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                 extras.release();
                 request = new StreamEndMessage(StreamEndMessage.Reason.valueOf(flags), connection.bucket());
                 connection.removeStream(msg.getOpaque());
+                updateConnectionStats(ctx, connection, msg);
                 break;
+
             default:
                 LOGGER.info("Unhandled DCP message: {}, {}", msg.getOpcode(), msg);
         }
         if (request != null) {
             connection.subject().onNext(request);
         }
-        updateConnectionStats(ctx, connection, msg);
         if (connection.streamsCount() == 0) {
             connection.subject().onCompleted();
         }
