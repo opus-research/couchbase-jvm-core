@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,18 +19,26 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.metrics;
 
-/**
- * A {@link MetricCollector} collects different type of metrics and potentially emits them into a sink.
- *
- * @author Michael Nitschinger
- * @since 1.2.0
- */
-public interface MetricCollector {
+package com.couchbase.client.core.dcp;
 
-    void recordLatency(MetricIdentifier identifier, long latency);
+import org.junit.Test;
 
-    MetricCollectorConfig config();
+import static org.junit.Assert.assertEquals;
+
+public class BucketStreamAggregatorStateTest {
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void shouldCheckStreamListBoundsOnSet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        aggregator.set(3, new BucketStreamState(0, 0, 0, 0, 0));
+    }
+
+    @Test
+    public void shouldNotCheckStreamListBoundsOnGet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        BucketStreamState state = aggregator.get(3);
+        assertEquals(0, state.vbucketUUID());
+    }
 
 }
