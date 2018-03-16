@@ -68,12 +68,7 @@ public abstract class AbstractBucketConfig implements BucketConfig {
         for (int i = 0; i < nodesExt.size(); i++) {
             NetworkAddress hostname = nodesExt.get(i).hostname();
             if (hostname == null) {
-                if (nodeInfos.size() == nodesExt.size()) {
-                    hostname = nodeInfos.get(i).hostname();
-                } else {
-                    // If hostname missing, then node configured using localhost
-                    hostname = NetworkAddress.localhost();
-                }
+                hostname = nodeInfos.get(i).hostname();
             }
             Map<ServiceType, Integer> ports = nodesExt.get(i).ports();
             Map<ServiceType, Integer> sslPorts = nodesExt.get(i).sslPorts();
