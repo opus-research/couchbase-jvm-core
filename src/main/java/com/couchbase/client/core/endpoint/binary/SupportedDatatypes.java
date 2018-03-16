@@ -22,12 +22,12 @@
 package com.couchbase.client.core.endpoint.binary;
 
 /**
- * Contains the supported server datatypes.
+ * Contains the supported server data types.
  *
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class SupportedDatatypes {
+public class SupportedDataTypes {
 
     /**
      * If JSON is supported.
@@ -39,7 +39,7 @@ public class SupportedDatatypes {
      */
     private final boolean compression;
 
-    public SupportedDatatypes(final boolean json, final boolean compression) {
+    public SupportedDataTypes(final boolean json, final boolean compression) {
         this.json = json;
         this.compression = compression;
     }
