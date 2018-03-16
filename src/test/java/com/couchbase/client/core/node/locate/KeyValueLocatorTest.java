@@ -43,9 +43,6 @@ import static org.mockito.Mockito.when;
 
 /**
  * Verifies the functionality of the {@link KeyValueLocator}.
- *
- * @author Michael Nitschinger
- * @since 1.0.0
  */
 public class KeyValueLocatorTest {
 
@@ -78,6 +75,11 @@ public class KeyValueLocatorTest {
 
         Node[] foundNodes = locator.locate(getRequestMock, nodes, configMock);
         assertEquals(node1Mock, foundNodes[0]);
+    }
+
+    @Test
+    public void shouldFanOutBroadcastableRequest() {
+
     }
 
 }
