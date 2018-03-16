@@ -20,7 +20,7 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 public class CloseBucketRequest extends AbstractCouchbaseRequest implements ClusterRequest {
 
     public CloseBucketRequest(String bucket) {
-        super(bucket, null);
+        super(bucket, null, null);
     }
 
 }
