@@ -27,6 +27,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.ResponseStatusDetails;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -702,6 +703,10 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
+        ResponseStatusDetails statusDetails = ResponseStatusConverter.detailsFromBinary(
+            msg.getDataType(),
+            msg.content()
+        );
         ErrorMap.ErrorCode errorCode = ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus());
 
         if (errorCode != null) {
@@ -796,6 +801,11 @@ public class KeyValueHandler
         } else {
             finishedDecoding();
         }
+
+        if (statusDetails != null) {
+            response.statusDetails(statusDetails);
+        }
+
         return response;
     }
 
