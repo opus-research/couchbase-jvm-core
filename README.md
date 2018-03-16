@@ -1,12 +1,12 @@
-# Couchbase Core IO
+# Couchbase JVM Core
 
-The Couchbase JVM IO Core is the foundational module for the JVM SDKs. It implements all the common tasks without
-imposing a specific language API. Language bindings like Java, Scala and so forth are implemented separately on top
-of it.
+The Couchbase JVM Core is the foundation module for the next generation of Couchbase JVM SDKs. It implements all the
+groundwork without imposing a specific language API. Language bindings like Java, Scala and so forth are implemented
+separately.
 
-Note that while properly documented and supported, the core package is not intended to be used directly by average
-Couchbase user. Instead, please use the higher level language bindings and come back here if you need to implement
-custom piece of software whose needs are not satisfied by the provided bindings.
+Note that while properly documented and supported, the core package is not intended to be used directly by general
+Couchbase adopters. Instead, use the higher level language bindings and come back here if you need to implement custom
+piece of software which needs are not satisfied by the provided bindings.
 
 ## Introduction
 
