@@ -45,10 +45,5 @@ public interface ClusterFacade {
      */
     @InterfaceStability.Committed
     @InterfaceAudience.Public
-    @Deprecated
     <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request);
-
-    @InterfaceStability.Committed
-    @InterfaceAudience.Public
-    <R extends CouchbaseResponse> Observable<R> send(final RequestFactory requestFactory);
 }
