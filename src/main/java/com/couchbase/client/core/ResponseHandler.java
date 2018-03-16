@@ -76,12 +76,12 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
      * Hey I just mapped you,
      * And this is crazy,
      * But here's my data
-     * so get me maybe.
+     * so subscribe me maybe.
      *
      * It's hard to block right,
      * at you baby,
      * But here's my data ,
-     * so get me maybe.
+     * so subscribe me maybe.
      */
     @Override
     public void onEvent(final ResponseEvent event, long sequence, boolean endOfBatch) throws Exception {
