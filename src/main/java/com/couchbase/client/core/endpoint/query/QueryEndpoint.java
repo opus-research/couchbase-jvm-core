@@ -23,7 +23,6 @@ package com.couchbase.client.core.endpoint.query;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.endpoint.GenericEndpointHandler;
 import com.couchbase.client.core.env.Environment;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
@@ -48,7 +47,6 @@ public class QueryEndpoint extends AbstractEndpoint {
         pipeline
             .addLast(new HttpClientCodec())
             .addLast(new HttpObjectAggregator(Integer.MAX_VALUE))
-            .addLast(new QueryCodec())
-            .addLast(new GenericEndpointHandler(this, responseBuffer()));
+            .addLast(new QueryCodec());
     }
 }
