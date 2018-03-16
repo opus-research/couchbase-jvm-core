@@ -272,6 +272,9 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 publishResponse(response, currentRequest.observable());
                 if (currentDecodingState == DecodingState.FINISHED) {
                     writeMetrics(response);
+                    if (currentRequest instanceof KeepAlive) {
+                        endpoint.setLastKeepAliveLatency(currentOpTime);
+                    }
                 }
             }
         } catch (CouchbaseException e) {
