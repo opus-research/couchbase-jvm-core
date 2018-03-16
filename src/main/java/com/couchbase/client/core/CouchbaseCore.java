@@ -117,8 +117,6 @@ public class CouchbaseCore implements ClusterFacade {
     private volatile boolean sharedEnvironment = true;
     private final CouchbaseCoreSendHook coreSendHook;
 
-    private volatile long ringBufferLogCounter = 0;
-
     /**
      * Populate the static exceptions with stack trace elements.
      */
@@ -214,7 +212,6 @@ public class CouchbaseCore implements ClusterFacade {
                 if (!published) {
                     request.observable().onError(BACKPRESSURE_EXCEPTION);
                 }
-                maybeLogRingBufferSizes();
                 return (Observable<R>) request.observable();
             } else {
                 Subject<CouchbaseResponse, CouchbaseResponse> response = request.observable();
@@ -226,14 +223,6 @@ public class CouchbaseCore implements ClusterFacade {
                 }
                 return (Observable<R>) hook.value2();
             }
-        }
-    }
-
-    private void maybeLogRingBufferSizes() {
-        if (ringBufferLogCounter++ % 10 == 0) {
-            long usedReq = environment.requestBufferSize() - requestDisruptor.getRingBuffer().remainingCapacity();
-            long usedRes = environment.responseBufferSize() - responseDisruptor.getRingBuffer().remainingCapacity();
-            LOGGER.trace("RequestBuffer Entries {} used / {} total, ResponseBuffer Entries {} used / {} total", usedReq, environment.requestBufferSize(), usedRes, environment.responseBufferSize());
         }
     }
 

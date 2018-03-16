@@ -783,7 +783,7 @@ public class QueryHandlerTest {
             }
 
             @Override
-            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse, CouchbaseRequest request) {
+            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
                 assertEquals(2, keepAliveEventCounter.incrementAndGet());
             }
 
