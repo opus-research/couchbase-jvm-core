@@ -317,23 +317,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                             LOGGER.debug("Unhandled exception during channel connect, ignoring.", future.cause());
                         }
 
-                        if (bootstrapping) {
-                            // we need to reconnect sockets, but the original observable has been failed already.
-                            // so transparently initiate the reconnect loop so if bootstrap succeeds and this endpoint
-                            // comes back online later it is picked up properly.
-                            connect(false).subscribe(new Subscriber<LifecycleState>() {
-                                @Override
-                                public void onCompleted() {}
-
-                                @Override
-                                public void onNext(LifecycleState lifecycleState) {}
-
-                                @Override
-                                public void onError(Throwable e) {
-                                    LOGGER.warn("Error during reconnect: ", e);
-                                }
-                            });
-                        } else if (!disconnected && !isTransient) {
+                        if (!disconnected && !bootstrapping && !isTransient) {
                             long delay = env.reconnectDelay().calculate(reconnectAttempt++);
                             TimeUnit delayUnit = env.reconnectDelay().unit();
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
@@ -360,7 +344,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                 }
                             }, delay, delayUnit);
                         } else {
-                            LOGGER.debug("{}Not retrying because already disconnected or transient.",
+                            LOGGER.debug("{}Not retrying because already disconnected.",
                                     logIdent(channel, AbstractEndpoint.this));
                         }
                     }
