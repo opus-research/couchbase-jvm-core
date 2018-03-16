@@ -31,7 +31,6 @@ import com.couchbase.client.core.message.kv.RemoveRequest;
 import com.couchbase.client.core.message.kv.RemoveResponse;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
-import com.couchbase.client.core.time.Delay;
 import com.couchbase.client.core.util.ClusterDependentTest;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
@@ -267,28 +266,6 @@ public class ObserveTest extends ClusterDependentTest {
                 Observe.ReplicateTo.NONE,
                 BestEffortRetryStrategy.INSTANCE
         ).timeout(5, TimeUnit.SECONDS).toBlocking().single();
-    }
-
-    @Test
-    public void shouldObserveThroughTokens() {
-        InsertRequest request = new InsertRequest("persInsDoc5", Unpooled.copiedBuffer("test", CharsetUtil.UTF_8), bucket());
-        InsertResponse response = cluster().<InsertResponse>send(request).toBlocking().single();
-        assertTrue(response.status().isSuccess());
-        ReferenceCountUtil.release(response);
-
-        Observe.call(
-            cluster(),
-            bucket(),
-            "persInsDoc5",
-            0,
-            false,
-            response.mutationToken(),
-            Observe.PersistTo.MASTER,
-            Observe.ReplicateTo.ONE,
-            Delay.fixed(1, TimeUnit.MILLISECONDS),
-            BestEffortRetryStrategy.INSTANCE
-        ).toBlocking().single();
-
     }
 
 }
