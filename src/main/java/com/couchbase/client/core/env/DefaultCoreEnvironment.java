@@ -106,7 +106,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
-    public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -216,7 +215,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final long disconnectTimeout;
     private final WaitStrategyFactory requestBufferWaitStrategy;
     private final MemcachedHashingStrategy memcachedHashingStrategy;
-    private final long configPollInterval;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -293,7 +291,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
         sslKeystore = builder.sslKeystore;
         memcachedHashingStrategy = builder.memcachedHashingStrategy;
-        configPollInterval = longPropertyOr("configPollInterval", builder.configPollInterval);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -863,11 +860,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return searchServiceConfig;
     }
 
-    @Override
-    public long configPollInterval() {
-        return configPollInterval;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -922,7 +914,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private long disconnectTimeout = DISCONNECT_TIMEOUT;
         private WaitStrategyFactory requestBufferWaitStrategy;
         private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
-        private long configPollInterval = CONFIG_POLL_INTERVAL;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
@@ -1522,23 +1513,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Allows to set the configuration poll interval which polls the server cluster
-         * configuration proactively.
-         *
-         * Note that the interval cannot be set lower than 2500 millisconds (other than 0
-         * to disable it).
-         * @param configPollInterval the interval in milliseconds, 0 deactivates the polling.
-         */
-        public Builder configPollInterval(long configPollInterval) {
-            if (configPollInterval < 2500 && configPollInterval != 0) {
-                throw new IllegalArgumentException("The poll interval cannot be lower than " +
-                    "2500 milliseconds");
-            }
-            this.configPollInterval = configPollInterval;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1570,7 +1544,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", viewServiceEndpoints=").append(viewServiceEndpoints);
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", searchServiceEndpoints=").append(searchServiceEndpoints);
-        sb.append(", configPollInterval=").append(configPollInterval);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");
