@@ -33,8 +33,6 @@ apply plugin: 'propdeps-maven'
 apply plugin: 'propdeps-idea'
 apply plugin: 'propdeps-eclipse'
 
-apply plugin: 'checkstyle'
-
 group = 'com.couchbase.client'
 description = 'Official Couchbase JVM Core Library'
 
@@ -55,10 +53,6 @@ buildscript {
 repositories {
     mavenCentral()
     jcenter()
-}
-
-checkstyle {
-    toolVersion = "6.0"
 }
 
 def getVersionName() {
