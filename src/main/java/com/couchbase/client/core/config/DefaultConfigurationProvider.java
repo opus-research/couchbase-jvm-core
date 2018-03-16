@@ -267,7 +267,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                     if (eventBus != null && eventBus.hasSubscribers()) {
                         eventBus.publish(new BucketOpenedEvent(bucket));
                     }
-                    bootstrapped = true;
                 }
             })
             .doOnError(new Action1<Throwable>() {
