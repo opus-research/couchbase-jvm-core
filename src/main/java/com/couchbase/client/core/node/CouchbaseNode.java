@@ -287,9 +287,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                     break;
             }
         }
-        if (serviceStates.size() == idle) {
-            return LifecycleState.IDLE;
-        } else if (serviceStates.size() == (connected + idle)) {
+        if (serviceStates.size() == (connected + idle)) {
             return LifecycleState.CONNECTED;
         } else if (connected > 0) {
             return LifecycleState.DEGRADED;
