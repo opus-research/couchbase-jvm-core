@@ -66,6 +66,8 @@ public class ClusterDependentTest {
     private static final CoreEnvironment env = DefaultCoreEnvironment
             .builder()
             .dcpEnabled(true)
+            .dcpConnectionBufferSize(1024)          // 1 kilobyte
+            .dcpConnectionBufferAckThreshold(0.5)   // should trigger BUFFER_ACK after 512 bytes
             .mutationTokensEnabled(true)
             .build();
 

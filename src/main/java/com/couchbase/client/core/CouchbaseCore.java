@@ -24,6 +24,7 @@ package com.couchbase.client.core;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultConfigurationProvider;
+import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.env.Diagnostics;
@@ -43,6 +44,8 @@ import com.couchbase.client.core.message.cluster.OpenBucketRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
+import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
+import com.couchbase.client.core.message.dcp.OpenConnectionResponse;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -64,8 +67,8 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The general implementation of a {@link ClusterFacade}.
@@ -291,6 +294,28 @@ public class CouchbaseCore implements ClusterFacade {
         } else if (request instanceof GetClusterConfigRequest) {
             request.observable().onNext(new GetClusterConfigResponse(configProvider.config(), ResponseStatus.SUCCESS));
             request.observable().onCompleted();
+        } else if (request instanceof OpenConnectionRequest) {
+            final CouchbaseCore core = this;
+            configProvider
+                    .openBucket(request.bucket(), request.password())
+                    .flatMap(new Func1<ClusterConfig, Observable<ClusterConfig>>() {
+                        @Override
+                        public Observable<ClusterConfig> call(ClusterConfig clusterConfig) {
+                            return requestHandler.reconfigure(clusterConfig);
+                        }
+                    })
+                    .map(new Func1<ClusterConfig, OpenConnectionResponse>() {
+                        @Override
+                        public OpenConnectionResponse call(final ClusterConfig clusterConfig) {
+                            if (clusterConfig.hasBucket(request.bucket())) {
+                                return new OpenConnectionResponse(
+                                        new DCPConnection(environment, core, request.bucket(), request.password()),
+                                        ResponseStatus.SUCCESS);
+                            }
+                            throw new CouchbaseException("Could not open bucket.");
+                        }
+                    })
+                    .subscribe(request.observable());
         }
     }
 

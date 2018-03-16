@@ -375,4 +375,5 @@ public interface CoreEnvironment {
      */
     boolean callbacksOnIoPool();
 
+    String dcpConnectionName();
 }
