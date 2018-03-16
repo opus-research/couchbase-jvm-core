@@ -1,6 +1,8 @@
 package com.couchbase.client.core.message.query;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import com.couchbase.client.core.message.CouchbaseResponse;
+import rx.subjects.ReplaySubject;
 
 /**
  * For the lack of a better name, a query request against a query server.
@@ -13,7 +15,7 @@ public class GenericQueryRequest extends AbstractCouchbaseRequest implements Que
     private final String query;
 
     public GenericQueryRequest(String query, String bucket, String password) {
-        super(bucket, password);
+        super(bucket, password, ReplaySubject.<CouchbaseResponse>create());
         this.query = query;
     }
 
