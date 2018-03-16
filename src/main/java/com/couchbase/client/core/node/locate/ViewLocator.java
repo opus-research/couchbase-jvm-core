@@ -27,7 +27,6 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.service.ServiceType;
 
 import java.util.List;
 
@@ -46,27 +45,14 @@ public class ViewLocator implements Locator {
             return null;
         }
 
-        int nodeSize = nodes.size();
-        int offset = (int) counter++ % nodeSize;
-
-        for (int i = offset; i < nodeSize; i++) {
-            Node node = nodes.get(i);
-            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
-                return new Node[] { node };
-            }
-        }
-
-        for (int i = 0; i < offset; i++) {
-            Node node = nodes.get(i);
-            if (checkNode(node, (CouchbaseBucketConfig) bucketConfig)) {
+        int item = (int) counter++ % nodes.size();
+        int i = 0;
+        for (Node node : nodes) {
+            if (i++ == item && ((CouchbaseBucketConfig) bucketConfig).hasPrimaryPartitionsOnNode(node.hostname())) {
                 return new Node[] { node };
             }
         }
 
         return new Node[] {};
-    }
-
-    protected boolean checkNode(final Node node, CouchbaseBucketConfig config) {
-        return node.serviceEnabled(ServiceType.VIEW) && config.hasPrimaryPartitionsOnNode(node.hostname());
     }
 }
