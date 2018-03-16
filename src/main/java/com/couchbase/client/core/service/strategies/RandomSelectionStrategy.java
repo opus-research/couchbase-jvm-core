@@ -38,12 +38,7 @@ public class RandomSelectionStrategy implements SelectionStrategy {
     /**
      * Random number generator, statically initialized and designed to be reused.
      */
-    private static final ThreadLocal<Random> RANDOM = new ThreadLocal<Random>() {
-        @Override
-        protected Random initialValue() {
-            return new Random();
-        }
-    };
+    private static final Random RANDOM = new Random();
 
     /**
      * The number of times to try to find a suitable endpoint before returning without success.
@@ -52,12 +47,14 @@ public class RandomSelectionStrategy implements SelectionStrategy {
 
     @Override
     public Endpoint select(final CouchbaseRequest request, final Endpoint[] endpoints) {
-        if (endpoints.length == 0) {
+        int numEndpoints = endpoints.length;
+        if (numEndpoints == 0) {
             return null;
         }
 
         for (int i = 0; i < MAX_TRIES; i++) {
-            Endpoint endpoint = endpoints[RANDOM.get().nextInt(endpoints.length)];
+            int rand = RANDOM.nextInt(endpoints.length);
+            Endpoint endpoint = endpoints[rand];
             if (endpoint.isState(LifecycleState.CONNECTED)) {
                 return endpoint;
             }
