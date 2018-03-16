@@ -40,15 +40,14 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import com.couchbase.mock.CouchbaseMock;
-import com.couchbase.mock.JsonUtils;
+import org.couchbase.mock.CouchbaseMock;
+import org.couchbase.mock.JsonUtils;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import rx.Observable;
 import rx.functions.Func1;
 
 import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -78,31 +77,23 @@ public class ClusterDependentTest {
 
     private static ClusterFacade cluster;
 
-    protected static String sendGetHttpRequestToMock(String path, Map<String, String> parameters) throws Exception {
+    private static int getCarrierPortInfo(int httpPort) throws Exception {
         URIBuilder builder = new URIBuilder();
-        builder.setScheme("http").setHost("localhost").setPort(mock().getHttpPort()).setPath(path);
-        for (Map.Entry<String, String> entry: parameters.entrySet()) {
-            builder.setParameter(entry.getKey(), entry.getValue());
-        }
+        builder.setScheme("http").setHost("localhost").setPort(httpPort).setPath("mock/get_mcports")
+                .setParameter("bucket", bucket);
         HttpGet request = new HttpGet(builder.build());
         HttpClient client = HttpClientBuilder.create().build();
         HttpResponse response = client.execute(request);
         int status = response.getStatusLine().getStatusCode();
-        if (status != 200) {
+        if (status < 200 || status > 300) {
             throw new ClientProtocolException("Unexpected response status: " + status);
         }
-        return EntityUtils.toString(response.getEntity());
-    }
-
-    private static int getCarrierPortInfo() throws Exception {
-        Map<String, String> parameters = new HashMap<String, String>();
-        parameters.put("idx", "0");
-        parameters.put("bucket", bucket());
-        String rawBody = sendGetHttpRequestToMock("mock/get_mcports", parameters);
+        String rawBody = EntityUtils.toString(response.getEntity());
         com.google.gson.JsonObject respObject = JsonUtils.GSON.fromJson(rawBody, com.google.gson.JsonObject.class);
         com.google.gson.JsonArray portsArray = respObject.getAsJsonArray("payload");
         return portsArray.get(0).getAsInt();
     }
+
 
     public static void connect(boolean useMock) {
         DefaultCoreEnvironment.Builder envBuilder = DefaultCoreEnvironment
@@ -111,7 +102,7 @@ public class ClusterDependentTest {
         if (useMock) {
             int httpBootstrapPort = couchbaseMock.getHttpPort();
             try {
-                int carrierBootstrapPort = getCarrierPortInfo();
+                int carrierBootstrapPort = getCarrierPortInfo(httpBootstrapPort);
                 envBuilder
                         .bootstrapHttpDirectPort(httpBootstrapPort)
                         .bootstrapCarrierDirectPort(carrierBootstrapPort)
@@ -164,8 +155,6 @@ public class ClusterDependentTest {
     public static CoreEnvironment env() {
         return env;
     }
-
-    public static CouchbaseMock mock() { return couchbaseMock; }
 
     /**
      * Checks based on the cluster node versions if DCP is available.
