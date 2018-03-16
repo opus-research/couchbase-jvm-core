@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,39 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.time;
+package com.couchbase.client.core.utils;
 
-import java.util.concurrent.TimeUnit;
+import io.netty.buffer.ByteBuf;
+import rx.functions.Action1;
 
 /**
- * Delay which increases linearly for every attempt.
+ * Collection of utilities around {@link ByteBuf}.
  *
- * @author Michael Nitschinger
- * @since 1.1.0
+ * @author Simon Baslé
+ * @since 1.1
  */
-public class LinearDelay extends Delay {
+public class Buffers {
 
-    private final double growBy;
-    private final long lower;
-    private final long upper;
-
-    LinearDelay(TimeUnit unit, long upper, long lower, double growBy) {
-        super(unit);
-
-        this.growBy = growBy;
-        this.lower = lower;
-        this.upper = upper;
-    }
-
-    @Override
-    public long calculate(long attempt) {
-        long calc = Math.round(attempt * growBy);
-        if (calc < lower) {
-            return lower;
+    /**
+     * An rx {@link Action1} that releases (once) a non-null {@link ByteBuf} provided its refCnt is > 0.
+     */
+    public static final Action1 BYTE_BUF_RELEASER = new Action1<ByteBuf>() {
+        @Override
+        public void call(ByteBuf byteBuf) {
+            if (byteBuf != null && byteBuf.refCnt() > 0) {
+                byteBuf.release();
+            }
         }
-        if (calc > upper) {
-            return upper;
-        }
-        return calc;
-    }
+    };
 }

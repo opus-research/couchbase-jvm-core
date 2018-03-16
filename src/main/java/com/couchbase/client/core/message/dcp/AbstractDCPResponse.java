@@ -19,28 +19,30 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.time;
 
-import java.util.concurrent.TimeUnit;
+package com.couchbase.client.core.message.dcp;
+
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
 
 /**
- * Delay which is fixed for every attempt.
+ * Default implementation of {@link DCPResponse}.
  *
- * @author Michael Nitschinger
+ * @author Sergey Avseyev
  * @since 1.1.0
  */
-public class FixedDelay extends Delay {
-
-    private final long delay;
-
-    FixedDelay(long delay, TimeUnit unit) {
-        super(unit);
-        this.delay = delay;
+@InterfaceStability.Experimental
+@InterfaceAudience.Private
+public abstract class AbstractDCPResponse extends AbstractCouchbaseResponse implements DCPResponse {
+    /**
+     * Creates {@link AbstractDCPResponse}.
+     *
+     * @param status  the status of the response.
+     */
+    public AbstractDCPResponse(ResponseStatus status, CouchbaseRequest request) {
+        super(status, request);
     }
-
-    @Override
-    public long calculate(long attempt) {
-        return delay;
-    }
-
 }

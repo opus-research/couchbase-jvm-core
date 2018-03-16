@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,22 +19,40 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.time;
 
-import org.junit.Test;
-import java.util.concurrent.TimeUnit;
+package com.couchbase.client.core.message.dcp;
 
-import static org.junit.Assert.assertEquals;
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
 
-public class FixedDelayTest {
+/**
+ * A message representing event that removes or expires a document.
+ *
+ * @author Sergey Avseyev
+ * @since 1.1.0
+ */
+@InterfaceStability.Experimental
+@InterfaceAudience.Private
+public class RemoveMessage extends AbstractDCPRequest {
+    private final String key;
+    private final long cas;
 
-    @Test
-    public void shouldCalculateFixedDelay() {
-        Delay fixedDelay = new FixedDelay(3, TimeUnit.SECONDS);
-
-        assertEquals(3, fixedDelay.calculate(1));
-        assertEquals(3, fixedDelay.calculate(2));
-        assertEquals(3, fixedDelay.calculate(3));
+    public RemoveMessage(short partition, String key, long cas, String bucket) {
+        this(partition, key, cas, bucket, null);
     }
 
+    public RemoveMessage(short partition, String key, long cas, String bucket, String password) {
+        super(bucket, password);
+        this.partition(partition);
+        this.key = key;
+        this.cas = cas;
+    }
+
+    public String key() {
+        return key;
+    }
+
+    public long cas() {
+        return cas;
+    }
 }

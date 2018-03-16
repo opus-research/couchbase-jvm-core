@@ -30,6 +30,7 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
+import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
@@ -39,6 +40,7 @@ import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.node.locate.ConfigLocator;
+import com.couchbase.client.core.node.locate.DCPLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
@@ -51,6 +53,7 @@ import com.lmax.disruptor.RingBuffer;
 import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -97,6 +100,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * The node locator for the config service.
      */
     private final Locator configLocator = new ConfigLocator();
+
+    /**
+     * The node locator for DCP service.
+     */
+    private final Locator dcpLocator = new DCPLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -156,41 +164,63 @@ public class RequestHandler implements EventHandler<RequestEvent> {
 
     @Override
     public void onEvent(final RequestEvent event, long sequence, final boolean endOfBatch) throws Exception {
-        final CouchbaseRequest request = event.getRequest();
+        try {
+            final CouchbaseRequest request = event.getRequest();
 
-        //prevent non-bootstrap requests to go through if bucket not part of config
-        if (!(request instanceof BootstrapMessage)) {
-            ClusterConfig config = configuration.get();
-            if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
-                request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
-                event.setRequest(null);
+            //prevent non-bootstrap requests to go through if bucket not part of config
+            if (!(request instanceof BootstrapMessage)) {
+                ClusterConfig config = configuration.get();
+                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
+                    request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
+                    return;
+                }
+            }
+
+            //short-circuit some kind of requests for which we know there won't be any handler to respond.
+            try {
+                checkFeaturesForRequest(request);
+            } catch (UnsupportedOperationException e) {
+                request.observable().onError(e);
                 return;
             }
-        }
 
-        Node[] found = locator(request).locate(request, nodes, configuration.get());
+            Node[] found = locator(request).locate(request, nodes, configuration.get());
 
-        if (found == null) {
-            event.setRequest(null);
-            return;
-        }
-        if (found.length == 0) {
-            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
-            event.setRequest(null);
-        }
-        for (int i = 0; i < found.length; i++) {
-            try {
-                found[i].send(request);
-            } catch (Exception ex) {
-                request.observable().onError(ex);
-            } finally {
-                event.setRequest(null);
+            if (found == null) {
+                return;
             }
-        }
-        if (endOfBatch) {
-            for (Node node : nodes) {
-                node.send(SignalFlush.INSTANCE);
+            if (found.length == 0) {
+                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             }
+            for (int i = 0; i < found.length; i++) {
+                try {
+                    found[i].send(request);
+                } catch (Exception ex) {
+                    request.observable().onError(ex);
+                }
+            }
+            if (endOfBatch) {
+                for (Node node : nodes) {
+                    node.send(SignalFlush.INSTANCE);
+                }
+            }
+        } finally {
+            event.setRequest(null);
+        }
+    }
+
+    /**
+     * Checks, for a sub-set of {@link CouchbaseRequest}, if the current environment has
+     * the necessary feature activated. If not, throws an {@link UnsupportedOperationException}.
+     *
+     * @param request the request to check.
+     * @throws UnsupportedOperationException if the request type needs a particular feature which isn't activated.
+     */
+    protected void checkFeaturesForRequest(CouchbaseRequest request) {
+        if (request instanceof QueryRequest && !environment.queryEnabled()) {
+            throw new UnsupportedOperationException("Request type needs a feature to be enabled in environment: query");
+        } else if (request instanceof  DCPRequest && !environment.dcpEnabled()) {
+            throw new UnsupportedOperationException("Request type needs a feature to be enabled in environment: dcp");
         }
     }
 
@@ -311,6 +341,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return queryLocator;
         } else if (request instanceof ConfigRequest) {
             return configLocator;
+        } else if (request instanceof DCPRequest) {
+            return dcpLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -369,10 +401,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                         }
                     }
 
-                    LOGGER.debug("Found nodes {} to be removed after reconfiguration.", nodes);
-
                     for (Node node : nodes) {
                         if (!configNodes.contains(node.hostname())) {
+                            LOGGER.debug("Removing and disconnecting node {}.", node.hostname());
                             removeNode(node);
                             node.disconnect().subscribe();
                         }
@@ -405,6 +436,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                                 environment.sslEnabled() ? nodeInfo.sslServices() : nodeInfo.services();
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
+                        }
+                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
+                            services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);
                     }

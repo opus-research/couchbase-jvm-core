@@ -19,34 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.time;
 
-import org.junit.Test;
-import java.util.concurrent.TimeUnit;
+package com.couchbase.client.core.message.dcp;
 
-import static org.junit.Assert.assertEquals;
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
 
-public class DelayTest {
-
-    @Test
-    public void shouldBuildFixedDelay() {
-        Delay delay = Delay.fixed(5, TimeUnit.MICROSECONDS);
-        assertEquals(TimeUnit.MICROSECONDS, delay.unit());
-        assertEquals(5, delay.calculate(10));
+/**
+ * @author Sergey Avseyev
+ * @since 1.1.0
+ */
+@InterfaceStability.Experimental
+@InterfaceAudience.Private
+public class OpenConnectionResponse extends AbstractDCPResponse {
+    /**
+     * Sets the required properties for the response.
+     *
+     * @param status  the status of the response.
+     * @param request
+     */
+    public OpenConnectionResponse(ResponseStatus status, CouchbaseRequest request) {
+        super(status, request);
     }
-
-    @Test
-    public void shouldBuildLinearDelay() {
-        Delay delay = Delay.linear(TimeUnit.HOURS);
-        assertEquals(TimeUnit.HOURS, delay.unit());
-        assertEquals(10, delay.calculate(10));
-    }
-
-    @Test
-    public void shouldBuildExponentialDelay() {
-        Delay delay = Delay.exponential(TimeUnit.SECONDS);
-        assertEquals(TimeUnit.SECONDS, delay.unit());
-        assertEquals(512, delay.calculate(10));
-    }
-
 }
