@@ -51,12 +51,7 @@ public enum ServiceType {
     /**
      * Search (CBFT) operations.
      */
-    SEARCH(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * Analytics operations.
-     */
-    ANALYTICS(BucketServiceMapping.ONE_FOR_ALL);
+    SEARCH(BucketServiceMapping.ONE_FOR_ALL);
 
     private final BucketServiceMapping mapping;
 
