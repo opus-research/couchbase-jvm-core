@@ -26,11 +26,9 @@ import com.couchbase.client.core.retry.FailFastRetryStrategy;
 import com.couchbase.client.core.service.ConfigService;
 import com.couchbase.client.core.service.KeyValueService;
 import com.couchbase.client.core.service.Service;
-import com.couchbase.client.core.service.ServiceFactory;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.utils.NetworkAddress;
-import com.lmax.disruptor.RingBuffer;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -44,10 +42,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Matchers.isNull;
-import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,7 +91,7 @@ public class CouchbaseNodeTest {
         when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertEquals(LifecycleState.CONNECTED, node.connect().toBlocking().single());
     }
@@ -111,7 +105,7 @@ public class CouchbaseNodeTest {
         when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTING));
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertEquals(LifecycleState.DEGRADED, node.connect().toBlocking().single());
     }
@@ -125,7 +119,7 @@ public class CouchbaseNodeTest {
         when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTING));
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertEquals(LifecycleState.CONNECTING, node.connect().toBlocking().single());
     }
@@ -138,7 +132,7 @@ public class CouchbaseNodeTest {
         when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
         when(service1Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertEquals(LifecycleState.DISCONNECTED, node.connect().toBlocking().single());
     }
@@ -157,7 +151,7 @@ public class CouchbaseNodeTest {
         BehaviorSubject<LifecycleState> states2 = BehaviorSubject.create();
         when(service1Mock.states()).thenReturn(states1);
         when(service2Mock.states()).thenReturn(states2);
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         Observable<LifecycleState> disconnect = node.disconnect();
         states1.onNext(LifecycleState.DISCONNECTING);
@@ -173,7 +167,7 @@ public class CouchbaseNodeTest {
         when(registryMock.services()).thenReturn(new Service[] {service1Mock, service2Mock});
         when(service1Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
         when(service2Mock.disconnect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertEquals(LifecycleState.DISCONNECTED, node.disconnect().toBlocking().single());
     }
@@ -181,7 +175,7 @@ public class CouchbaseNodeTest {
     @Test
     public void shouldRegisterGlobalService() {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
         Service registered = node.addService(new AddServiceRequest(ServiceType.CONFIG, null, null, 0, host))
             .toBlocking().single();
 
@@ -192,17 +186,7 @@ public class CouchbaseNodeTest {
     @Test
     public void shouldRegisterLocalService() {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
-        ServiceFactory serviceFactory = mock(ServiceFactory.class);
-
-        Service binaryServiceMock = mock(Service.class);
-        when(binaryServiceMock.type()).thenReturn(ServiceType.BINARY);
-        when(binaryServiceMock.states()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(binaryServiceMock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(serviceFactory.create(anyString(), anyString(), anyString(), anyString(),
-                eq(0), same(environment), eq(ServiceType.BINARY), any(RingBuffer.class))).thenReturn(binaryServiceMock);
-
-
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, serviceFactory);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
         Service registered = node.addService(new AddServiceRequest(ServiceType.BINARY, "bucket", null, 0, host))
             .toBlocking().single();
 
@@ -216,7 +200,7 @@ public class CouchbaseNodeTest {
         Service serviceMock = mock(Service.class);
         when(serviceMock.type()).thenReturn(ServiceType.CONFIG);
         when(registryMock.serviceBy(ServiceType.CONFIG, null)).thenReturn(serviceMock);
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         node.removeService(new RemoveServiceRequest(ServiceType.CONFIG, null, host))
             .toBlocking().single();
@@ -230,7 +214,7 @@ public class CouchbaseNodeTest {
         when(serviceMock.type()).thenReturn(ServiceType.BINARY);
         when(registryMock.serviceBy(ServiceType.BINARY, "bucket")).thenReturn(serviceMock);
         when(serviceMock.states()).thenReturn(Observable.<LifecycleState>empty());
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         node.removeService(new RemoveServiceRequest(ServiceType.BINARY, "bucket", host))
             .toBlocking().single();
@@ -246,7 +230,7 @@ public class CouchbaseNodeTest {
         CoreEnvironment env = mock(CoreEnvironment.class);
         when(env.retryStrategy()).thenReturn(FailFastRetryStrategy.INSTANCE);
 
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, env, null, ServiceFactory.INSTANCE);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, env, null);
 
         CouchbaseRequest request = mock(CouchbaseRequest.class);
         when(request.isActive()).thenReturn(true);
@@ -260,23 +244,8 @@ public class CouchbaseNodeTest {
     @Test
     public void shouldCacheEnabledServices() {
         ServiceRegistry registryMock = mock(ServiceRegistry.class);
-        ServiceFactory serviceFactory = mock(ServiceFactory.class);
 
-        Service binaryServiceMock = mock(Service.class);
-        when(binaryServiceMock.type()).thenReturn(ServiceType.BINARY);
-        when(binaryServiceMock.states()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(binaryServiceMock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(serviceFactory.create(anyString(), anyString(), anyString(), anyString(),
-        eq(0), same(environment), eq(ServiceType.BINARY), any(RingBuffer.class))).thenReturn(binaryServiceMock);
-
-        Service configServiceMock = mock(Service.class);
-        when(configServiceMock.type()).thenReturn(ServiceType.CONFIG);
-        when(configServiceMock.states()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(configServiceMock.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(serviceFactory.create(anyString(), anyString(), anyString(), anyString(),
-                eq(0), same(environment), eq(ServiceType.CONFIG), any(RingBuffer.class))).thenReturn(configServiceMock);
-
-        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null, serviceFactory);
+        CouchbaseNode node = new CouchbaseNode(host, registryMock, environment, null);
 
         assertFalse(node.serviceEnabled(ServiceType.BINARY));
         assertFalse(node.serviceEnabled(ServiceType.CONFIG));
@@ -296,7 +265,12 @@ public class CouchbaseNodeTest {
         assertTrue(node.serviceEnabled(ServiceType.CONFIG));
         assertFalse(node.serviceEnabled(ServiceType.QUERY));
 
+        // Pretend services are properly stored in the registry before removal
+        Service binaryServiceMock = mock(Service.class);
+        when(binaryServiceMock.type()).thenReturn(ServiceType.BINARY);
         when(registryMock.serviceBy(ServiceType.BINARY, "bucket")).thenReturn(binaryServiceMock);
+        Service configServiceMock = mock(Service.class);
+        when(configServiceMock.type()).thenReturn(ServiceType.CONFIG);
         when(registryMock.serviceBy(ServiceType.CONFIG, null)).thenReturn(configServiceMock);
 
         node.removeService(new RemoveServiceRequest(ServiceType.BINARY, "bucket", host))
@@ -305,6 +279,7 @@ public class CouchbaseNodeTest {
         assertFalse(node.serviceEnabled(ServiceType.BINARY));
         assertTrue(node.serviceEnabled(ServiceType.CONFIG));
         assertFalse(node.serviceEnabled(ServiceType.QUERY));
+
 
         node.removeService(new RemoveServiceRequest(ServiceType.CONFIG, null, host))
                 .toBlocking().single();
