@@ -23,7 +23,7 @@
 package com.couchbase.client.core.endpoint.dcp;
 
 import com.couchbase.client.core.message.dcp.DCPRequest;
-import rx.subjects.PublishSubject;
+import rx.subjects.ReplaySubject;
 import rx.subjects.Subject;
 
 /**
@@ -42,11 +42,12 @@ public class DCPStream {
      *
      * @param id     stream identifier
      * @param bucket name of the bucket
+     * @param size   size of the subject
      */
-    public DCPStream(int id, String bucket) {
+    public DCPStream(final int id, final String bucket, final int size) {
         this.id = id;
         this.bucket = bucket;
-        subject = PublishSubject.<DCPRequest>create().toSerialized();
+        subject = ReplaySubject.<DCPRequest>createWithSize(size).toSerialized();
     }
 
     public Subject<DCPRequest, DCPRequest> subject() {

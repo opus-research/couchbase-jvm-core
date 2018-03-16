@@ -95,6 +95,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean TCP_NODELAY_ENALED = true;
     public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
+    public static final int DCP_STREAM_SIZE = 1024;
+
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
@@ -183,6 +185,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean tcpNodelayEnabled;
     private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
+    private final int dcpStreamSize;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -236,6 +239,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         tcpNodelayEnabled = booleanPropertyOr("tcpNodelayEnabled", builder.tcpNodelayEnabled);
         mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
+        dcpStreamSize = intPropertyOr("dcpStreamSize", builder.dcpStreamSize);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -614,6 +618,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return socketConnectTimeout;
     }
 
+    @Override
+    public int dcpStreamSize() {
+        return dcpStreamSize;
+    }
+
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -653,6 +662,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean tcpNodelayEnabled = TCP_NODELAY_ENALED;
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
+        private int dcpStreamSize = DCP_STREAM_SIZE;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
@@ -1067,6 +1077,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        /**
+         * Sets size boundary of ReplaySubject inside DCPStream.
+         *
+         * @param dcpStreamSize the number of events for ReplaySubject inside DCPStream.
+         */
+        public Builder dcpStreamSize(int dcpStreamSize) {
+            this.dcpStreamSize = dcpStreamSize;
+            return this;
+        }
+
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1120,6 +1140,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
         sb.append(", mutationTokensEnabled=").append(mutationTokensEnabled);
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
+        sb.append(", dcpStreamSize=").append(dcpStreamSize);
         return sb;
     }
 
