@@ -39,7 +39,7 @@ import rx.subjects.Subject;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
-    private final CouchbaseCore cluster;
+    private final ClusterFacade cluster;
     private final ConfigurationProvider configurationProvider;
     private final CoreEnvironment environment;
 
@@ -50,7 +50,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
      * @param cluster the cluster reference.
      * @param provider th configuration provider.
      */
-    public ResponseHandler(CoreEnvironment environment, CouchbaseCore cluster, ConfigurationProvider provider) {
+    public ResponseHandler(CoreEnvironment environment, ClusterFacade cluster, ConfigurationProvider provider) {
         this.cluster = cluster;
         this.configurationProvider = provider;
         this.environment = environment;
@@ -160,7 +160,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             @Override
             public void call() {
                 try {
-                    cluster.sendHot(request);
+                    cluster.send(request);
                 } finally {
                     worker.unsubscribe();
                 }
