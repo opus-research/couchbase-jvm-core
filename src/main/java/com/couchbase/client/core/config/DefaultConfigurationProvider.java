@@ -333,11 +333,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     public void signalOutdated() {
         LOGGER.debug("Received signal for outdated configuration.");
 
-        if (currentConfig.get().bucketConfigs().isEmpty()) {
-            LOGGER.debug("Ignoring outdated signal, since no buckets are open.");
-            return;
-        }
-
         for (Refresher refresher : refreshers.values()) {
             refresher.refresh(currentConfig.get());
         }
