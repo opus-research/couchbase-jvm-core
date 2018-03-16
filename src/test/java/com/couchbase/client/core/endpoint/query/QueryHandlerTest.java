@@ -40,7 +40,6 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -93,7 +92,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Verifies the correct functionality of the {@link QueryHandler} using V1 Parser.
+ * Verifies the correct functionality of the {@link QueryHandler}.
  *
  * @author Michael Nitschinger
  * @since 1.0
@@ -107,16 +106,18 @@ public class QueryHandlerTest {
     private static final String FAKE_SIGNATURE = "{\"*\":\"*\"}";
 
     private ObjectMapper mapper = new ObjectMapper();
-    protected Queue<QueryRequest> queue;
-    protected EmbeddedChannel channel;
-    protected Disruptor<ResponseEvent> responseBuffer;
-    protected RingBuffer<ResponseEvent> responseRingBuffer;
-    protected List<CouchbaseMessage> firedEvents;
-    protected CountDownLatch latch;
-    protected AbstractEndpoint endpoint;
-    protected ChannelHandler handler;
+    private Queue<QueryRequest> queue;
+    private EmbeddedChannel channel;
+    private Disruptor<ResponseEvent> responseBuffer;
+    private RingBuffer<ResponseEvent> responseRingBuffer;
+    private List<CouchbaseMessage> firedEvents;
+    private CountDownLatch latch;
+    private QueryHandler handler;
+    private AbstractEndpoint endpoint;
 
-    protected void commonSetup() {
+    @Before
+    @SuppressWarnings("unchecked")
+    public void setup() {
         responseBuffer = new Disruptor<ResponseEvent>(new EventFactory<ResponseEvent>() {
             @Override
             public ResponseEvent newInstance() {
@@ -145,12 +146,6 @@ public class QueryHandlerTest {
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<QueryRequest>();
-    }
-
-    @Before
-    @SuppressWarnings("unchecked")
-    public void setup() {
-        commonSetup();
         handler = new QueryHandler(endpoint, responseRingBuffer, queue, false, false);
         channel = new EmbeddedChannel(handler);
     }
@@ -1537,9 +1532,8 @@ public class QueryHandlerTest {
         SoftAssertions softly = new SoftAssertions();
         softly.assertThat(inbound).isNotNull();
         softly.assertThat(error).isNull();
-        if (handler instanceof QueryHandler) {
-            softly.assertThat(((QueryHandler) handler).getDecodingState()).isEqualTo(DecodingState.INITIAL);
-        }
+        softly.assertThat(handler.getDecodingState()).isEqualTo(DecodingState.INITIAL);
+        softly.assertThat(handler.getQueryParsingState()).isEqualTo(QueryHandler.QUERY_STATE_INITIAL);
         softly.assertAll();
     }
 
