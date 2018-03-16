@@ -70,6 +70,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
      */
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(CoreEnvironment.class);
 
+    public static final boolean DCP_ENABLED = false;
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
@@ -82,6 +83,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int BOOTSTRAP_CARRIER_SSL_PORT = 11207;
     public static final int REQUEST_BUFFER_SIZE = 16384;
     public static final int RESPONSE_BUFFER_SIZE = 16384;
+    public static final int DCP_CONNECTION_BUFFER_SIZE = 20971520; // 20MiB
+    public static final double DCP_CONNECTION_BUFFER_ACK_THRESHOLD = 0.2; // for 20Mib it is 4MiB
+    public static final String DCP_CONNECTION_NAME = "dcp/core-io";
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
@@ -106,7 +110,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
-    public static final long CONFIG_POLL_INTERVAL = 2500;
+    public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
     public static final boolean CERT_AUTH_ENABLED = false;
 
     public static String CORE_VERSION;
@@ -178,6 +182,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
     }
 
+    private final boolean dcpEnabled;
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
     private final String sslKeystorePassword;
@@ -192,6 +197,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int computationPoolSize;
     private final int responseBufferSize;
     private final int requestBufferSize;
+    private final int dcpConnectionBufferSize;
+    private final double dcpConnectionBufferAckThreshold;
+    private final String dcpConnectionName;
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
@@ -258,6 +266,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             emitEnvWarnMessage = true;
         }
 
+        dcpEnabled = booleanPropertyOr("dcpEnabled", builder.dcpEnabled);
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
@@ -271,6 +280,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         int computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize);
         responseBufferSize = intPropertyOr("responseBufferSize", builder.responseBufferSize);
         requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize);
+        dcpConnectionBufferSize = intPropertyOr("dcpConnectionBufferSize", builder.dcpConnectionBufferSize);
+        dcpConnectionBufferAckThreshold = doublePropertyOr("dcpConnectionBufferAckThreshold", builder.dcpConnectionBufferAckThreshold);
+        dcpConnectionName = stringPropertyOr("dcpConnectionName", builder.dcpConnectionName);
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
@@ -617,6 +629,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
+    public boolean dcpEnabled() {
+        return dcpEnabled;
+    }
+
+    @Override
     public String sslKeystoreFile() {
         return sslKeystoreFile;
     }
@@ -679,6 +696,22 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public int responseBufferSize() {
         return responseBufferSize;
+    }
+    @Override
+    public int dcpConnectionBufferSize() {
+        return dcpConnectionBufferSize;
+    }
+
+    @Override
+    public double dcpConnectionBufferAckThreshold() {
+        return dcpConnectionBufferAckThreshold;
+    }
+
+    @Override
+    @InterfaceStability.Experimental
+    @InterfaceAudience.Public
+    public String dcpConnectionName() {
+        return dcpConnectionName;
     }
 
     @Override
@@ -889,6 +922,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     public static class Builder {
 
+        private boolean dcpEnabled = DCP_ENABLED;
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
@@ -905,6 +939,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int computationPoolSize = COMPUTATION_POOL_SIZE;
         private int responseBufferSize = RESPONSE_BUFFER_SIZE;
         private int requestBufferSize = REQUEST_BUFFER_SIZE;
+        private int dcpConnectionBufferSize = DCP_CONNECTION_BUFFER_SIZE;
+        private double dcpConnectionBufferAckThreshold = DCP_CONNECTION_BUFFER_ACK_THRESHOLD;
+        private String dcpConnectionName = DCP_CONNECTION_NAME;
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
@@ -955,6 +992,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
 
         protected Builder() {
+        }
+
+        /**
+         * Set if DCP should be enabled (only makes sense with server versions >= 3.0.0, default {@value #DCP_ENABLED}).
+         */
+        @Deprecated
+        public Builder dcpEnabled(final boolean dcpEnabled) {
+            this.dcpEnabled = dcpEnabled;
+            return this;
         }
 
         /**
@@ -1091,6 +1137,40 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder responseBufferSize(final int responseBufferSize) {
             this.responseBufferSize = responseBufferSize;
+            return this;
+        }
+
+        /**
+         * Sets the size of the buffer to control speed of DCP producer. The server will stop emitting data if
+         * the current value of the buffer reach this limit. Set it to zero to disable DCP flow control.
+         * (default value {@value #DCP_CONNECTION_BUFFER_SIZE}).
+         */
+        @Deprecated
+        public Builder dcpConnectionBufferSize(final int dcpConnectionBufferSize) {
+            this.dcpConnectionBufferSize = dcpConnectionBufferSize;
+            return this;
+        }
+
+        /**
+         * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
+         * a DCP Buffer Acknowledge message is sent to the server to signal producer how much data has been processed.
+         * (default value {@value #DCP_CONNECTION_BUFFER_ACK_THRESHOLD}).
+         */
+        @Deprecated
+        public Builder dcpConnectionBufferAckThreshold(final double dcpConnectionBufferAckThreshold) {
+            this.dcpConnectionBufferAckThreshold = dcpConnectionBufferAckThreshold;
+            return this;
+        }
+
+        /**
+         * Sets default name for DCP connection. It is used to identify streams on the server.
+         * (default value {@value #DCP_CONNECTION_NAME}).
+         */
+        @InterfaceStability.Experimental
+        @InterfaceAudience.Public
+        @Deprecated
+        public Builder dcpConnectionName(final String dcpConnectionName) {
+            this.dcpConnectionName = dcpConnectionName;
             return this;
         }
 
@@ -1503,16 +1583,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Allows to set the configuration poll interval which polls the server cluster
          * configuration proactively.
          *
-         * Note that the interval cannot be set lower than 50 milliseconds (other than 0
+         * Note that the interval cannot be set lower than 2500 millisconds (other than 0
          * to disable it).
          * @param configPollInterval the interval in milliseconds, 0 deactivates the polling.
          */
         @InterfaceStability.Experimental
         @InterfaceAudience.Public
         public Builder configPollInterval(long configPollInterval) {
-            if (configPollInterval < 50 && configPollInterval != 0) {
+            if (configPollInterval < 2500 && configPollInterval != 0) {
                 throw new IllegalArgumentException("The poll interval cannot be lower than " +
-                    "50 milliseconds");
+                    "2500 milliseconds");
             }
             this.configPollInterval = configPollInterval;
             return this;
@@ -1646,6 +1726,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", memcachedHashingStrategy=").append(memcachedHashingStrategy.getClass().getSimpleName());
         sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
+        sb.append(", dcpEnabled=").append(dcpEnabled);
         sb.append(", retryStrategy=").append(retryStrategy);
         sb.append(", maxRequestLifetime=").append(maxRequestLifetime);
         sb.append(", retryDelay=").append(retryDelay);
@@ -1660,12 +1741,14 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
         sb.append(", mutationTokensEnabled=").append(mutationTokensEnabled);
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
+        sb.append(", dcpConnectionBufferSize=").append(dcpConnectionBufferSize);
+        sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
+        sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
         sb.append(", disconnectTimeout=").append(disconnectTimeout);
         sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
         sb.append(", certAuthEnabled=").append(certAuthEnabled);
-        sb.append(", coreSendHook=").append(couchbaseCoreSendHook == null ? "null" :
-            couchbaseCoreSendHook.getClass().getSimpleName());
+
         return sb;
     }
 

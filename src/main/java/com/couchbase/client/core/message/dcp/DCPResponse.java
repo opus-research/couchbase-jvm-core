@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Couchbase, Inc.
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.hooks;
+
+package com.couchbase.client.core.message.dcp;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.lang.Tuple2;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.CouchbaseCore;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import rx.subjects.Subject;
 
 /**
- * This hook allows to intercept and modify the {@link CouchbaseRequest} in the
- * path of the {@link CouchbaseCore#send(CouchbaseRequest)} method.
+ * Common interface for all DCP responses.
  *
- * @author Michael Nitschinger
- * @since 1.4.8
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-@InterfaceAudience.Public
 @InterfaceStability.Experimental
-public interface CouchbaseCoreSendHook {
+@InterfaceAudience.Private
+@Deprecated
+public interface DCPResponse extends CouchbaseResponse {
+    /**
+     * The partition (vBucket) to use for this request.
+     *
+     * @return the partition to use.
+     */
+    short partition();
 
-    Tuple2<CouchbaseRequest, Subject<CouchbaseResponse, CouchbaseResponse>>
-        beforeSend(CouchbaseRequest originalRequest, Subject<CouchbaseResponse, CouchbaseResponse> originalResponse);
+    /**
+     * Set the partition ID.
+     *
+     * @param id the id of the partition.
+     * @return the {@link DCPRequest} for proper chaining.
+     */
+    DCPResponse partition(short id);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Couchbase, Inc.
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.hooks;
+
+package com.couchbase.client.core.message.dcp;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.CouchbaseCore;
-import com.couchbase.client.core.message.CouchbaseResponse;
-import rx.subjects.Subject;
+import com.couchbase.client.core.message.ResponseStatus;
 
 /**
- * This hook allows to intercept and modify the {@link CouchbaseRequest} in the
- * path of the {@link CouchbaseCore#send(CouchbaseRequest)} method.
- *
- * @author Michael Nitschinger
- * @since 1.4.8
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-@InterfaceAudience.Public
 @InterfaceStability.Experimental
-public interface CouchbaseCoreSendHook {
-
-    Tuple2<CouchbaseRequest, Subject<CouchbaseResponse, CouchbaseResponse>>
-        beforeSend(CouchbaseRequest originalRequest, Subject<CouchbaseResponse, CouchbaseResponse> originalResponse);
+@InterfaceAudience.Private
+@Deprecated
+public class StreamCloseResponse extends AbstractDCPResponse {
+    /**
+     * Sets the required properties for the response.
+     *
+     * @param status  the status of the response.
+     * @param request
+     */
+    public StreamCloseResponse(final ResponseStatus status, final CouchbaseRequest request) {
+        super(status, request);
+    }
 }
