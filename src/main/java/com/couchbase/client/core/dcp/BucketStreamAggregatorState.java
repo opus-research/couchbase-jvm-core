@@ -38,29 +38,19 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * Default state, which matches all changes in the stream.
      */
     public static final BucketStreamAggregatorState BLANK = new BucketStreamAggregatorState(0);
-    public static final BucketStreamAggregatorStateSerializer NULL_SERIALIZER =
-            new BucketStreamAggregatorStateSerializer() {
+    public static final BucketStreamAggregatorStateListener NULL_LISTENER =
+            new BucketStreamAggregatorStateListener() {
                 @Override
-                public void dump(BucketStreamAggregatorState state) {
+                public void onDump(BucketStreamAggregatorState state) {
                 }
 
                 @Override
-                public void dump(BucketStreamAggregatorState aggregatorState, int partition,
-                                 BucketStreamState streamState) {
-                }
-
-                @Override
-                public BucketStreamAggregatorState load(BucketStreamAggregatorState aggregatorState) {
-                    return BucketStreamAggregatorState.BLANK;
-                }
-
-                @Override
-                public BucketStreamState load(BucketStreamAggregatorState aggregatorState, int partition) {
-                    return BucketStreamState.BLANK;
+                public void onDump(BucketStreamAggregatorState aggregatorState, int partition,
+                                   BucketStreamState streamState) {
                 }
             };
 
-    private final BucketStreamAggregatorStateSerializer serializer;
+    private final BucketStreamAggregatorStateListener listener;
     private BucketStreamState[] feeds;
 
     /**
@@ -69,13 +59,13 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param feeds list containing state of each vBucket
      */
     public BucketStreamAggregatorState(final BucketStreamState[] feeds) {
-        this(feeds, NULL_SERIALIZER);
+        this(feeds, NULL_LISTENER);
     }
 
     public BucketStreamAggregatorState(final BucketStreamState[] feeds,
-                                       final BucketStreamAggregatorStateSerializer serializer) {
+                                       final BucketStreamAggregatorStateListener listener) {
         this.feeds = feeds;
-        this.serializer = serializer;
+        this.listener = listener;
     }
 
     /**
@@ -88,7 +78,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * @param numPartitions total number of states.
      */
     public BucketStreamAggregatorState(int numPartitions) {
-        this(numPartitions, NULL_SERIALIZER);
+        this(numPartitions, NULL_LISTENER);
     }
 
     /**
@@ -99,10 +89,10 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
      * the underlying container.
      *
      * @param numPartitions total number of states.
-     * @param serializer    object used to serialize state
+     * @param listener      object used to serialize state
      */
-    public BucketStreamAggregatorState(int numPartitions, final BucketStreamAggregatorStateSerializer serializer) {
-        this.serializer = serializer;
+    public BucketStreamAggregatorState(int numPartitions, final BucketStreamAggregatorStateListener listener) {
+        this.listener = listener;
         feeds = new BucketStreamState[numPartitions];
         Arrays.fill(feeds, BucketStreamState.BLANK);
     }
@@ -117,7 +107,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Sets state for particular vBucket and notifies serializer.
+     * Sets state for particular vBucket and notifies listener.
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
@@ -129,7 +119,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Sets state for particular vBucket and optionally notifies serializer.
+     * Sets state for particular vBucket and optionally notifies listener.
      *
      * @param partition vBucketID (partition number)
      * @param state     stream state
@@ -140,12 +130,12 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     public void set(int partition, final BucketStreamState state, boolean dump) {
         feeds[partition] = state;
         if (dump) {
-            serializer.dump(this, partition, state);
+            listener.onDump(this, partition, state);
         }
     }
 
     /**
-     * Replaces whole aggregator state and optionally notifies serializer.
+     * Replaces whole aggregator state and optionally notifies listener.
      *
      * @param feeds new state of partitions.
      */
@@ -154,7 +144,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
-     * Replaces whole aggregator state and optionally notifies serializer.
+     * Replaces whole aggregator state and optionally notifies listener.
      *
      * @param feeds new state of partitions.
      * @param dump  false if state serialization should be skipped
@@ -162,7 +152,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     public void replace(final BucketStreamState[] feeds, boolean dump) {
         this.feeds = feeds;
         if (dump) {
-            serializer.dump(this);
+            listener.onDump(this);
         }
     }
 

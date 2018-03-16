@@ -25,14 +25,14 @@ package com.couchbase.client.core.dcp;
 /**
  * @author Sergey Avseyev
  */
-public interface BucketStreamAggregatorStateSerializer {
+public interface BucketStreamAggregatorStateListener {
     /**
      * Serialize whole state of bucket stream aggregator.
      * Used during substitution of whole state in {@link BucketStreamAggregatorState#replace(BucketStreamState[])}
      *
      * @param aggregatorState the state being serialized
      */
-    void dump(BucketStreamAggregatorState aggregatorState);
+    void onDump(BucketStreamAggregatorState aggregatorState);
 
     /**
      * Serialize state of updated partition.
@@ -42,28 +42,5 @@ public interface BucketStreamAggregatorStateSerializer {
      * @param partition       updated partition index
      * @param streamState     new state of the stream
      */
-    void dump(BucketStreamAggregatorState aggregatorState, int partition, BucketStreamState streamState);
-
-    /**
-     * Load state of whole bucket stream aggregator.
-     * It might update the state in place, or return new one.
-     * <p/>
-     * Note that the core library does not use this method to update the state object.
-     *
-     * @param aggregatorState current bucket stream aggregator state
-     * @return new state loaded from external source
-     */
-    BucketStreamAggregatorState load(BucketStreamAggregatorState aggregatorState);
-
-    /**
-     * Load state of the partition stream.
-     * It might update the state in place, or return new one.
-     * <p/>
-     * Note that the core library does not use this method to update the state object.
-     *
-     * @param aggregatorState current bucket stream aggregator state
-     * @param partition       partition index
-     * @return new state loaded from external source
-     */
-    BucketStreamState load(BucketStreamAggregatorState aggregatorState, int partition);
+    void onDump(BucketStreamAggregatorState aggregatorState, int partition, BucketStreamState streamState);
 }
