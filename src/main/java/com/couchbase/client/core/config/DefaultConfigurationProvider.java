@@ -332,8 +332,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         ClusterConfig cluster = currentConfig.get();
         cluster.deleteBucketConfig(name);
         currentConfig.set(cluster);
-        if (currentConfig.get().bucketConfigs().size() > 0) {
-            configObservable.onNext(currentConfig.get());
-        }
+        configObservable.onNext(currentConfig.get());
     }
 }
