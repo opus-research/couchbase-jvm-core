@@ -85,8 +85,7 @@ public enum ResponseStatus {
     INTERNAL_ERROR,
 
     /**
-     * Generic failure status. Usually indicates a server status code that is
-     * unknown to the SDK (for binary responses it can be found in the response).
+     * Generic failure status.
      */
     FAILURE,
 
