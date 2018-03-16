@@ -46,6 +46,7 @@ import rx.functions.Func0;
 import rx.functions.Func1;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Provides a higher level abstraction over a DCP stream.
@@ -63,7 +64,7 @@ public class BucketStreamAggregator {
     private final ClusterFacade core;
     private final String bucket;
     private final String name;
-    private DCPConnection connection = null;
+    private final AtomicReference<DCPConnection> connection = new AtomicReference<DCPConnection>();
 
     public BucketStreamAggregator(final ClusterFacade core, final String bucket) {
         this(DEFAULT_CONNECTION_NAME, core, bucket);
@@ -147,7 +148,7 @@ public class BucketStreamAggregator {
                                 .flatMap(new Func1<List<StreamRequestResponse>, Observable<DCPRequest>>() {
                                     @Override
                                     public Observable<DCPRequest> call(List<StreamRequestResponse> streamRequestResponses) {
-                                        return connection.subject();
+                                        return connection.get().subject();
                                     }
                                 });
                     }
@@ -208,17 +209,17 @@ public class BucketStreamAggregator {
     }
 
     private Observable<DCPConnection> open() {
-        if (connection == null) {
+        if (connection.get() == null) {
             return core.<OpenConnectionResponse>send(new OpenConnectionRequest(name, bucket))
                     .flatMap(new Func1<OpenConnectionResponse, Observable<DCPConnection>>() {
                         @Override
                         public Observable<DCPConnection> call(final OpenConnectionResponse response) {
-                            connection = response.connection();
-                            return Observable.just(connection);
+                            connection.compareAndSet(null, response.connection());
+                            return Observable.just(connection.get());
                         }
                     });
         }
-        return Observable.just(connection);
+        return Observable.just(connection.get());
     }
 
     /**
