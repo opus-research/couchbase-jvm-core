@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,19 +21,19 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 
 /**
- * A sub-document get operation.
+ * A sub-document get count operation.
  *
- * @author Simon Baslé
- * @since 1.2
+ * @author Michael Nitschinger
+ * @since 1.5
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
-public class SubGetRequest extends AbstractSubdocRequest {
+public class SubGetCountRequest extends AbstractSubdocRequest {
 
     private boolean xattr;
 
     /**
-     * Creates a new {@link SubGetRequest}.
+     * Creates a new {@link SubGetCountRequest}.
      *
      * @param key      the key of the document.
      * @param path     the subdocument path to consider inside the document.
@@ -41,7 +41,7 @@ public class SubGetRequest extends AbstractSubdocRequest {
      * @throws NullPointerException     if the path is null (see {@link #EXCEPTION_NULL_PATH})
      * @throws IllegalArgumentException if the path is empty (see {@link #EXCEPTION_EMPTY_PATH})
      */
-    public SubGetRequest(String key, String path, String bucket) {
+    public SubGetCountRequest(String key, String path, String bucket) {
         super(key, path, bucket);
         if (path.isEmpty()) {
             cleanUpAndThrow(EXCEPTION_EMPTY_PATH);
@@ -52,11 +52,11 @@ public class SubGetRequest extends AbstractSubdocRequest {
 
     /**
      * {@inheritDoc}
-     * @return {@link KeyValueHandler#OP_SUB_GET}
+     * @return {@link KeyValueHandler#OP_SUB_GET_COUNT}
      */
     @Override
     public byte opcode() {
-        return KeyValueHandler.OP_SUB_GET;
+        return KeyValueHandler.OP_SUB_GET_COUNT;
     }
 
     public boolean xattr() {

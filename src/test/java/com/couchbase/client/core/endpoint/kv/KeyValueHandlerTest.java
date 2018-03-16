@@ -911,7 +911,8 @@ public class KeyValueHandlerTest {
 
             @Override
             protected CoreEnvironment env() {
-                return DefaultCoreEnvironment.create();
+                return DefaultCoreEnvironment.builder()
+                    .continuousKeepAliveEnabled(false).build();
             }
         };
         EmbeddedChannel channel = new EmbeddedChannel(testHandler);
@@ -989,4 +990,26 @@ public class KeyValueHandlerTest {
         assertTrue(onErrorEvents.get(0).getCause() instanceof IllegalReferenceCountException);
     }
 
+    @Test
+    public void testUnSubscribedRequest() {
+        String id = "key";
+        GetRequest request = new GetRequest(id, BUCKET);
+
+        TestSubscriber<CouchbaseResponse> ts = TestSubscriber.create();
+        request.subscriber(ts);
+
+        ts.unsubscribe();
+        assertTrue(!request.isActive());
+    }
+
+    @Test
+    public void testRequestSubscription() {
+        String id = "key";
+        GetRequest request = new GetRequest(id, BUCKET);
+
+        TestSubscriber<CouchbaseResponse> ts = TestSubscriber.create();
+        request.subscriber(ts);
+
+        assertTrue(request.isActive());
+    }
 }

@@ -27,6 +27,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.ResponseStatusDetails;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -77,6 +78,7 @@ import com.couchbase.client.core.message.kv.subdoc.multi.Mutation;
 import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommand;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
 import com.couchbase.client.core.message.kv.subdoc.simple.SubExistRequest;
+import com.couchbase.client.core.message.kv.subdoc.simple.SubGetCountRequest;
 import com.couchbase.client.core.message.kv.subdoc.simple.SubGetRequest;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.time.Delay;
@@ -104,6 +106,7 @@ import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.AUTH
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.AUTO_RETRY;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.CONN_STATE_INVALIDATED;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.FETCH_CONFIG;
+import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.ITEM_LOCKED;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.RETRY_LATER;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.RETRY_NOW;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.SUBDOC;
@@ -164,6 +167,7 @@ public class KeyValueHandler
     public static final byte OP_SUB_COUNTER = (byte) 0xcf;
     public static final byte OP_SUB_MULTI_LOOKUP = (byte) 0xd0;
     public static final byte OP_SUB_MULTI_MUTATION = (byte) 0xd1;
+    public static final byte OP_SUB_GET_COUNT = (byte) 0xd2;
 
     /**
      * The bitmask for sub-document extras "command" section (third byte of the extras) that activates the
@@ -179,17 +183,8 @@ public class KeyValueHandler
     /**
      * The bitmask for sub-document create document
      */
-    public static final byte SUBDOC_DOCFLAG_MKDOC = (byte) 0x1;
+    public static final byte SUBDOC_FLAG_MKDOC = (byte) 0x1;
 
-    /**
-     * The bitmask for sub-document add document
-     */
-    public static final byte SUBDOC_DOCFLAG_ADD = (byte) 0x2;
-
-    /**
-     * The bitmask for sub-document access deleted
-     */
-    public static final byte SUBDOC_DOCFLAG_ACCESS_DELETED = (byte) 0x3;
 
     boolean seqOnMutation = false;
 
@@ -624,11 +619,9 @@ public class KeyValueHandler
 
             byte docFlags = 0;
             if (mut.createDocument()) {
-                docFlags |= SUBDOC_DOCFLAG_MKDOC;
+                docFlags |= SUBDOC_FLAG_MKDOC;
             }
-            if (mut.addDocument()) {
-                docFlags |= SUBDOC_DOCFLAG_ADD;
-            }
+
             if (docFlags != 0) {
                 extrasLength += 1;
                 extras.writeByte(docFlags);
@@ -642,20 +635,19 @@ public class KeyValueHandler
             } else {
                 extras.writeByte(0);
             }
-            if (req.accessDeleted()) {
-                extrasLength += 1;
-                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
-            }
         } else if (msg instanceof SubExistRequest) {
-            SubExistRequest req =  (SubExistRequest)msg;
+            SubExistRequest req = (SubExistRequest) msg;
             if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
                 extras.writeByte(0);
             }
-            if (req.accessDeleted()) {
-                extrasLength += 1;
-                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
+        } else if (msg instanceof SubGetCountRequest) {
+            SubGetCountRequest req = (SubGetCountRequest) msg;
+            if (req.xattr()) {
+                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
+            } else {
+                extras.writeByte(0);
             }
         } else {
             extras.writeByte(0);
@@ -676,20 +668,10 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        byte extrasLength = 0;
-
-        ByteBuf extras = Unpooled.EMPTY_BUFFER;
-
-        if (msg.docFlags() != 0) {
-            extrasLength = 1;
-            extras = ctx.alloc().buffer(extrasLength, extrasLength);
-            extras.writeByte(msg.docFlags());
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
         request.setOpcode(OP_SUB_MULTI_LOOKUP)
                 .setKeyLength(keyLength)
-                .setExtrasLength(extrasLength)
+                .setExtrasLength((byte) 0)
                 .setTotalBodyLength(keyLength + msg.content().readableBytes());
 
         return request;
@@ -741,7 +723,13 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
-        ErrorMap.ErrorCode errorCode = ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus());
+        ResponseStatusDetails statusDetails = ResponseStatusConverter.detailsFromBinary(
+            msg.getDataType(),
+            msg.content()
+        );
+
+        // Only consult the error map if we don't know what the code is!
+        ErrorMap.ErrorCode errorCode = status == ResponseStatus.FAILURE ? ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus()) : null;
 
         if (errorCode != null) {
             LOGGER.debug("ResponseStatus with Extended Error Code {}", errorCode.toString());
@@ -769,6 +757,15 @@ public class KeyValueHandler
                 LOGGER.debug(logIdent(ctx, endpoint()) +
                         "Authentication failure using error code translation");
                 status = ResponseStatus.ACCESS_ERROR;
+            }
+
+            // For LOCKED we need to make sure we are not retrying to preserve
+            // backwards compatible behavior (that is, not retry...)!
+            if (errorCode.attributes().contains(ITEM_LOCKED)) {
+                errorCode.attributes().remove(RETRY_NOW);
+                errorCode.attributes().remove(RETRY_LATER);
+                errorCode.attributes().remove(AUTO_RETRY);
+                status = ResponseStatus.LOCKED;
             }
 
             if (errorCode.attributes().contains(AUTO_RETRY) ||
@@ -835,6 +832,11 @@ public class KeyValueHandler
         } else {
             finishedDecoding();
         }
+
+        if (statusDetails != null) {
+            response.statusDetails(statusDetails);
+        }
+
         return response;
     }
 

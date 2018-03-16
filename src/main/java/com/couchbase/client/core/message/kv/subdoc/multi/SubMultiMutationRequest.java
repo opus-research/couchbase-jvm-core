@@ -68,10 +68,7 @@ public class SubMultiMutationRequest extends AbstractKeyValueRequest implements 
         this.expiration = expiration;
         this.cas = cas;
         if (docOptionsBuilder.createDocument()) {
-            this.docFlags |= SUBDOC_DOCFLAG_MKDOC;
-        }
-        if (docOptionsBuilder.addDocument()) {
-            this.docFlags |= SUBDOC_DOCFLAG_ADD;
+            this.docFlags |= SUBDOC_FLAG_MKDOC;
         }
     }
 
