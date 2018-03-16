@@ -41,7 +41,7 @@ public class DefaultBinaryMemcacheResponse extends AbstractBinaryMemcacheMessage
      *
      * @param key    the key to use
      */
-    public DefaultBinaryMemcacheResponse(byte[] key) {
+    public DefaultBinaryMemcacheResponse(String key) {
         this(key, null);
     }
 
@@ -60,7 +60,7 @@ public class DefaultBinaryMemcacheResponse extends AbstractBinaryMemcacheMessage
      * @param key    the key to use.
      * @param extras the extras to use.
      */
-    public DefaultBinaryMemcacheResponse(byte[] key, ByteBuf extras) {
+    public DefaultBinaryMemcacheResponse(String key, ByteBuf extras) {
         super(key, extras);
         setMagic(RESPONSE_MAGIC_BYTE);
     }

@@ -112,8 +112,8 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
      * @return the request to send over the wire
      */
     private FullBinaryMemcacheRequest helloRequest() {
-        byte[] key = userAgent.getBytes(CharsetUtil.UTF_8);
-        short keyLength = (short) key.length;
+        String key = userAgent;
+        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
 
         ByteBuf wanted = Unpooled.buffer(features.size() * 2);
         for (ServerFeatures feature : features) {
