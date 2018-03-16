@@ -28,7 +28,6 @@ public class NotConnectedException extends CouchbaseException {
     private static final long serialVersionUID = 1093906979963191815L;
 
     public NotConnectedException() {
-	super();
     }
 
     public NotConnectedException(String message) {

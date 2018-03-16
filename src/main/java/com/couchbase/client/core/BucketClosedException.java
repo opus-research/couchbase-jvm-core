@@ -25,7 +25,6 @@ package com.couchbase.client.core;
 public class BucketClosedException extends CouchbaseException {
 
     public BucketClosedException() {
-	super();
     }
 
     public BucketClosedException(String message) {

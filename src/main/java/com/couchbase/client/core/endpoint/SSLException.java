@@ -26,7 +26,6 @@ import com.couchbase.client.core.CouchbaseException;
 public class SSLException extends CouchbaseException {
 
     public SSLException() {
-	super();
     }
 
     public SSLException(String message) {

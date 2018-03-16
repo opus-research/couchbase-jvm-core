@@ -26,7 +26,6 @@ package com.couchbase.client.core;
 public class ReplicaNotAvailableException extends CouchbaseException {
 
     public ReplicaNotAvailableException() {
-	super();
     }
 
     public ReplicaNotAvailableException(String message) {
