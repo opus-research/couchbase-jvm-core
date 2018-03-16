@@ -29,17 +29,17 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.node.locate.ConfigLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
+import com.couchbase.client.core.node.locate.ConfigLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
 import com.couchbase.client.core.node.locate.ViewLocator;
@@ -51,13 +51,15 @@ import com.lmax.disruptor.RingBuffer;
 import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -123,7 +125,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(new CopyOnWriteArraySet<Node>(), environment, configObservable, responseBuffer);
+        this(Collections.newSetFromMap(new ConcurrentHashMap<Node, Boolean>(INITIAL_NODE_SIZE)), environment,
+            configObservable, responseBuffer);
     }
 
     /**
@@ -156,40 +159,41 @@ public class RequestHandler implements EventHandler<RequestEvent> {
 
     @Override
     public void onEvent(final RequestEvent event, long sequence, final boolean endOfBatch) throws Exception {
-        try {
-            final CouchbaseRequest request = event.getRequest();
+        final CouchbaseRequest request = event.getRequest();
 
-            //prevent non-bootstrap requests to go through if bucket not part of config
-            if (!(request instanceof BootstrapMessage)) {
-                ClusterConfig config = configuration.get();
-                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
-                    request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
-                    return;
-                }
-            }
-
-            Node[] found = locator(request).locate(request, nodes, configuration.get());
-
-            if (found == null) {
+        //prevent non-bootstrap requests to go through if bucket not part of config
+        if (!(request instanceof BootstrapMessage)) {
+            ClusterConfig config = configuration.get();
+            if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
+                request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
+                event.setRequest(null);
                 return;
             }
-            if (found.length == 0) {
-                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
-            }
-            for (int i = 0; i < found.length; i++) {
-                try {
-                    found[i].send(request);
-                } catch (Exception ex) {
-                    request.observable().onError(ex);
-                }
-            }
-            if (endOfBatch) {
-                for (Node node : nodes) {
-                    node.send(SignalFlush.INSTANCE);
-                }
-            }
-        } finally {
+        }
+
+        Node[] found = locator(request).locate(request, nodes, configuration.get());
+
+        if (found == null) {
             event.setRequest(null);
+            return;
+        }
+        if (found.length == 0) {
+            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+            event.setRequest(null);
+        }
+        for (int i = 0; i < found.length; i++) {
+            try {
+                found[i].send(request);
+            } catch (Exception ex) {
+                request.observable().onError(ex);
+            } finally {
+                event.setRequest(null);
+            }
+        }
+        if (endOfBatch) {
+            for (Node node : nodes) {
+                node.send(SignalFlush.INSTANCE);
+            }
         }
     }
 

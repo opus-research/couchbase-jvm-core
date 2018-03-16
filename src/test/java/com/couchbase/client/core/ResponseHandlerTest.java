@@ -32,10 +32,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import org.junit.Test;
-import rx.subjects.Subject;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -60,13 +58,10 @@ public class ResponseHandlerTest {
 
         ResponseEvent retryEvent = new ResponseEvent();
         retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, 0, "bucket", config, mock(InsertRequest.class)));
-        retryEvent.setObservable(mock(Subject.class));
         handler.onEvent(retryEvent, 1, true);
 
         verify(providerMock, times(1)).proposeBucketConfig("bucket", "{\"json\": true}");
         assertEquals(0, config.refCnt());
-        assertNull(retryEvent.getMessage());
-        assertNull(retryEvent.getObservable());
     }
 
     @Test
@@ -78,13 +73,10 @@ public class ResponseHandlerTest {
 
         ResponseEvent retryEvent = new ResponseEvent();
         retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, 0, "bucket", config, mock(InsertRequest.class)));
-        retryEvent.setObservable(mock(Subject.class));
         handler.onEvent(retryEvent, 1, true);
 
         verify(providerMock, never()).proposeBucketConfig("bucket", "Not my Vbucket");
         assertEquals(0, config.refCnt());
-        assertNull(retryEvent.getMessage());
-        assertNull(retryEvent.getObservable());
     }
 
 }
