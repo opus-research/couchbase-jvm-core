@@ -39,7 +39,7 @@ public class TestProperties {
      * Initialize static the properties.
      */
     static {
-        seedNode = System.getProperty("seedNode", "10.112.110.101");
+        seedNode = System.getProperty("seedNode", "127.0.0.1");
         bucket = System.getProperty("bucket", "default");
         password = System.getProperty("password", "");
         adminUser = System.getProperty("adminUser", "Administrator");
