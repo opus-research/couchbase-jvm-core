@@ -37,9 +37,8 @@ public class GetResponse extends AbstractKeyValueResponse {
     private final long cas;
     private final int flags;
 
-    public GetResponse(final ResponseStatus status, final short serverStatusCode, final long cas, final int flags,
-                       final String bucket, final ByteBuf content, final CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, content, request);
+    public GetResponse(final ResponseStatus status, final long cas, final int flags, final String bucket, final ByteBuf content, final CouchbaseRequest request) {
+        super(status, bucket, content, request);
         this.cas = cas;
         this.flags = flags;
     }
@@ -54,14 +53,8 @@ public class GetResponse extends AbstractKeyValueResponse {
 
     @Override
     public String toString() {
-        return new StringBuilder()
-                .append("GetResponse{")
-                .append("bucket='").append(bucket()).append('\'')
-                .append(", status=").append(status()).append(" (").append(serverStatusCode()).append(')')
-                .append(", cas=").append(cas)
-                .append(", flags=").append(flags)
-                .append(", request=").append(request())
-                .append(", content=").append(content().toString(CharsetUtil.UTF_8))
-                .append('}').toString();
+        return "GetResponse{" + "bucket='" + bucket() + '\'' + ", status=" + status() + ", cas=" + cas
+            + ", flags=" + flags + ", request=" + request() + ", content="
+            + content().toString(CharsetUtil.UTF_8) + '}';
     }
 }
