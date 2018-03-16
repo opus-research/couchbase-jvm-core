@@ -168,7 +168,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             request.content().writeBytes(query);
             query.release();
         } else if (msg instanceof KeepAliveRequest) {
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
+            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, "/");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
         } else {
             throw new IllegalArgumentException("Unknown incoming QueryRequest type "
@@ -192,10 +192,12 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         if (currentRequest() instanceof KeepAliveRequest) {
-            response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
-            responseContent.clear();
-            responseContent.discardReadBytes();
-            finishedDecoding();
+            if (msg instanceof LastHttpContent) {
+                response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
+                responseContent.clear();
+                responseContent.discardReadBytes();
+                finishedDecoding();
+            }
         } else if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
             boolean lastChunk = msg instanceof LastHttpContent;
