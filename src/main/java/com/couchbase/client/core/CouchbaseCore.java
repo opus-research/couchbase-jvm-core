@@ -180,6 +180,7 @@ public class CouchbaseCore implements ClusterFacade {
             @Override
             public void handleEventException(Throwable ex, long sequence, Object event) {
                 LOGGER.warn("Exception while Handling Request Events {}, {}", event, ex);
+                ex.printStackTrace();
             }
 
             @Override
