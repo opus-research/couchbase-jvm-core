@@ -27,14 +27,14 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 import rx.Observable;
 import rx.subjects.PublishSubject;
 
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * State of the stream aggregator.
  * <p/>
- * It contains list of the stream states.
+ * It basically contains list of the stream states.
  *
  * @author Sergey Avseyev
  * @since 1.2.0
@@ -42,17 +42,37 @@ import java.util.Map;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class BucketStreamAggregatorState implements Iterable<BucketStreamState> {
-    private final String name;
-    private final PublishSubject<BucketStreamStateUpdatedEvent> updates = PublishSubject.create();
-    private final Map<Short, BucketStreamState> feeds = new HashMap<Short, BucketStreamState>(1024);
+    /**
+     * Default state, which matches all changes in the stream.
+     */
+    public static final BucketStreamAggregatorState BLANK = new BucketStreamAggregatorState(0);
+
+    private final PublishSubject<BucketStreamStateUpdatedEvent> updates;
+    private BucketStreamState[] feeds;
 
     /**
      * Creates a new {@link BucketStreamAggregatorState}.
      *
-     * @param name name of the DCP connection.
+     * @param feeds list containing state of each vBucket
      */
-    public BucketStreamAggregatorState(final String name) {
-        this.name = name;
+    public BucketStreamAggregatorState(final BucketStreamState[] feeds) {
+        this.feeds = feeds;
+        updates = PublishSubject.create();
+    }
+
+    /**
+     * Creates a new {@link BucketStreamAggregatorState}.
+     * <p/>
+     * Initializes each entry with empty state BucketStreamState.BLANK. Note that it will throw
+     * {@link IndexOutOfBoundsException} during set if requested partition index will not fit
+     * the underlying container.
+     *
+     * @param numPartitions total number of states.
+     */
+    public BucketStreamAggregatorState(int numPartitions) {
+        updates = PublishSubject.create();
+        feeds = new BucketStreamState[numPartitions];
+        Arrays.fill(feeds, BucketStreamState.BLANK);
     }
 
     /**
@@ -63,61 +83,107 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     }
 
     /**
+     * Returns number of aggregated partitions.
+     *
+     * @return number of partitions.
+     */
+    public int numPartitions() {
+        return feeds.length;
+    }
+
+    /**
      * Sets state for particular vBucket and notifies listener.
      *
-     * @param state stream state
+     * @param partition vBucketID (partition number)
+     * @param state     stream state
+     * @throws IndexOutOfBoundsException if the state holder is BLANK, or allocated less
+     *                                   partition slots then requested index.
      */
-    public void put(final BucketStreamState state) {
-        put(state, true);
+    public void set(int partition, final BucketStreamState state) {
+        set(partition, state, true);
     }
 
     /**
      * Sets state for particular vBucket and optionally notifies listener.
      *
-     * @param state  stream state
+     * @param partition vBucketID (partition number)
+     * @param state     stream state
+     * @param notify    false if state notification should be skipped
+     * @throws IndexOutOfBoundsException if the state holder is BLANK, or allocated less
+     *                                   partition slots then requested index.
+     */
+    public void set(int partition, final BucketStreamState state, boolean notify) {
+        feeds[partition] = state;
+        if (notify) {
+            updates.onNext(new BucketStreamStateUpdatedEvent(this, partition));
+        }
+    }
+
+    /**
+     * Replaces whole aggregator state and optionally notifies listener.
+     *
+     * @param feeds new state of partitions.
+     */
+    public void replace(final BucketStreamState[] feeds) {
+        replace(feeds, true);
+    }
+
+    /**
+     * Replaces whole aggregator state and optionally notifies listener.
+     *
+     * @param feeds  new state of partitions.
      * @param notify false if state notification should be skipped
      */
-    public void put(final BucketStreamState state, boolean notify) {
-        feeds.put(state.partition(), state);
+    public void replace(final BucketStreamState[] feeds, boolean notify) {
+        this.feeds = feeds;
         if (notify) {
-            updates.onNext(new BucketStreamStateUpdatedEvent(this, state));
+            updates.onNext(new BucketStreamStateUpdatedEvent(this));
         }
+    }
+
+    @Override
+    public Iterator<BucketStreamState> iterator() {
+        return new BucketStreamAggregatorStateIterator(feeds);
     }
 
     /**
      * Returns state for the vBucket
      *
      * @param partition vBucketID (partition number).
-     * @return state or null if state of partition not tracked.
+     * @return state or BucketStreamState.BLANK
      */
-    public BucketStreamState get(short partition) {
-        return feeds.get(partition);
-    }
-
-    public BucketStreamState remove(short partition) {
-        return feeds.remove(partition);
-    }
-
-    public int size() {
-        return feeds.size();
+    public BucketStreamState get(int partition) {
+        if (feeds.length > partition) {
+            return feeds[partition];
+        } else {
+            return BucketStreamState.BLANK;
+        }
     }
 
     /**
-     * Returns name of the DCP stream.
-     *
-     * @return name of the DCP stream.
+     * Helper class to iterate over {@link BucketStreamAggregatorState}.
      */
-    public String name() {
-        return name;
-    }
+    public class BucketStreamAggregatorStateIterator implements Iterator<BucketStreamState> {
+        private final BucketStreamState[] feeds;
+        private int index;
 
-    @Override
-    public Iterator<BucketStreamState> iterator() {
-        return feeds.values().iterator();
-    }
+        public BucketStreamAggregatorStateIterator(final BucketStreamState[] feeds) {
+            this.feeds = feeds;
+            this.index = 0;
+        }
 
-    @Override
-    public String toString() {
-        return feeds.values().toString();
+        @Override
+        public boolean hasNext() {
+            return index != feeds.length;
+        }
+
+        @Override
+        public BucketStreamState next() {
+            if (hasNext()) {
+                return feeds[index++];
+            } else {
+                throw new NoSuchElementException("There are no elements. size = " + feeds.length);
+            }
+        }
     }
 }
