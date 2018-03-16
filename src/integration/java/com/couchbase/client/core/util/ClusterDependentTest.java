@@ -66,7 +66,6 @@ public class ClusterDependentTest {
 
     static {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-        System.setProperty("com.couchbase.xerrorEnabled", "true");
     }
 
     private static final String seedNode = TestProperties.seedNode();
@@ -136,8 +135,10 @@ public class ClusterDependentTest {
          * If we are running under RBAC, set the user and password to the admin
          * credentials which will always work. This hopefully makes the test suite
          * forwards and backwards compat.
+         *
+         * Also, the mock currently doesn't support RBAC so ignore it if set.
          */
-        if (minClusterVersion()[0] >= 5) {
+        if (minClusterVersion()[0] >= 5 && !useMock) {
             username = adminUser;
             password = adminPassword;
         }
@@ -158,9 +159,7 @@ public class ClusterDependentTest {
             }
 
         }
-        env = envBuilder.dcpEnabled(true)
-                .dcpConnectionBufferSize(1024)          // 1 kilobyte
-                .dcpConnectionBufferAckThreshold(0.5)   // should trigger BUFFER_ACK after 512 bytes
+        env = envBuilder
                 .mutationTokensEnabled(true)
                 .keepAliveInterval(KEEPALIVE_INTERVAL)
                 .build();
@@ -203,15 +202,6 @@ public class ClusterDependentTest {
     }
 
     public static CouchbaseMock mock() { return couchbaseMock; }
-
-    /**
-     * Checks based on the cluster node versions if DCP is available.
-     *
-     * @return true if all nodes in the cluster are version 3 or later.
-     */
-    public static boolean isDCPEnabled() throws Exception {
-        return minNodeVersion()[0] >= 3;
-    }
 
     public static boolean isMutationMetadataEnabled() throws Exception {
         return minNodeVersion()[0] >= 4;
