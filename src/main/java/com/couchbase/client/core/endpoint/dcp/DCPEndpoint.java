@@ -41,15 +41,16 @@ public class DCPEndpoint extends AbstractEndpoint {
 
     public DCPEndpoint(String hostname, String bucket, String password, int port,
                        CoreEnvironment environment, RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
+        super(hostname, bucket, password, port, environment, responseBuffer, true);
     }
 
     @Override
     protected void customEndpointHandlers(ChannelPipeline pipeline) {
         pipeline
-            .addLast(new BinaryMemcacheClientCodec())
-            .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
-            .addLast(new KeyValueAuthHandler(bucket(), password()))
-            .addLast(new DCPHandler(this, responseBuffer(), false));
+                .addLast(new BinaryMemcacheClientCodec())
+                .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
+                .addLast(new KeyValueAuthHandler(bucket(), password()))
+                .addLast(new DCPHandler(this, responseBuffer(), true));
+
     }
 }
