@@ -57,13 +57,14 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
 
     private final List<ServerFeatures> features;
     private final String userAgent;
+    private final String bucket;
 
     /**
      * The connect promise issued by the connect process.
      */
     private ChannelPromise originalPromise;
 
-    public KeyValueFeatureHandler(CoreEnvironment environment) {
+    public KeyValueFeatureHandler(CoreEnvironment environment, String bucket) {
         userAgent = environment.userAgent();
         boolean tcpNodelay = environment.tcpNodelayEnabled();
 
@@ -73,6 +74,8 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
         }
         features.add(tcpNodelay ? ServerFeatures.TCPNODELAY : ServerFeatures.TCPDELAY);
         features.add(ServerFeatures.XATTR);
+        features.add(ServerFeatures.SELECT_BUCKET);
+        this.bucket = bucket;
     }
 
     @Override

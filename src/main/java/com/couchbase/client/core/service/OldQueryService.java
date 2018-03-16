@@ -42,6 +42,7 @@ public class OldQueryService extends AbstractPoolingService {
      */
     private static final EndpointFactory FACTORY = new QueryEndpointFactory();
 
+
     /**
      * Creates a new {@link QueryService}.
      *
@@ -52,9 +53,25 @@ public class OldQueryService extends AbstractPoolingService {
      * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public OldQueryService(final String hostname, final String bucket, final String password, final int port,
-                        final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.queryEndpoints(), env.queryEndpoints(), STRATEGY,
+    public OldQueryService(final String hostname, final String bucket, final String password,
+                           final int port, final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
+        this(hostname, bucket, bucket, password, port, env, responseBuffer);
+    }
+
+    /**
+     * Creates a new {@link QueryService}.
+     *
+     * @param hostname the hostname of the service.
+     * @param bucket the name of the bucket.
+     * @param username the user authorized for bucket access.
+     * @param password the password of the bucket.
+     * @param port the port of the service.
+     * @param env the shared environment.
+     * @param responseBuffer the shared response buffer.
+     */
+    public OldQueryService(final String hostname, final String bucket, final String username, final String password,
+                           final int port, final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
+        super(hostname, bucket, username, password, port, env, env.queryEndpoints(), env.queryEndpoints(), STRATEGY,
                 responseBuffer, FACTORY);
     }
 
@@ -67,11 +84,11 @@ public class OldQueryService extends AbstractPoolingService {
     /**
      * The factory for {@link com.couchbase.client.core.endpoint.query.QueryEndpoint}s.
      */
-    static class QueryEndpointFactory implements EndpointFactory {
+    static class QueryEndpointFactory extends AbstractEndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
                                final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new QueryEndpoint(hostname, bucket, password, port, env, responseBuffer);
+            return new QueryEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
         }
     }
 }

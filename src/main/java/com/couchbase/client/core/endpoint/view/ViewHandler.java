@@ -557,7 +557,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null);
+            super(null, null, null);
         }
     }
 
