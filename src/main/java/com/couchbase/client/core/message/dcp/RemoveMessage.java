@@ -33,7 +33,8 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-public class RemoveMessage extends AbstractDCPMessage {
+public class RemoveMessage extends AbstractDCPRequest {
+    private final String key;
     private final long cas;
     private final long bySequenceNumber;
     private final long revisionSequenceNumber;
@@ -43,10 +44,16 @@ public class RemoveMessage extends AbstractDCPMessage {
     }
 
     public RemoveMessage(short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket, String password) {
-        super(partition, key, bucket, password);
+        super(bucket, password);
+        this.partition(partition);
+        this.key = key;
         this.cas = cas;
         this.bySequenceNumber = bySequenceNumber;
         this.revisionSequenceNumber = revisionSequenceNumber;
+    }
+
+    public String key() {
+        return key;
     }
 
     public long cas() {

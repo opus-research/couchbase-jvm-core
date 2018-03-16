@@ -278,7 +278,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                 extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
                 flags = extras.readInt();
                 extras.release();
-                request = new StreamEndMessage(msg.getStatus(), StreamEndMessage.Reason.valueOf(flags), connection.bucket());
+                request = new StreamEndMessage(StreamEndMessage.Reason.valueOf(flags), connection.bucket());
                 connection.removeStream(msg.getOpaque());
                 updateConnectionStats(ctx, connection, msg);
                 break;
