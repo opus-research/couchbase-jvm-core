@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import java.net.InetAddress;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -42,17 +41,5 @@ public class DefaultCouchbaseBucketConfigTest {
 
         assertTrue(config.hasPrimaryPartitionsOnNode(InetAddress.getByName("1.2.3.4")));
         assertFalse(config.hasPrimaryPartitionsOnNode(InetAddress.getByName("2.3.4.5")));
-        assertEquals(BucketNodeLocator.VBUCKET, config.locator());
-    }
-
-    @Test
-    public void shouldFallbackToNodeHostnameIfNotInNodesExt() throws Exception {
-        String raw = Resources.read("nodes_ext_without_hostname.json", getClass());
-        CouchbaseBucketConfig config = JSON_MAPPER.readValue(raw, CouchbaseBucketConfig.class);
-
-        InetAddress expected = InetAddress.getByName("1.2.3.4");
-        assertEquals(1, config.nodes().size());
-        assertEquals(expected, config.nodes().get(0).hostname());
-        assertEquals(BucketNodeLocator.VBUCKET, config.locator());
     }
 }

@@ -23,7 +23,6 @@ package com.couchbase.client.core.config.loader;
 
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.ConfigurationException;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -39,10 +38,9 @@ import rx.Observable;
 
 import java.net.InetAddress;
 
-import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -86,10 +84,9 @@ public class CarrierLoaderTest {
         ClusterFacade cluster = mock(ClusterFacade.class);
         ByteBuf content = Unpooled.copiedBuffer("myconfig", CharsetUtil.UTF_8);
         Observable<CouchbaseResponse> response = Observable.just(
-                (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.SUCCESS,
-                        ResponseStatusConverter.BINARY_SUCCESS, "bucket", content, host)
+                (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.SUCCESS, "bucket", content, host)
         );
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(response);
+        when(cluster.send(isA(GetBucketConfigRequest.class))).thenReturn(response);
 
         CarrierLoader loader = new CarrierLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);
@@ -100,10 +97,9 @@ public class CarrierLoaderTest {
     public void shouldThrowExceptionIfNotDiscovered() {
         ClusterFacade cluster = mock(ClusterFacade.class);
         Observable<CouchbaseResponse> response = Observable.just(
-                (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.FAILURE,
-                        ResponseStatusConverter.BINARY_ERR_NOT_FOUND, "bucket", Unpooled.EMPTY_BUFFER, host)
+                (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.FAILURE, "bucket", Unpooled.EMPTY_BUFFER, host)
         );
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(response);
+        when(cluster.send(isA(GetBucketConfigRequest.class))).thenReturn(response);
 
         CarrierLoader loader = new CarrierLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);

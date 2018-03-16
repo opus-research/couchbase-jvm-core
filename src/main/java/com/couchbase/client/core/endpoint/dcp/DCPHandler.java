@@ -46,7 +46,6 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBina
 import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.functions.Action1;
 
@@ -261,7 +260,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
 
         String key = msg.connectionName();
         byte extrasLength = (byte) extras.readableBytes();
-        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
+        short keyLength = (short) key.length();
 
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key, extras);
         request.setOpcode(OP_OPEN_CONNECTION);

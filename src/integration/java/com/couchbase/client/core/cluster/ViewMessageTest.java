@@ -31,7 +31,6 @@ import org.junit.Test;
 import rx.functions.Action1;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Verifies basic functionality of view operations.
@@ -44,13 +43,16 @@ public class ViewMessageTest extends ClusterDependentTest {
     @Test
     public void shouldQueryNonExistentView() {
         ViewQueryResponse single = cluster()
-            .<ViewQueryResponse>send(new ViewQueryRequest("designdoc", "foobar", false, "debug=true", null, bucket(), password()))
+            .<ViewQueryResponse>send(new ViewQueryRequest("designdoc", "foobar", false, "debug=true", bucket(), password()))
             .toBlocking()
             .single();
         assertEquals(ResponseStatus.NOT_EXISTS, single.status());
-        String error = single.error().toBlocking().singleOrDefault(null);
-        assertNotNull(error);
-
+        single.info().toBlocking().forEach(new Action1<ByteBuf>() {
+            @Override
+            public void call(ByteBuf byteBuf) {
+                ReferenceCountUtil.releaseLater(byteBuf);
+            }
+        });
         single.rows().toBlocking().forEach(new Action1<ByteBuf>() {
             @Override
             public void call(ByteBuf byteBuf) {

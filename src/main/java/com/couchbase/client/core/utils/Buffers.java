@@ -65,30 +65,34 @@ public class Buffers {
      * @param source the source observable to wrap.
      * @return the wrapped cold observable with refcnt release logic.
      */
-    public static <T> Observable<T> liftForAutoRelease(final Observable<T> source) {
-        return source.lift(new Observable.Operator<T, T>() {
+    public static <T> Observable<T> wrapColdWithAutoRelease(final Observable<T> source) {
+        return Observable.create(new Observable.OnSubscribe<T>() {
             @Override
-            public Subscriber<? super T> call(final Subscriber<? super T> o) {
-                return new Subscriber<T>() {
+            public void call(final Subscriber<? super T> subscriber) {
+                source.subscribe(new Subscriber<T>() {
                     @Override
                     public void onCompleted() {
-                        o.onCompleted();
+                        if (!subscriber.isUnsubscribed()) {
+                            subscriber.onCompleted();
+                        }
                     }
 
                     @Override
                     public void onError(Throwable e) {
-                        o.onError(e);
+                        if(!subscriber.isUnsubscribed()) {
+                            subscriber.onError(e);
+                        }
                     }
 
                     @Override
                     public void onNext(T t) {
-                        if (!o.isUnsubscribed()) {
-                            o.onNext(t);
+                        if (!subscriber.isUnsubscribed()) {
+                            subscriber.onNext(t);
                         } else {
                             ReferenceCountUtil.release(t);
                         }
                     }
-                };
+                });
             }
         });
     }

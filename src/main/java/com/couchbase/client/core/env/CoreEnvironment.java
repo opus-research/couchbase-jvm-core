@@ -76,54 +76,16 @@ public interface CoreEnvironment {
      */
     boolean sslEnabled();
 
-    /**
-     * Identifies the filepath to the ssl keystore.
-     *
-     * @return the path to the keystore file.
-     */
     String sslKeystoreFile();
 
-    /**
-     * The password which is used to protect the keystore.
-     *
-     * @return the keystore password.
-     */
     String sslKeystorePassword();
 
-    /**
-     * True if N1QL querying should be enabled manually, deprecated.
-     *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return true if manual N1QL querying is enabled.
-     * @deprecated
-     */
-    @Deprecated
     boolean queryEnabled();
 
-    /**
-     * If manual querying enabled, this defines the N1QL port to use, deprecated.
-     *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return the query port.
-     * @deprecated
-     */
-    @Deprecated
     int queryPort();
 
-    /**
-     * If bootstrapping through HTTP is enabled.
-     *
-     * @return true if enabled.
-     */
     boolean bootstrapHttpEnabled();
 
-    /**
-     * If bootstrapping through the advanced carrier publication is enabled.
-     *
-     * @return true if enabled.
-     */
     boolean bootstrapCarrierEnabled();
 
     /**
@@ -161,11 +123,6 @@ public interface CoreEnvironment {
      */
     int ioPoolSize();
 
-    /**
-     * Returns the pool size (number of threads) for all computation tasks.
-     *
-     * @return the pool size (number of threads to use).
-     */
     int computationPoolSize();
 
     /**
@@ -289,22 +246,5 @@ public interface CoreEnvironment {
      */
     boolean bufferPoolingEnabled();
 
-    /**
-     * Returns true if TCP_NODELAY is enabled (therefore Nagle'ing is disabled).
-     *
-     * @return true if enabled.
-     */
-    boolean tcpNodelayEnabled();
 
-    /**
-     * Returns true if extended mutation tokens are enabled.
-     *
-     * Note that while this may return true, the server also needs to support it (Couchbase Server
-     * 4.0 and above). It will be negotiated during connection setup, but needs to be explicitly
-     * enabled on the environment as well to take effect (since it has a 16 bytes overhead on
-     * every mutation performed).
-     *
-     * @return true if enabled on the client side.
-     */
-    boolean mutationTokensEnabled();
 }

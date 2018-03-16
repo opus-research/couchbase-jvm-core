@@ -22,13 +22,11 @@
 package com.couchbase.client.core.config.loader;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.RequestFactory;
 import com.couchbase.client.core.config.ConfigurationException;
 import com.couchbase.client.core.config.LoaderType;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.BucketConfigRequest;
 import com.couchbase.client.core.message.config.BucketConfigResponse;
 import com.couchbase.client.core.service.ServiceType;
@@ -78,12 +76,7 @@ public class HttpLoader extends AbstractLoader {
         LOGGER.debug("Starting to discover config through HTTP Bootstrap");
 
         return cluster()
-            .<BucketConfigResponse>send(new RequestFactory() {
-                @Override
-                public CouchbaseRequest call() {
-                    return new BucketConfigRequest(TERSE_PATH, hostname, bucket, password);
-                }
-            })
+            .<BucketConfigResponse>send(new BucketConfigRequest(TERSE_PATH, hostname, bucket, password))
             .flatMap(new Func1<BucketConfigResponse, Observable<BucketConfigResponse>>() {
                 @Override
                 public Observable<BucketConfigResponse> call(BucketConfigResponse response) {
@@ -93,12 +86,7 @@ public class HttpLoader extends AbstractLoader {
                     }
 
                     LOGGER.debug("Terse bucket config failed, falling back to verbose.");
-                    return cluster().send(new RequestFactory() {
-                        @Override
-                        public CouchbaseRequest call() {
-                            return new BucketConfigRequest(VERBOSE_PATH, hostname, bucket, password);
-                        }
-                    });
+                    return cluster().send(new BucketConfigRequest(VERBOSE_PATH, hostname, bucket, password));
                 }
             })
             .map(new Func1<BucketConfigResponse, String>() {
@@ -106,7 +94,7 @@ public class HttpLoader extends AbstractLoader {
                 public String call(BucketConfigResponse response) {
                     if (!response.status().isSuccess()) {
                         throw new IllegalStateException("Could not load bucket configuration: "
-                                + response.status() + "(" + response.config() + ")");
+                            + response.status() + "(" + response.config() + ")");
                     }
 
                     LOGGER.debug("Successfully loaded config through HTTP.");

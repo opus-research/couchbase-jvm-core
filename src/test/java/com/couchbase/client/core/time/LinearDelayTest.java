@@ -36,8 +36,6 @@ public class LinearDelayTest {
         assertEquals(2, linearDelay.calculate(2));
         assertEquals(3, linearDelay.calculate(3));
         assertEquals(4, linearDelay.calculate(4));
-
-        assertEquals("LinearDelay{growBy 1.0 SECONDS; lower=0, upper=2147483647}", linearDelay.toString());
     }
 
     @Test
@@ -48,8 +46,6 @@ public class LinearDelayTest {
         assertEquals(3, linearDelay.calculate(2));
         assertEquals(3, linearDelay.calculate(3));
         assertEquals(4, linearDelay.calculate(4));
-
-        assertEquals("LinearDelay{growBy 1.0 SECONDS; lower=3, upper=2147483647}", linearDelay.toString());
     }
 
     @Test
@@ -60,8 +56,6 @@ public class LinearDelayTest {
         assertEquals(2, linearDelay.calculate(2));
         assertEquals(2, linearDelay.calculate(3));
         assertEquals(2, linearDelay.calculate(4));
-
-        assertEquals("LinearDelay{growBy 1.0 SECONDS; lower=0, upper=2}", linearDelay.toString());
     }
 
     @Test
@@ -74,8 +68,6 @@ public class LinearDelayTest {
         assertEquals(2, linearDelay.calculate(4));
         assertEquals(3, linearDelay.calculate(5));
         assertEquals(3, linearDelay.calculate(6));
-
-        assertEquals("LinearDelay{growBy 0.5 SECONDS; lower=0, upper=2147483647}", linearDelay.toString());
     }
 
 }

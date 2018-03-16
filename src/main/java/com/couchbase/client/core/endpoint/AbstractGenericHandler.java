@@ -83,15 +83,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     private final Queue<REQUEST> sentRequestQueue;
 
-    /**
-     * If this handler is transient (will close after one request).
-     */
     private final boolean isTransient;
-
-    /**
-     * If TRACE level logging has been enabled at startup.
-     */
-    private final boolean traceEnabled;
 
     /**
      * The request which is expected to return next.
@@ -124,7 +116,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestQueue = queue;
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
-        this.traceEnabled = LOGGER.isTraceEnabled();
     }
 
     /**
@@ -165,8 +156,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
-            if (traceEnabled) {
-                LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Started decoding of " + currentRequest);
             }
         }
 
@@ -182,8 +173,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
-            if (traceEnabled) {
-                LOGGER.trace("{}Finished decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Finished decoding of " + currentRequest);
             }
             currentRequest = null;
             currentDecodingState = DecodingState.INITIAL;
@@ -360,7 +351,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
      */
     protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
-        if (traceEnabled) {
+        if (LOGGER.isTraceEnabled()) {
             LOGGER.trace(logIdent(ctx, endpoint) + "keepAlive was answered, status "
                     + keepAliveResponse.status());
         }
@@ -392,13 +383,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected CoreEnvironment env() {
         return endpoint.environment();
-    }
-
-    /**
-     * The parent endpoint.
-     */
-    protected AbstractEndpoint endpoint() {
-        return endpoint;
     }
 
     /**

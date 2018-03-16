@@ -29,7 +29,6 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultNodeInfo;
 import com.couchbase.client.core.config.NodeInfo;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -41,16 +40,14 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import org.junit.Test;
 import rx.Observable;
-
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -82,13 +79,13 @@ public class CarrierRefresherTest {
         when(config.nodes()).thenReturn(nodeInfos);
 
         ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(Observable.just(
-                (CouchbaseResponse) new GetBucketConfigResponse(
-                        ResponseStatus.SUCCESS, ResponseStatusConverter.BINARY_SUCCESS,
-                        "bucket",
-                        content,
-                        InetAddress.getByName("localhost")
-                )
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(Observable.just(
+            (CouchbaseResponse) new GetBucketConfigResponse(
+                ResponseStatus.SUCCESS,
+                "bucket",
+                content,
+                InetAddress.getByName("localhost")
+            )
         ));
 
         refresher.markTainted(config);
@@ -114,9 +111,9 @@ public class CarrierRefresherTest {
         when(config.nodes()).thenReturn(nodeInfos);
 
         ByteBuf content = Unpooled.copiedBuffer("", CharsetUtil.UTF_8);
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(Observable.just(
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(Observable.just(
             (CouchbaseResponse) new GetBucketConfigResponse(
-                ResponseStatus.FAILURE, ResponseStatusConverter.BINARY_ERR_NOT_FOUND,
+                ResponseStatus.FAILURE,
                 "bucket",
                 content,
                 InetAddress.getByName("localhost")
@@ -151,9 +148,9 @@ public class CarrierRefresherTest {
         when(clusterConfig.bucketConfigs()).thenReturn(bucketConfigs);
 
         ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(Observable.just(
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(Observable.just(
             (CouchbaseResponse) new GetBucketConfigResponse(
-                ResponseStatus.SUCCESS, ResponseStatusConverter.BINARY_SUCCESS,
+                ResponseStatus.SUCCESS,
                 "bucket",
                 content,
                 InetAddress.getByName("localhost")
@@ -188,9 +185,9 @@ public class CarrierRefresherTest {
         when(clusterConfig.bucketConfigs()).thenReturn(bucketConfigs);
 
         ByteBuf content = Unpooled.copiedBuffer("", CharsetUtil.UTF_8);
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(Observable.just(
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(Observable.just(
             (CouchbaseResponse) new GetBucketConfigResponse(
-                ResponseStatus.FAILURE, ResponseStatusConverter.BINARY_ERR_NOT_FOUND,
+                ResponseStatus.FAILURE,
                 "bucket",
                 content,
                 InetAddress.getByName("localhost")
@@ -228,14 +225,14 @@ public class CarrierRefresherTest {
         ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
         Observable<CouchbaseResponse> goodResponse = Observable.just(
             (CouchbaseResponse) new GetBucketConfigResponse(
-                ResponseStatus.SUCCESS, ResponseStatusConverter.BINARY_SUCCESS,
+                ResponseStatus.SUCCESS,
                 "bucket",
                 content,
                 InetAddress.getByName("1.2.3.4")
             )
         );
         Observable<CouchbaseResponse> badResponse = Observable.error(new CouchbaseException("Woops.."));
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(badResponse, goodResponse);
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(badResponse, goodResponse);
 
         refresher.refresh(clusterConfig);
 
@@ -262,13 +259,13 @@ public class CarrierRefresherTest {
 
         ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
         Observable<CouchbaseResponse> goodResponse = Observable.just((CouchbaseResponse) new GetBucketConfigResponse(
-            ResponseStatus.SUCCESS, ResponseStatusConverter.BINARY_SUCCESS,
+            ResponseStatus.SUCCESS,
             "bucket",
             content,
             InetAddress.getByName("1.2.3.4")
         ));
         Observable<CouchbaseResponse> badResponse = Observable.error(new CouchbaseException("Failure"));
-        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(badResponse, goodResponse);
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(badResponse, goodResponse);
         refresher.markTainted(config);
 
         Thread.sleep(1500);
@@ -276,8 +273,6 @@ public class CarrierRefresherTest {
         verify(provider, times(1)).proposeBucketConfig("bucket", "{\"config\": true}");
         assertEquals(0, content.refCnt());
     }
-
-
 
 
 }

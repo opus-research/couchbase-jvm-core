@@ -21,8 +21,6 @@
  */
 package com.couchbase.client.core.endpoint;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.ResponseStatus;
 
 /**
@@ -33,15 +31,9 @@ import com.couchbase.client.core.message.ResponseStatus;
  */
 public class ResponseStatusConverter {
 
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(ResponseStatusConverter.class);
-
     public static final int HTTP_OK = 200;
     public static final int HTTP_CREATED = 201;
     public static final int HTTP_ACCEPTED = 202;
-    public static final int HTTP_BAD_REQUEST = 400;
     public static final int HTTP_NOT_FOUND = 404;
 
     public static final short BINARY_SUCCESS = 0x00;
@@ -96,7 +88,6 @@ public class ResponseStatusConverter {
             case BINARY_ERR_DELTA_BADVAL:
                 return ResponseStatus.INVALID_ARGUMENTS;
             default:
-                LOGGER.warn("Unknown ResponseStatus with Protocol KeyValue: {}", Integer.toHexString(status));
                 return ResponseStatus.FAILURE;
         }
     }
@@ -118,11 +109,7 @@ public class ResponseStatusConverter {
             case HTTP_NOT_FOUND:
                 status = ResponseStatus.NOT_EXISTS;
                 break;
-            case HTTP_BAD_REQUEST:
-                status = ResponseStatus.INVALID_ARGUMENTS;
-                break;
             default:
-                LOGGER.warn("Unknown ResponseStatus with Protocol HTTP: {}", code);
                 status = ResponseStatus.FAILURE;
         }
         return status;
