@@ -81,7 +81,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int RESPONSE_BUFFER_SIZE = 16384;
     public static final int DCP_CONNECTION_BUFFER_SIZE = 20971520; // 20MiB
     public static final double DCP_CONNECTION_BUFFER_ACK_THRESHOLD = 0.2; // for 20Mib it is 4MiB
-    public static final String DCP_CONNECTION_NAME = "dcp/core-io";
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
@@ -174,7 +173,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int requestBufferSize;
     private final int dcpConnectionBufferSize;
     private final double dcpConnectionBufferAckThreshold;
-    private final String dcpConnectionName;
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
@@ -232,7 +230,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize);
         dcpConnectionBufferSize = intPropertyOr("dcpConnectionBufferSize", builder.dcpConnectionBufferSize);
         dcpConnectionBufferAckThreshold = doublePropertyOr("dcpConnectionBufferAckThreshold", builder.dcpConnectionBufferAckThreshold);
-        dcpConnectionName = stringPropertyOr("dcpConnectionName", builder.dcpConnectionName);
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
@@ -552,11 +549,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public String dcpConnectionName() {
-        return dcpConnectionName;
-    }
-
-    @Override
     public int kvEndpoints() {
         return kvServiceEndpoints;
     }
@@ -683,7 +675,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int requestBufferSize = REQUEST_BUFFER_SIZE;
         private int dcpConnectionBufferSize = DCP_CONNECTION_BUFFER_SIZE;
         private double dcpConnectionBufferAckThreshold = DCP_CONNECTION_BUFFER_ACK_THRESHOLD;
-        private String dcpConnectionName = DCP_CONNECTION_NAME;
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
@@ -880,15 +871,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder dcpConnectionBufferAckThreshold(final double dcpConnectionBufferAckThreshold) {
             this.dcpConnectionBufferAckThreshold = dcpConnectionBufferAckThreshold;
-            return this;
-        }
-
-        /**
-         * Sets default name for DCP connection. It is used to identify streams on the server.
-         * (default value {@value #DCP_CONNECTION_NAME}).
-         */
-        public Builder dcpConnectionName(final String dcpConnectionName) {
-            this.dcpConnectionName = dcpConnectionName;
             return this;
         }
 
