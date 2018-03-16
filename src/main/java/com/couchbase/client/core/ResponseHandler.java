@@ -27,15 +27,18 @@ import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.kv.BinaryResponse;
+import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.Subscription;
 import rx.functions.Action0;
 import rx.subjects.Subject;
+
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
@@ -135,11 +138,13 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        worker.schedule(new Action0() {
+        final AtomicReference<Subscription> subscription = new AtomicReference<Subscription>();
+        subscription.set(worker.schedule(new Action0() {
             @Override
             public void call() {
                 cluster.send(request);
+                subscription.get().unsubscribe();
             }
-        }, 10, TimeUnit.MILLISECONDS);
+        }, 10, TimeUnit.MILLISECONDS));
     }
 }
