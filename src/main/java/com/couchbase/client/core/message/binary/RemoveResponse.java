@@ -1,12 +1,12 @@
 package com.couchbase.client.core.message.binary;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.document.CoreDocument;
+import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
 
 public class RemoveResponse extends AbstractBinaryResponse {
 
-    public RemoveResponse(final CoreDocument document, final String bucket, final CouchbaseRequest request) {
-        super(document, bucket, request);
+    public RemoveResponse(ResponseStatus status, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
     }
-
 }

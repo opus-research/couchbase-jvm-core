@@ -102,10 +102,10 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                     "support cloning."));
             }
             if (message instanceof BinaryResponse) {
-                final BinaryResponse response = (BinaryResponse) message;
-                if (response.document() != null && response.document().content() != null && response.document().content().readableBytes() > 0) {
+                BinaryResponse response = (BinaryResponse) message;
+                if (response.content() != null && response.content().readableBytes() > 0) {
                     configurationProvider.proposeBucketConfig(response.bucket(),
-                        response.document().content().toString(CharsetUtil.UTF_8));
+                        response.content().toString(CharsetUtil.UTF_8));
                 }
             }
         }

@@ -22,23 +22,45 @@
 package com.couchbase.client.core.message.binary;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.document.CoreDocument;
+import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
+import io.netty.util.CharsetUtil;
 
 /**
  * Represents a response to a {@link GetRequest}.
  *
  * @author Michael Nitschinger
- * @author David Sondermann
  * @since 1.0
  */
-public class GetResponse extends AbstractCoreDocumentBinaryResponse {
+public class GetResponse extends AbstractBinaryResponse {
 
-    public GetResponse(final CoreDocument document, final String bucket, final CouchbaseRequest request) {
-        super(document, bucket, request);
+    private final long cas;
+    private final int flags;
+
+    public GetResponse(final ResponseStatus status, final long cas, final int flags, final String bucket, final ByteBuf content, final CouchbaseRequest request) {
+        super(status, bucket, content, request);
+        this.cas = cas;
+        this.flags = flags;
+    }
+
+    public long cas() {
+        return cas;
+    }
+
+    public int flags() {
+        return flags;
     }
 
     @Override
     public String toString() {
-        return toStringInternal("GetResponse");
+        final StringBuilder sb = new StringBuilder("GetResponse{");
+        sb.append("bucket='").append(bucket()).append('\'');
+        sb.append(", status=").append(status());
+        sb.append(", cas=").append(cas);
+        sb.append(", flags=").append(flags);
+        sb.append(", request=").append(request());
+        sb.append(", content=").append(content().toString(CharsetUtil.UTF_8));
+        sb.append('}');
+        return sb.toString();
     }
 }

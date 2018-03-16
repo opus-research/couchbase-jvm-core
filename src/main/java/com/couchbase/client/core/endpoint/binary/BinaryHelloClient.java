@@ -75,7 +75,7 @@ public class BinaryHelloClient extends SimpleChannelInboundHandler<FullBinaryMem
             while(msg.content().isReadable()) {
                 short supported = msg.content().readShort();
                 if (supported == DATATYPE_SUPPORT) {
-                    SupportedDataTypes dtypes = new SupportedDataTypes(true, true);
+                    SupportedDatatypes dtypes = new SupportedDatatypes(true, true);
                     LOGGER.debug(ctx.channel().remoteAddress() + " Hello detected: " + dtypes);
                     ctx.fireUserEventTriggered(dtypes);
                 }
