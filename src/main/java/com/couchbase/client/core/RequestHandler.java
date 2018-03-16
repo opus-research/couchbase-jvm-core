@@ -182,15 +182,14 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             ClusterConfig config = configuration;
             //prevent non-bootstrap requests to go through if bucket not part of config
             if (!(request instanceof BootstrapMessage)) {
-                BucketConfig bucketConfig = config == null ? null : config.bucketConfig(request.bucket());
-                if (config == null || (request.bucket() != null  && bucketConfig == null)) {
+                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
                     request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
                     return;
                 }
 
                 //short-circuit some kind of requests for which we know there won't be any handler to respond.
                 try {
-                    checkFeaturesForRequest(request, bucketConfig);
+                    checkFeaturesForRequest(request, config.bucketConfig(request.bucket()));
                 } catch (ServiceNotAvailableException e) {
                     request.observable().onError(e);
                     return;
