@@ -30,6 +30,7 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
+import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
@@ -38,11 +39,7 @@ import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.node.locate.ConfigLocator;
-import com.couchbase.client.core.node.locate.KeyValueLocator;
-import com.couchbase.client.core.node.locate.Locator;
-import com.couchbase.client.core.node.locate.QueryLocator;
-import com.couchbase.client.core.node.locate.ViewLocator;
+import com.couchbase.client.core.node.locate.*;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
@@ -51,12 +48,9 @@ import com.lmax.disruptor.RingBuffer;
 import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -97,6 +91,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * The node locator for the config service.
      */
     private final Locator configLocator = new ConfigLocator();
+
+    /**
+     * The node locator for DCP service.
+     */
+    private final Locator dcpLocator = new DCPLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -311,6 +310,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return queryLocator;
         } else if (request instanceof ConfigRequest) {
             return configLocator;
+        } else if (request instanceof DCPRequest) {
+            return dcpLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
