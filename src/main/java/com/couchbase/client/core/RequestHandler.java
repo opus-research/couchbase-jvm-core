@@ -243,11 +243,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 failSafe(environment.scheduler(), true, request.observable(), e);
                 return;
             }
-
-            //don't send timed out requests to server
-            if(request.isTimedOut()) {
-                return;
-            }
         }
 
         locator(request).locateAndDispatch(request, nodes, config, environment, responseBuffer);

@@ -15,7 +15,7 @@
  */
 package com.couchbase.client.core.message;
 
-import rx.Subscriber;
+import com.couchbase.client.core.time.Delay;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -52,13 +52,13 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
      */
     private final long creationTime;
 
-    /**
-     * Additional subscriber information to check if the request has timed out
-     */
-    private Subscriber subscriber;
-
     private volatile int retryCount;
 
+    private volatile long retryAfter;
+
+    private volatile long maxRetryDuration;
+
+    private Delay retryDelay;
 
     /**
      * Create a new {@link AbstractCouchbaseRequest}.
@@ -151,17 +151,30 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
     }
 
     @Override
-    public boolean isTimedOut() {
-        if (this.subscriber != null) {
-            return this.subscriber.isUnsubscribed();
-        } else {
-            return false;
-        }
+    public void retryAfter(long after) {
+        this.retryAfter = after;
     }
 
     @Override
-    public void addSubscriber(Subscriber subscriber) {
-        this.subscriber = subscriber;
+    public long retryAfter() {
+        return this.retryAfter;
+    }
+
+    @Override
+    public void maxRetryDuration(long maxRetryDuration) {
+        this.maxRetryDuration = maxRetryDuration;
+    }
+    @Override
+    public long maxRetryDuration() { return this.maxRetryDuration; }
+
+    @Override
+    public void retryDelay(Delay retryDelay) {
+        this.retryDelay = retryDelay;
+    }
+
+    @Override
+    public Delay retryDelay() {
+        return this.retryDelay;
     }
 
     @Override

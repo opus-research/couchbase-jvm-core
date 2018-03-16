@@ -34,20 +34,25 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
 import org.apache.http.HttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.couchbase.mock.CouchbaseMock;
-import org.couchbase.mock.JsonUtils;
+import com.couchbase.mock.CouchbaseMock;
+import com.couchbase.mock.JsonUtils;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import rx.Observable;
 import rx.functions.Func1;
 
 import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
@@ -66,8 +71,8 @@ public class ClusterDependentTest {
 
     private static final String seedNode = TestProperties.seedNode();
     private static final String bucket = TestProperties.bucket();
-    private static final String username = TestProperties.username();
-    private static final String password = TestProperties.password();
+    private static volatile String username = TestProperties.username();
+    private static volatile String password = TestProperties.password();
     private static final String adminUser = TestProperties.adminUser();
     private static final String adminPassword = TestProperties.adminPassword();
     private static final CouchbaseMock couchbaseMock = TestProperties.couchbaseMock();
@@ -77,32 +82,73 @@ public class ClusterDependentTest {
 
     private static ClusterFacade cluster;
 
-    private static int getCarrierPortInfo(int httpPort) throws Exception {
+    protected static String sendGetHttpRequestToMock(String path, Map<String, String> parameters) throws Exception {
         URIBuilder builder = new URIBuilder();
-        builder.setScheme("http").setHost("localhost").setPort(httpPort).setPath("mock/get_mcports")
-                .setParameter("bucket", bucket);
+        builder.setScheme("http").setHost("localhost").setPort(mock().getHttpPort()).setPath(path);
+        for (Map.Entry<String, String> entry: parameters.entrySet()) {
+            builder.setParameter(entry.getKey(), entry.getValue());
+        }
         HttpGet request = new HttpGet(builder.build());
         HttpClient client = HttpClientBuilder.create().build();
         HttpResponse response = client.execute(request);
         int status = response.getStatusLine().getStatusCode();
-        if (status < 200 || status > 300) {
+        if (status != 200) {
             throw new ClientProtocolException("Unexpected response status: " + status);
         }
-        String rawBody = EntityUtils.toString(response.getEntity());
+        return EntityUtils.toString(response.getEntity());
+    }
+
+    private static int getCarrierPortInfo() throws Exception {
+        Map<String, String> parameters = new HashMap<String, String>();
+        parameters.put("idx", "0");
+        parameters.put("bucket", bucket());
+        String rawBody = sendGetHttpRequestToMock("mock/get_mcports", parameters);
         com.google.gson.JsonObject respObject = JsonUtils.GSON.fromJson(rawBody, com.google.gson.JsonObject.class);
         com.google.gson.JsonArray portsArray = respObject.getAsJsonArray("payload");
         return portsArray.get(0).getAsInt();
     }
 
+    /**
+     * Helper (hacked together) method to grab a config from a bucket without having to initialize the
+     * client first - this helps with pre-bootstrap decisions like credentials for RBAC.
+     */
+    private static int[] minClusterVersion() throws Exception {
+        URIBuilder builder = new URIBuilder();
+        builder.setScheme("http").setHost(seedNode).setPort(8091).setPath("/pools/default/buckets/" + bucket)
+            .setParameter("bucket", bucket);
+        HttpGet request = new HttpGet(builder.build());
+        CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(new AuthScope(seedNode, 8091), new UsernamePasswordCredentials(adminUser, adminPassword));
+        HttpClient client = HttpClientBuilder.create().setDefaultCredentialsProvider(credentialsProvider).build();
+        HttpResponse response = client.execute(request);
+        int status = response.getStatusLine().getStatusCode();
+        if (status < 200 || status > 300) {
+            throw new ClientProtocolException("Unexpected response status: " + status);
+        }
+        String rawConfig = EntityUtils.toString(response.getEntity());
+        return minNodeVersionFromConfig(rawConfig);
+    }
 
-    public static void connect(boolean useMock) {
+
+    public static void connect(boolean useMock) throws Exception {
+
+        /*
+         * If we are running under RBAC, set the user and password to the admin
+         * credentials which will always work. This hopefully makes the test suite
+         * forwards and backwards compat.
+         */
+        if (minClusterVersion()[0] >= 5) {
+            username = adminUser;
+            password = adminPassword;
+        }
+
         DefaultCoreEnvironment.Builder envBuilder = DefaultCoreEnvironment
                 .builder();
 
         if (useMock) {
             int httpBootstrapPort = couchbaseMock.getHttpPort();
             try {
-                int carrierBootstrapPort = getCarrierPortInfo(httpBootstrapPort);
+                int carrierBootstrapPort = getCarrierPortInfo();
                 envBuilder
                         .bootstrapHttpDirectPort(httpBootstrapPort)
                         .bootstrapCarrierDirectPort(carrierBootstrapPort)
@@ -128,7 +174,7 @@ public class ClusterDependentTest {
                     }
                 }
         ).toBlocking().single();
-       cluster.send(new FlushRequest(bucket, username, password)).toBlocking().single();
+        cluster.send(new FlushRequest(bucket, username, password)).toBlocking().single();
     }
 
     @AfterClass
@@ -155,6 +201,8 @@ public class ClusterDependentTest {
     public static CoreEnvironment env() {
         return env;
     }
+
+    public static CouchbaseMock mock() { return couchbaseMock; }
 
     /**
      * Checks based on the cluster node versions if DCP is available.
