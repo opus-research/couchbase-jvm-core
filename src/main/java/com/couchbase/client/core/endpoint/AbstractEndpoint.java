@@ -377,7 +377,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         return password;
     }
 
-    public CoreEnvironment environment() {
+    protected CoreEnvironment environment() {
         return env;
     }
 
