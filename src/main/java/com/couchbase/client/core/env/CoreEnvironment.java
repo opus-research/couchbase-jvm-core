@@ -23,6 +23,8 @@ package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
+import com.couchbase.client.core.metrics.MetricsCollector;
+import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
@@ -76,16 +78,54 @@ public interface CoreEnvironment {
      */
     boolean sslEnabled();
 
+    /**
+     * Identifies the filepath to the ssl keystore.
+     *
+     * @return the path to the keystore file.
+     */
     String sslKeystoreFile();
 
+    /**
+     * The password which is used to protect the keystore.
+     *
+     * @return the keystore password.
+     */
     String sslKeystorePassword();
 
+    /**
+     * True if N1QL querying should be enabled manually, deprecated.
+     *
+     * With Couchbase Server 4.0 and onward, it will be automatically detected.
+     *
+     * @return true if manual N1QL querying is enabled.
+     * @deprecated
+     */
+    @Deprecated
     boolean queryEnabled();
 
+    /**
+     * If manual querying enabled, this defines the N1QL port to use, deprecated.
+     *
+     * With Couchbase Server 4.0 and onward, it will be automatically detected.
+     *
+     * @return the query port.
+     * @deprecated
+     */
+    @Deprecated
     int queryPort();
 
+    /**
+     * If bootstrapping through HTTP is enabled.
+     *
+     * @return true if enabled.
+     */
     boolean bootstrapHttpEnabled();
 
+    /**
+     * If bootstrapping through the advanced carrier publication is enabled.
+     *
+     * @return true if enabled.
+     */
     boolean bootstrapCarrierEnabled();
 
     /**
@@ -123,6 +163,11 @@ public interface CoreEnvironment {
      */
     int ioPoolSize();
 
+    /**
+     * Returns the pool size (number of threads) for all computation tasks.
+     *
+     * @return the pool size (number of threads to use).
+     */
     int computationPoolSize();
 
     /**
@@ -246,6 +291,38 @@ public interface CoreEnvironment {
      */
     boolean bufferPoolingEnabled();
 
+    /**
+     * Returns true if TCP_NODELAY is enabled (therefore Nagle'ing is disabled).
+     *
+     * @return true if enabled.
+     */
+    boolean tcpNodelayEnabled();
+
+    /**
+     * Returns true if extended mutation tokens are enabled.
+     *
+     * Note that while this may return true, the server also needs to support it (Couchbase Server
+     * 4.0 and above). It will be negotiated during connection setup, but needs to be explicitly
+     * enabled on the environment as well to take effect (since it has a 16 bytes overhead on
+     * every mutation performed).
+     *
+     * @return true if enabled on the client side.
+     */
+    boolean mutationTokensEnabled();
+
+    /**
+     * Returns the collector responsible for aggregating and publishing runtime information like gc and memory.
+     *
+     * @return the collector.
+     */
+    MetricsCollector runtimeMetricsCollector();
+
+    /**
+     * Returns the collector responsible for aggregating and publishing network latency information.
+     *
+     * @return the collector.
+     */
+    NetworkLatencyMetricsCollector networkLatencyMetricsCollector();
 
     /**
      * Returns the amount of time the SDK will wait on the socket connect until an error is raised and handled.
