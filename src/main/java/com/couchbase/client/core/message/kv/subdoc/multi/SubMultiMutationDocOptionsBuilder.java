@@ -25,46 +25,26 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  * @author Subhashni Balakrishnan
  * @since 1.4.6
  */
-@InterfaceStability.Committed
+@InterfaceStability.Uncommitted
 @InterfaceAudience.Public
 public class SubMultiMutationDocOptionsBuilder {
-    private boolean upsertDocument;
+    private boolean createDocument;
     private boolean insertDocument;
 
     public static SubMultiMutationDocOptionsBuilder builder() {
         return new SubMultiMutationDocOptionsBuilder();
     }
 
-    @Deprecated
     public SubMultiMutationDocOptionsBuilder createDocument(boolean createDocument) {
-        if (this.insertDocument && createDocument) {
-            throw new IllegalArgumentException("Invalid to set createDocument to true along with insertDocument");
-        }
-        this.upsertDocument = createDocument;
+        this.createDocument = createDocument;
         return this;
     }
 
-    @Deprecated
     public boolean createDocument() {
-        return this.upsertDocument;
-    }
-
-    public SubMultiMutationDocOptionsBuilder upsertDocument(boolean upsertDocument) {
-        if (this.insertDocument && upsertDocument) {
-            throw new IllegalArgumentException("Invalid to set upsertDocument to true along with insertDocument");
-        }
-        this.upsertDocument = upsertDocument;
-        return this;
-    }
-
-    public boolean upsertDocument() {
-        return this.upsertDocument;
+        return this.createDocument;
     }
 
     public SubMultiMutationDocOptionsBuilder insertDocument(boolean insertDocument) {
-        if (this.upsertDocument && insertDocument) {
-            throw new IllegalArgumentException("Invalid to set insertDocument to true along with upsertDocument(or createDocumnet)");
-        }
         this.insertDocument = insertDocument;
         return this;
     }
@@ -77,7 +57,7 @@ public class SubMultiMutationDocOptionsBuilder {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
-        sb.append(" \"upsertDocument\":" + upsertDocument);
+        sb.append(" \"createDocument\":" + createDocument);
         sb.append(", \"insertDocument\": " + insertDocument);
         sb.append("}");
         return sb.toString();
