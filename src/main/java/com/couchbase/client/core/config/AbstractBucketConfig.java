@@ -23,7 +23,6 @@ package com.couchbase.client.core.config;
 
 import com.couchbase.client.core.service.ServiceType;
 
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -45,7 +44,7 @@ public abstract class AbstractBucketConfig implements BucketConfig {
         this.locator = locator;
         this.uri = uri;
         this.streamingUri = streamingUri;
-        this.nodeInfo = portInfos == null ? nodeInfos : nodeInfoFromExtended(portInfos, nodeInfos);
+        this.nodeInfo = portInfos == null ? nodeInfos : nodeInfoFromExtended(portInfos);
 
         this.enabledServices = new HashSet<ServiceType>();
         for (NodeInfo info : nodeInfo) {
@@ -57,20 +56,13 @@ public abstract class AbstractBucketConfig implements BucketConfig {
     /**
      * Helper method to create the {@link NodeInfo}s from from the extended node information.
      *
-     * In older server versions (< 3.0.2) the nodesExt part does not carry a hostname, so as a fallback the hostname
-     * is loaded from the node info if needed.
-     *
      * @param nodesExt the extended information.
      * @return the generated node infos.
      */
-    private static List<NodeInfo> nodeInfoFromExtended(final List<PortInfo> nodesExt, final List<NodeInfo> nodeInfos) {
+    private static List<NodeInfo> nodeInfoFromExtended(final List<PortInfo> nodesExt) {
         List<NodeInfo> converted = new ArrayList<NodeInfo>(nodesExt.size());
-        for (int i = 0; i < nodesExt.size(); i++) {
-            InetAddress hostname = nodesExt.get(i).hostname();
-            if (hostname == null) {
-                hostname = nodeInfos.get(i).hostname();
-            }
-            converted.add(new DefaultNodeInfo(hostname, nodesExt.get(i).ports(), nodesExt.get(i).sslPorts()));
+        for (PortInfo nodeExt : nodesExt) {
+            converted.add(new DefaultNodeInfo(nodeExt.hostname(), nodeExt.ports(), nodeExt.sslPorts()));
         }
         return converted;
     }
