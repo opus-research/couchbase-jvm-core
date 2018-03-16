@@ -24,9 +24,9 @@ import io.netty.handler.codec.http.HttpClientCodec;
 
 public class ConfigEndpoint extends AbstractEndpoint {
 
-    public ConfigEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
+    public ConfigEndpoint(String hostname, String bucket, String username, String password, int port, CoreEnvironment environment,
         final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, true, environment.ioPool(), false);
+        super(hostname, bucket, username, password, port, environment, responseBuffer, true, environment.ioPool(), false);
     }
 
     @Override
