@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -108,13 +109,16 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         List<NodeInfo> partitionHosts = new ArrayList<NodeInfo>();
         for (String rawHost : partitionInfo.partitionHosts()) {
             InetAddress convertedHost;
+            int directPort;
             try {
-                convertedHost = InetAddress.getByName(rawHost);
+                String pair[] = rawHost.split(":");
+                convertedHost = InetAddress.getByName(pair[0]);
+                directPort = Integer.parseInt(pair[1]);
             } catch (UnknownHostException e) {
                 throw new ConfigurationException("Could not resolve " + rawHost + "on config building.");
             }
             for (NodeInfo nodeInfo : nodeInfos) {
-                if (nodeInfo.hostname().equals(convertedHost)) {
+                if (nodeInfo.hostname().equals(convertedHost) && nodeInfo.services().get(ServiceType.BINARY) == directPort) {
                     partitionHosts.add(nodeInfo);
                 }
             }
