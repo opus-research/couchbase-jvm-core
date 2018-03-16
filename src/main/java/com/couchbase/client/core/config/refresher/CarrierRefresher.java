@@ -131,7 +131,6 @@ public class CarrierRefresher extends AbstractRefresher {
     public void refresh(final ClusterConfig config) {
         Observable
             .from(config.bucketConfigs().values())
-            .observeOn(environment.scheduler())
             .filter(new Func1<BucketConfig, Boolean>() {
                 @Override
                 public Boolean call(BucketConfig config) {

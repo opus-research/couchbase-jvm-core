@@ -71,11 +71,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
     private final RingBuffer<ResponseEvent> responseBuffer;
 
     /**
-     * The hostname of this service.
-     */
-    private final String hostname;
-
-    /**
      * The current list of endpoint states.
      */
     protected List<Observable<LifecycleState>> endpointStates;
@@ -100,7 +95,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
 
         this.strategy = strategy;
         this.responseBuffer = responseBuffer;
-        this.hostname = hostname;
         endpointStates = new ArrayList<Observable<LifecycleState>>();
         endpoints = new Endpoint[numEndpoints];
         for (int i = 0; i < numEndpoints; i++) {
@@ -117,20 +111,20 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
                     return calculateStateFrom(Arrays.asList(states));
                 }
             })
-            .subscribe(new Action1<LifecycleState>() {
-                @Override
-                public void call(LifecycleState state) {
-                    if (state == state()) {
-                        return;
+                .subscribe(new Action1<LifecycleState>() {
+                    @Override
+                    public void call(LifecycleState state) {
+                        if (state == state()) {
+                            return;
+                        }
+                        if (state == LifecycleState.CONNECTED) {
+                            LOGGER.debug(logIdent(hostname, AbstractService.this) + "Connected Service.");
+                        } else if (state == LifecycleState.DISCONNECTED) {
+                            LOGGER.debug(logIdent(hostname, AbstractService.this) + "Disconnected Service.");
+                        }
+                        transitionState(state);
                     }
-                    if (state == LifecycleState.CONNECTED) {
-                        LOGGER.debug(logIdent(hostname, AbstractService.this) + "Connected Service.");
-                    } else if (state == LifecycleState.DISCONNECTED) {
-                        LOGGER.debug(logIdent(hostname, AbstractService.this) + "Disconnected Service.");
-                    }
-                    transitionState(state);
-                }
-            });
+                });
     }
 
     @Override
@@ -158,9 +152,7 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
 
     @Override
     public Observable<LifecycleState> connect() {
-        LOGGER.debug(logIdent(hostname, this) + "Got instructed to connect.");
         if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
-            LOGGER.debug(logIdent(hostname, this) + "Already connected or connecting, skipping connect.");
             return Observable.just(state());
         }
 
@@ -169,7 +161,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
             .flatMap(new Func1<Endpoint, Observable<LifecycleState>>() {
                 @Override
                 public Observable<LifecycleState> call(final Endpoint endpoint) {
-                    LOGGER.debug(logIdent(hostname, AbstractService.this) + "Initializing connect on Endpoint.");
                     return endpoint.connect();
                 }
             })
@@ -184,9 +175,7 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
 
     @Override
     public Observable<LifecycleState> disconnect() {
-        LOGGER.debug(logIdent(hostname, this) + "Got instructed to disconnect.");
         if (state() == LifecycleState.DISCONNECTED || state() == LifecycleState.DISCONNECTING) {
-            LOGGER.debug(logIdent(hostname, this) + "Already disconnected or disconnecting, skipping disconnect.");
             return Observable.just(state());
         }
 
@@ -195,7 +184,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
             .flatMap(new Func1<Endpoint, Observable<LifecycleState>>() {
                 @Override
                 public Observable<LifecycleState> call(Endpoint endpoint) {
-                    LOGGER.debug(logIdent(hostname, AbstractService.this) + "Initializing disconnect on Endpoint.");
                     return endpoint.disconnect();
                 }
             })
