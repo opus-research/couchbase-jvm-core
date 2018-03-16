@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,36 +19,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+
 package com.couchbase.client.core;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
-import rx.Observable;
+import rx.functions.Func0;
 
 /**
- * Represents a Couchbase Cluster.
+ * Marker interface which is used to denote a factory implementation that creates new requests on each call..
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.2.0
  */
-public interface ClusterFacade {
-
-    /**
-     * Sends a {@link CouchbaseRequest} into the cluster and eventually returns a {@link CouchbaseResponse}.
-     *
-     * The {@link CouchbaseResponse} is not returned directly, but is wrapped into a {@link Observable}.
-     *
-     * @param request the request to send.
-     * @return the {@link CouchbaseResponse} wrapped into a {@link Observable}.
-     */
-    @InterfaceStability.Committed
-    @InterfaceAudience.Public
-    @Deprecated
-    <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request);
-
-    @InterfaceStability.Committed
-    @InterfaceAudience.Public
-    <R extends CouchbaseResponse> Observable<R> send(final RequestFactory requestFactory);
+public interface RequestFactory extends Func0<CouchbaseRequest> {
 }
