@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Couchbase, Inc.
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,32 +19,29 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.endpoint.query;
-
-import com.couchbase.client.core.ResponseEvent;
-import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.CoreEnvironment;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.HttpClientCodec;
+package com.couchbase.client.core.event;
 
 /**
- * This endpoint defines the pipeline for query requests and responses (N1QL).
+ * Different event types available.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.1.0
  */
-public class QueryEndpoint extends AbstractEndpoint {
+public enum EventType {
 
-    public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
-        RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
-    }
+    /**
+     * The event contains some kind of metric.
+     */
+    METRIC,
 
-    @Override
-    protected void customEndpointHandlers(final ChannelPipeline pipeline) {
-        pipeline
-            .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer(), false));
-    }
+    /**
+     * The event is system state related.
+     */
+    SYSTEM,
+
+    /**
+     * The event indicates an error or possible error.
+     */
+    ERROR
+
 }

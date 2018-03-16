@@ -21,6 +21,7 @@
  */
 package com.couchbase.client.core.env;
 
+import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -213,9 +214,9 @@ public interface CoreEnvironment {
     long maxRequestLifetime();
 
     /**
-     * The time in milliseconds after which some service will issue a form of keep-alive request.
+     * Returns the event bus where events are broadcasted on and can be published to.
      *
-     * @return the interval of idle time in milliseconds after which a keep-alive is triggered.
+     * @return the configured event bus.
      */
-    long keepAliveInterval();
+    EventBus eventBus();
 }

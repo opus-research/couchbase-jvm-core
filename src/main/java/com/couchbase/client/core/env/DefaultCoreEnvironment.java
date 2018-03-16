@@ -22,6 +22,8 @@
 package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.event.DefaultEventBus;
+import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
@@ -71,7 +73,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final Delay RETRY_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 100);
     public static final RetryStrategy RETRY_STRATEGY = BestEffortRetryStrategy.INSTANCE;
     public static final long MAX_REQUEST_LIFETIME = TimeUnit.SECONDS.toMillis(75);
-    public static final long KEEPALIVEINTERVAL = TimeUnit.SECONDS.toMillis(30);
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
@@ -145,13 +146,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final String packageNameAndVersion;
     private final RetryStrategy retryStrategy;
     private final long maxRequestLifetime;
-    private final long keepAliveInterval;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
 
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
+    private final EventBus eventBus;
     private volatile boolean shutdown;
 
     protected DefaultCoreEnvironment(final Builder builder) {
@@ -185,12 +186,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         retryDelay = builder.retryDelay();
         retryStrategy = builder.retryStrategy();
         maxRequestLifetime = longPropertyOr("maxRequestLifetime", builder.maxRequestLifetime());
-        keepAliveInterval = longPropertyOr("keepAliveInterval", builder.keepAliveInterval());
 
         this.ioPool = builder.ioPool() == null
             ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
         this.coreScheduler = builder.scheduler() == null
             ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
+        this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
         this.shutdown = false;
     }
 
@@ -404,8 +405,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public long keepAliveInterval() {
-        return this.keepAliveInterval;
+    public EventBus eventBus() {
+        return eventBus;
     }
 
     public static class Builder implements CoreEnvironment {
@@ -437,8 +438,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private RetryStrategy retryStrategy = RETRY_STRATEGY;
         private EventLoopGroup ioPool;
         private Scheduler scheduler;
+        private EventBus eventBus;
         private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
-        private long keepAliveInterval = KEEPALIVEINTERVAL;
 
         protected Builder() {
         }
@@ -865,17 +866,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         @Override
-        public long keepAliveInterval() {
-            return keepAliveInterval;
+        public EventBus eventBus() {
+            return eventBus;
         }
 
-        /**
-         * Sets the time of inactivity, in milliseconds, after which some services
-         * will issue a form of keep-alive request to their corresponding server/nodes
-         * (default is 30s, values <= 0 deactivate the idle check).
-         */
-        public Builder keepAliveInterval(long keepAliveIntervalMilliseconds) {
-            this.keepAliveInterval = keepAliveIntervalMilliseconds;
+        public Builder eventBus(final EventBus eventBus) {
+            this.eventBus = eventBus;
             return this;
         }
 
@@ -907,6 +903,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         sb.append(", coreScheduler=").append(coreScheduler.getClass().getSimpleName());
+        sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);
         sb.append(", retryStrategy=").append(retryStrategy);
@@ -914,7 +911,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", retryDelay=").append(retryDelay);
         sb.append(", reconnectDelay=").append(reconnectDelay);
         sb.append(", observeIntervalDelay=").append(observeIntervalDelay);
-        sb.append(", keepAliveInterval=").append(keepAliveInterval);
         sb.append('}');
         return sb.toString();
     }

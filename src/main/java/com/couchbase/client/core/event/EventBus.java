@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Couchbase, Inc.
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,32 +19,30 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.endpoint.query;
+package com.couchbase.client.core.event;
 
-import com.couchbase.client.core.ResponseEvent;
-import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.CoreEnvironment;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.HttpClientCodec;
+import rx.Observable;
 
 /**
- * This endpoint defines the pipeline for query requests and responses (N1QL).
+ * Defines the interface for a generic event bus.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.1.0
  */
-public class QueryEndpoint extends AbstractEndpoint {
+public interface EventBus {
 
-    public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
-        RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
-    }
+    /**
+     * Subscribe to the event bus to retrieve {@link CouchbaseEvent}s.
+     *
+     * @return the observable where the events are emitted into.
+     */
+    Observable<CouchbaseEvent> get();
 
-    @Override
-    protected void customEndpointHandlers(final ChannelPipeline pipeline) {
-        pipeline
-            .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer(), false));
-    }
+    /**
+     * Publish a {@link CouchbaseEvent} into the bus.
+     *
+     * @param event the event to publish.
+     */
+    void publish(CouchbaseEvent event);
+
 }

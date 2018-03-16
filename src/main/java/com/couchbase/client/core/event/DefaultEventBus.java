@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Couchbase, Inc.
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,32 +19,39 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.endpoint.query;
+package com.couchbase.client.core.event;
 
-import com.couchbase.client.core.ResponseEvent;
-import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.CoreEnvironment;
-import com.lmax.disruptor.RingBuffer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.HttpClientCodec;
+import rx.Observable;
+import rx.Scheduler;
+import rx.subjects.PublishSubject;
+import rx.subjects.Subject;
 
 /**
- * This endpoint defines the pipeline for query requests and responses (N1QL).
+ * The default event bus implementation.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.1.0
  */
-public class QueryEndpoint extends AbstractEndpoint {
+public class DefaultEventBus implements EventBus {
 
-    public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
-        RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
+    private final Subject<CouchbaseEvent, CouchbaseEvent> bus;
+    private final Scheduler scheduler;
+
+    public DefaultEventBus(final Scheduler scheduler) {
+        bus = PublishSubject.create();
+        this.scheduler = scheduler;
     }
 
     @Override
-    protected void customEndpointHandlers(final ChannelPipeline pipeline) {
-        pipeline
-            .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer(), false));
+    public Observable<CouchbaseEvent> get() {
+        return bus.onBackpressureDrop().observeOn(scheduler);
     }
+
+    @Override
+    public void publish(final CouchbaseEvent event) {
+        if (bus.hasObservers()) {
+            bus.onNext(event);
+        }
+    }
+
 }
