@@ -367,7 +367,8 @@ public class ByteBufJsonParser {
         if (lastValidIndex == -1) {
             if (mode == Mode.JSON_NUMBER_VALUE && content.readableBytes() > 2) {
                 length = 1;
-                level.setCurrentValue(content.copy(readerIndex - 1, length), length);
+                ByteBuf slice = this.content.slice(readerIndex - 1, length);
+                level.setCurrentValue(slice.copy(), length);
                 //no need to skip here
                 level.emitJsonPointerValue();
             } else {
@@ -384,7 +385,8 @@ public class ByteBufJsonParser {
 
                 length = lastValidIndex - readerIndex + 1;
                 if (shouldSaveValue) {
-                    level.setCurrentValue(content.copy(readerIndex - 1, length + 1), length);
+                    ByteBuf slice = content.slice(readerIndex - 1, length + 1);
+                    level.setCurrentValue(slice.copy(), length);
                     level.emitJsonPointerValue();
                 }
                 content.skipBytes(length);
@@ -394,14 +396,16 @@ public class ByteBufJsonParser {
                 length = lastValidIndex - readerIndex;
                 if (length > 0) {
                     if (shouldSaveValue) {
-                        level.setCurrentValue(content.copy(readerIndex - 1, length + 1), length);
+                        ByteBuf slice = content.slice(readerIndex - 1, length + 1);
+                        level.setCurrentValue(slice.copy(), length);
                         level.emitJsonPointerValue();
                     }
                     this.content.skipBytes(length);
                 } else {
                     length = 1;
                     if (shouldSaveValue) {
-                        level.setCurrentValue(content.copy(readerIndex - 1, length), length);
+                        ByteBuf slice = content.slice(readerIndex - 1, length);
+                        level.setCurrentValue(slice.copy(), length);
                         level.emitJsonPointerValue();
                     }
                 }
