@@ -15,7 +15,6 @@
  */
 package com.couchbase.client.core.utils;
 
-import java.net.Inet4Address;
 import java.net.InetAddress;
 
 /**
@@ -31,7 +30,7 @@ public class NetworkAddress {
     /**
      * Flag which controls the usage of reverse dns
      */
-    public static final boolean ALLOW_REVERSE_DNS = Boolean.parseBoolean(
+    private static final boolean ALLOW_REVERSE_DNS = Boolean.parseBoolean(
         System.getProperty(REVERSE_DNS_PROPERTY, "true")
     );
 
@@ -41,19 +40,7 @@ public class NetworkAddress {
 
     NetworkAddress(final String input, final boolean reverseDns) {
         try {
-            InetAddress[] addrs = InetAddress.getAllByName(input);
-            InetAddress foundAddr = null;
-            for (InetAddress addr : addrs) {
-                if (addr instanceof Inet4Address) {
-                    // we need to ignore IPv6 addrs since Couchbase doesn't support it by now
-                    foundAddr = addr;
-                    break;
-                }
-            }
-            if (foundAddr == null) {
-                throw new IllegalArgumentException("No IPv4 address found for \"" + input + "\"");
-            }
-            this.inner = foundAddr;
+            this.inner = InetAddress.getByName(input);
             this.createdFromHostname = !InetAddresses.isInetAddress(input);
             this.allowReverseDns = reverseDns;
         } catch (Exception ex) {

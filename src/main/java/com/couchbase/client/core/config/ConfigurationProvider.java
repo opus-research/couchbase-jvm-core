@@ -18,6 +18,7 @@ package com.couchbase.client.core.config;
 import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
 
+import java.net.InetAddress;
 import java.util.Set;
 
 public interface ConfigurationProvider {

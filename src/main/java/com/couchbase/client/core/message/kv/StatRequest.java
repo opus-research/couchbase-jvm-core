@@ -19,6 +19,8 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.utils.NetworkAddress;
 import rx.subjects.ReplaySubject;
 
+import java.net.InetAddress;
+
 /**
  * @author Sergey Avseyev
  * @since 1.2.1

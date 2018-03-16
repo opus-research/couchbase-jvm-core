@@ -20,6 +20,8 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.message.observe.ObserveViaMutationToken;
 import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
+
 /**
  * Get the current high sequence numbers one could initialize streams
  * for all partitions that are located on the server, or use in {@link ObserveViaMutationToken}.

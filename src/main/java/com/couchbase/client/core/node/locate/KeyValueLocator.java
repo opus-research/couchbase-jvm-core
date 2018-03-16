@@ -41,6 +41,7 @@ import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.RingBuffer;
 
+import java.net.InetAddress;
 import java.util.List;
 import java.util.zip.CRC32;
 

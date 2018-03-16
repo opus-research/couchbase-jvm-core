@@ -17,6 +17,7 @@ package com.couchbase.client.core.config;
 
 import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;

@@ -56,6 +56,7 @@ import rx.Subscriber;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

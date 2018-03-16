@@ -38,8 +38,11 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
+import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static com.couchbase.client.core.utils.NetworkAddress.REVERSE_DNS_PROPERTY;
 
 /**
  * The general implementation of a {@link Node}.
@@ -114,7 +117,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.eventBus = environment.eventBus();
         this.serviceStates = new ServiceStateZipper(LifecycleState.DISCONNECTED);
 
-        if (NetworkAddress.ALLOW_REVERSE_DNS) {
+        if (Boolean.parseBoolean(System.getProperty(REVERSE_DNS_PROPERTY, "true"))) {
             //JVMCBC-229: eagerly trigger and time a reverse DNS lookup
             long lookupStart = System.nanoTime();
             String lookupResult = hostname.nameAndAddress();

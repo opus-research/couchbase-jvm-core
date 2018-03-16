@@ -16,12 +16,14 @@
 package com.couchbase.client.core.node.locate;
 
 import com.couchbase.client.core.config.ClusterConfig;
+import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.search.SearchQueryRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.Test;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

@@ -26,6 +26,8 @@ import com.couchbase.client.core.state.Stateful;
 import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
 
+import java.net.InetAddress;
+
 /**
  * Represents a Couchbase Node.
  *

@@ -60,11 +60,13 @@ import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Subscriber;
 import rx.observers.TestSubscriber;
 import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
+import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.List;

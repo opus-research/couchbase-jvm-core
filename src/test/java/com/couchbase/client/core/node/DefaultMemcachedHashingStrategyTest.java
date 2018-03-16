@@ -19,6 +19,8 @@ import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.Test;
 
+import java.net.InetAddress;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

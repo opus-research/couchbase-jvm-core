@@ -34,6 +34,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import rx.Observable;
 
+import java.net.InetAddress;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.isA;

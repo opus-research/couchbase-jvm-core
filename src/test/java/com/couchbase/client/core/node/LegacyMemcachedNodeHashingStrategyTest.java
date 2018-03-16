@@ -20,6 +20,7 @@ import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.NetworkAddress;
 import org.junit.Test;
 
+import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
 

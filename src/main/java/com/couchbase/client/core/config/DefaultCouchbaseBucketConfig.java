@@ -15,14 +15,18 @@
  */
 package com.couchbase.client.core.config;
 
+import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

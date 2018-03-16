@@ -58,6 +58,7 @@ import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
+import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Queue;

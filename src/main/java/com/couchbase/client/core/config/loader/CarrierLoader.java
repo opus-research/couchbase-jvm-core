@@ -29,6 +29,9 @@ import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.functions.Func1;
+import sun.nio.ch.Net;
+
+import java.net.InetAddress;
 
 /**
  * Loads a raw bucket configuration through the carrier mechanism (also commonly referred to as CCCP).

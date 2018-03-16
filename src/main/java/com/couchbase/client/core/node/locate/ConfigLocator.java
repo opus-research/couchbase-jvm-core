@@ -27,6 +27,7 @@ import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.RingBuffer;
 
+import java.net.InetAddress;
 import java.util.List;
 
 /**

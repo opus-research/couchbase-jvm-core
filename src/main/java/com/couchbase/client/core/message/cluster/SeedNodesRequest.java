@@ -21,7 +21,10 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.utils.NetworkAddress;
+import sun.nio.ch.Net;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;

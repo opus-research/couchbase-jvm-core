@@ -18,6 +18,8 @@ package com.couchbase.client.core.message.internal;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
+
 public class RemoveNodeRequest extends AbstractCouchbaseRequest implements InternalRequest {
 
     private final NetworkAddress hostname;

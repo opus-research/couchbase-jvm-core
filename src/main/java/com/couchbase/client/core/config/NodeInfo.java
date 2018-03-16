@@ -20,6 +20,7 @@ import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+import java.net.InetAddress;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)

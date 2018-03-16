@@ -17,6 +17,7 @@ package com.couchbase.client.core.config;
 
 import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import java.net.InetAddress;
 
 /**
  * A configuration representing the couchbase bucket.

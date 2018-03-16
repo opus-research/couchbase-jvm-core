@@ -19,6 +19,8 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.buffer.ByteBuf;
 
+import java.net.InetAddress;
+
 /**
  * Represents a response with a bucket configuration.
  *

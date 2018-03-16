@@ -28,6 +28,8 @@ import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
 import rx.functions.Func1;
 
+import java.net.InetAddress;
+
 /**
  * Loads a raw bucket configuration through the Couchbase Server HTTP config interface.
  *

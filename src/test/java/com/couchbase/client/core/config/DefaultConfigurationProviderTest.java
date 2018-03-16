@@ -33,6 +33,7 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.AsyncSubject;
 
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;

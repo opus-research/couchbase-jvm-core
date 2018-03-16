@@ -17,6 +17,7 @@ package com.couchbase.client.core.config.loader;
 
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.config.ConfigurationException;
+import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
@@ -31,6 +32,8 @@ import io.netty.util.CharsetUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import rx.Observable;
+
+import java.net.InetAddress;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;

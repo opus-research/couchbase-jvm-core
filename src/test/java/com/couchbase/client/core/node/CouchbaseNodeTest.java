@@ -36,6 +36,8 @@ import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.BehaviorSubject;
 
+import java.net.InetAddress;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;

@@ -30,6 +30,7 @@ import rx.observers.TestSubscriber;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

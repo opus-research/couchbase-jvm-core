@@ -20,6 +20,8 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
+
 public class AddNodeResponse extends AbstractCouchbaseResponse implements CouchbaseResponse {
 
     private final NetworkAddress hostname;

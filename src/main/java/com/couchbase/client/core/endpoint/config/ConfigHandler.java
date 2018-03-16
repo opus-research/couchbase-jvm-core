@@ -51,6 +51,7 @@ import com.couchbase.client.core.message.config.UpdateBucketResponse;
 import com.couchbase.client.core.message.config.UpsertUserRequest;
 import com.couchbase.client.core.message.config.UpsertUserResponse;
 import com.couchbase.client.core.service.ServiceType;
+import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;

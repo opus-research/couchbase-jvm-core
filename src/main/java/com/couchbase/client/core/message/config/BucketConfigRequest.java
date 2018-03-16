@@ -18,6 +18,8 @@ package com.couchbase.client.core.message.config;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.utils.NetworkAddress;
 
+import java.net.InetAddress;
+
 public class BucketConfigRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
     private static final String PATH = "/pools/default/b/";

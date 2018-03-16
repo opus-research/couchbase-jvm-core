@@ -15,6 +15,8 @@
  */
 package com.couchbase.client.core.message.kv;
 
+import java.net.InetAddress;
+
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.utils.NetworkAddress;
 

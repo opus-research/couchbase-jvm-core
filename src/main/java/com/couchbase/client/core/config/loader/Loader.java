@@ -21,6 +21,8 @@ import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
 
+import java.net.InetAddress;
+
 public interface Loader {
 
      @Deprecated

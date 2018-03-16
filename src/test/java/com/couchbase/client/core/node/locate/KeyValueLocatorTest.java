@@ -27,6 +27,7 @@ import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.util.CharsetUtil;
 import org.junit.Test;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
