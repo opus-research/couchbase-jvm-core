@@ -35,8 +35,7 @@ public enum BucketCapabilities {
     CCCP("cccp"),
     XDCR_CHECKPOINTING("xdcrCheckpointing"),
     NODES_EXT("nodesExt"),
-    DCP("dcp"),
-    XATTR("xattr");
+    DCP("dcp");
 
     private final String raw;
 
