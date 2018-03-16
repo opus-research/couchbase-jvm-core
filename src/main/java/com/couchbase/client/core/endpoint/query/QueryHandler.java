@@ -195,7 +195,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
                 + msg.getClass());
         }
 
-        addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
+        addHttpBasicAuth(ctx, request, msg.username(), msg.password());
         return request;
     }
 
@@ -756,7 +756,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null);
+            super(null, null, null);
         }
     }
 

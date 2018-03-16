@@ -26,7 +26,7 @@ public class RemoveServiceRequest extends AbstractCouchbaseRequest implements In
     private final InetAddress hostname;
 
     public RemoveServiceRequest(ServiceType type, String bucket, InetAddress hostname) {
-        super(bucket, null);
+        super(bucket, null, null);
         this.type = type;
         this.hostname = hostname;
     }

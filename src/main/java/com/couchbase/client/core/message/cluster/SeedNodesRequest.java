@@ -77,7 +77,7 @@ public class SeedNodesRequest extends AbstractCouchbaseRequest implements Cluste
      * @param nodes the seed node hostnames.
      */
     public SeedNodesRequest(final List<String> nodes) {
-        super(null, null);
+        super(null, null, null);
 
         if (nodes == null || nodes.isEmpty()) {
             throw new ConfigurationException("Empty or null bootstrap list provided.");

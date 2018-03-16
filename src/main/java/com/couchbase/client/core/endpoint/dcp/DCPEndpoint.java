@@ -33,9 +33,9 @@ import io.netty.channel.ChannelPipeline;
  */
 public class DCPEndpoint extends AbstractEndpoint {
 
-    public DCPEndpoint(String hostname, String bucket, String password, int port,
+    public DCPEndpoint(String hostname, String bucket, String username, String password, int port,
                        CoreEnvironment environment, RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false, environment.ioPool(), true);
+        super(hostname, bucket, username, password, port, environment, responseBuffer, false, environment.ioPool(), true);
     }
 
     @Override
