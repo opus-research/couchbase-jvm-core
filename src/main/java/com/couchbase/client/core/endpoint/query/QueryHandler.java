@@ -24,7 +24,6 @@ package com.couchbase.client.core.endpoint.query;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
@@ -202,7 +201,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
         if (currentRequest() instanceof KeepAliveRequest) {
             if (msg instanceof LastHttpContent) {
-                response = new KeepAliveResponse(ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()), currentRequest());
+                response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
                 responseContent.clear();
                 responseContent.discardReadBytes();
                 finishedDecoding();
@@ -306,7 +305,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             return null;
         }
 
-        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         if (!success) {
             status = ResponseStatus.FAILURE;
         }
@@ -553,6 +552,28 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryStatusObservable = null;
         querySignatureObservable = null;
         queryParsingState = QUERY_STATE_INITIAL;
+    }
+
+    /**
+     * Converts a HTTP status code in its appropriate {@link ResponseStatus} representation.
+     *
+     * @param code the http code.
+     * @return the parsed status.
+     */
+    private static ResponseStatus statusFromCode(int code) {
+        ResponseStatus status;
+        switch (code) {
+            case 200:
+            case 201:
+                status = ResponseStatus.SUCCESS;
+                break;
+            case 404:
+                status = ResponseStatus.NOT_EXISTS;
+                break;
+            default:
+                status = ResponseStatus.FAILURE;
+        }
+        return status;
     }
 
     @Override
