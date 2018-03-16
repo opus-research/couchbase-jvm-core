@@ -92,32 +92,30 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Verifies the correct functionality of the {@link QueryHandler}.
+ * Verifies the correct functionality of the {@link QueryHandler} using V1 Parser.
  *
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class QueryHandlerTest {
+public class QueryHandlerWithParserV1Test {
 
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandlerTest.class);
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandlerWithParserV1Test.class);
 
     private static final String FAKE_REQUESTID = "1234test-7802-4fc2-acd6-dfcd1c05a288";
     private static final String FAKE_CLIENTID = "1234567890123456789012345678901234567890123456789012345678901234";
     private static final String FAKE_SIGNATURE = "{\"*\":\"*\"}";
 
     private ObjectMapper mapper = new ObjectMapper();
-    private Queue<QueryRequest> queue;
-    private EmbeddedChannel channel;
-    private Disruptor<ResponseEvent> responseBuffer;
-    private RingBuffer<ResponseEvent> responseRingBuffer;
-    private List<CouchbaseMessage> firedEvents;
-    private CountDownLatch latch;
-    private QueryHandler handler;
-    private AbstractEndpoint endpoint;
+    protected Queue<QueryRequest> queue;
+    protected EmbeddedChannel channel;
+    protected Disruptor<ResponseEvent> responseBuffer;
+    protected RingBuffer<ResponseEvent> responseRingBuffer;
+    protected List<CouchbaseMessage> firedEvents;
+    protected CountDownLatch latch;
+    protected QueryHandler handler;
+    protected AbstractEndpoint endpoint;
 
-    @Before
-    @SuppressWarnings("unchecked")
-    public void setup() {
+    protected void commonSetup() {
         responseBuffer = new Disruptor<ResponseEvent>(new EventFactory<ResponseEvent>() {
             @Override
             public ResponseEvent newInstance() {
@@ -146,7 +144,13 @@ public class QueryHandlerTest {
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<QueryRequest>();
-        handler = new QueryHandler(endpoint, responseRingBuffer, queue, false, false);
+    }
+
+    @Before
+    @SuppressWarnings("unchecked")
+    public void setup() {
+        commonSetup();
+        handler = new QueryHandler(endpoint, responseRingBuffer, queue, false, false, false);
         channel = new EmbeddedChannel(handler);
     }
 
@@ -1533,7 +1537,6 @@ public class QueryHandlerTest {
         softly.assertThat(inbound).isNotNull();
         softly.assertThat(error).isNull();
         softly.assertThat(handler.getDecodingState()).isEqualTo(DecodingState.INITIAL);
-        softly.assertThat(handler.getQueryParsingState()).isEqualTo(QueryHandler.QUERY_STATE_INITIAL);
         softly.assertAll();
     }
 
