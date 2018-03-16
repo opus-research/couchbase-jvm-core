@@ -19,13 +19,13 @@ import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.ResponseHandler;
-import com.couchbase.client.core.endpoint.kv.MalformedMemcacheHeaderException;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.CoreScheduler;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
+import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.retry.RetryHelper;
@@ -260,14 +260,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                     writeMetrics(response);
                 }
             }
-        } catch (MalformedMemcacheHeaderException e) {
-            //Close the socket as something is terribly wrong when the header is malformed
-            //and send the request to retry queue
-            LOGGER.error(logIdent(ctx, endpoint) +
-                    "Closing and reconnecting the endpoint due to malformed header, reason is "+ e.getMessage());
-            endpoint().disconnect();
-            endpoint().connect();
-            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, currentRequest, currentRequest.observable());
         } catch (CouchbaseException e) {
             failSafe(env().scheduler(), moveResponseOut, currentRequest.observable(), e);
         } catch (Exception e) {
@@ -275,6 +267,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
+            endpoint.notifyResponseDecoded(currentRequest instanceof KeepAlive);
             resetStatesAfterDecode(ctx);
         }
     }

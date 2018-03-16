@@ -13,60 +13,65 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.couchbase.client.core.service;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.Endpoint;
-import com.couchbase.client.core.endpoint.search.SearchEndpoint;
+import com.couchbase.client.core.endpoint.query.QueryEndpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.service.strategies.RandomSelectionStrategy;
+import com.couchbase.client.core.service.strategies.RoundRobinSelectionStrategy;
 import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
 /**
- * @author Sergey Avseyev
+ * The {@link QueryService} is composed of and manages {@link com.couchbase.client.core.endpoint.query.QueryEndpoint}s.
+ *
+ * @author Michael Nitschinger
+ * @since 1.0
  */
-public class SearchService extends PooledService {
+public class OldQueryService extends AbstractPoolingService {
+
     /**
      * The endpoint selection strategy.
      */
-    private static final SelectionStrategy STRATEGY = new RandomSelectionStrategy();
+    private static final SelectionStrategy STRATEGY = new RoundRobinSelectionStrategy();
+
     /**
      * The endpoint factory.
      */
-    private static final EndpointFactory FACTORY = new SearchEndpointFactory();
+    private static final EndpointFactory FACTORY = new QueryEndpointFactory();
 
     /**
-     * Creates a new {@link ViewService}.
+     * Creates a new {@link QueryService}.
      *
-     * @param hostname       the hostname of the service.
-     * @param bucket         the name of the bucket.
-     * @param password       the password of the bucket.
-     * @param port           the port of the service.
-     * @param env            the shared environment.
+     * @param hostname the hostname of the service.
+     * @param bucket the name of the bucket.
+     * @param password the password of the bucket.
+     * @param port the port of the service.
+     * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public SearchService(final String hostname, final String bucket, final String password, final int port,
-                         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.searchServiceConfig(), responseBuffer, FACTORY, STRATEGY);
-
+    public OldQueryService(final String hostname, final String bucket, final String password, final int port,
+                        final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
+        super(hostname, bucket, password, port, env, env.queryEndpoints(), env.queryEndpoints(), STRATEGY,
+                responseBuffer, FACTORY);
     }
+
 
     @Override
     public ServiceType type() {
-        return ServiceType.SEARCH;
+        return ServiceType.QUERY;
     }
 
     /**
-     * The factory for {@link SearchEndpoint}s.
+     * The factory for {@link com.couchbase.client.core.endpoint.query.QueryEndpoint}s.
      */
-    static class SearchEndpointFactory implements EndpointFactory {
+    static class QueryEndpointFactory implements EndpointFactory {
         @Override
         public Endpoint create(final String hostname, final String bucket, final String password, final int port,
                                final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new SearchEndpoint(hostname, bucket, password, port, env, responseBuffer);
+            return new QueryEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
-
 }
