@@ -346,4 +346,10 @@ public interface CoreEnvironment {
      */
     int socketConnectTimeout();
 
+    /**
+     * Returns the amount of events which will be kept in the DCP stream object to deliver to subscribers.
+     *
+     * @return the number of events for ReplaySubject inside DCPStream
+     */
+    int dcpStreamSize();
 }
