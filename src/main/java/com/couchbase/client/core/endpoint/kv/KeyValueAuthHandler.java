@@ -23,6 +23,7 @@ package com.couchbase.client.core.endpoint.kv;
 
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.security.sasl.Sasl;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
@@ -38,12 +39,12 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
-import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -238,8 +239,13 @@ public class KeyValueAuthHandler
         byte[] evaluatedBytes = saslClient.evaluateChallenge(response);
 
         if (evaluatedBytes != null) {
-            String[] evaluated = new String(evaluatedBytes).split(" ");
-            ByteBuf content = Unpooled.copiedBuffer(username + "\0" + evaluated[1], CharsetUtil.UTF_8);
+            ByteBuf content;
+            if (selectedMechanism == "CRAM-MD5") {
+                String[] evaluated = new String(evaluatedBytes).split(" ");
+                content = Unpooled.copiedBuffer(username + "\0" + evaluated[1], CharsetUtil.UTF_8);
+            } else {
+                content = Unpooled.wrappedBuffer(evaluatedBytes);
+            }
 
             FullBinaryMemcacheRequest stepRequest = new DefaultFullBinaryMemcacheRequest(
                 selectedMechanism,
