@@ -531,6 +531,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     if (!pipeline) {
                         free = false;
                     }
+                    request.dispatchHostname(hostname);
                     channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
