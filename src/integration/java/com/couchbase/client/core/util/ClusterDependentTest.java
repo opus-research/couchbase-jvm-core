@@ -40,8 +40,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.couchbase.mock.CouchbaseMock;
-import org.couchbase.mock.JsonUtils;
+import com.couchbase.mock.CouchbaseMock;
+import com.couchbase.mock.JsonUtils;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import rx.Observable;
@@ -155,6 +155,8 @@ public class ClusterDependentTest {
     public static CoreEnvironment env() {
         return env;
     }
+
+    public static CouchbaseMock mock() { return couchbaseMock; }
 
     /**
      * Checks based on the cluster node versions if DCP is available.
