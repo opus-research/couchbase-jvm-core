@@ -45,28 +45,12 @@ public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implem
      * @param password the optional password of the bucket.
      */
     public AbstractDCPRequest(String bucket, String password) {
-        this(bucket, bucket, password);
-    }
-
-    /**
-     * Creates a new {@link AbstractDCPRequest}.
-     *
-     * @param bucket   the bucket of the document.
-     * @param username the user authorized for bucket access.
-     * @param password the optional password of the user.
-     */
-    public AbstractDCPRequest(String bucket, String username, String password) {
-        super(bucket, username, password);
+        super(bucket, password);
     }
 
     public AbstractDCPRequest(String bucket, String password, Subject<CouchbaseResponse,
             CouchbaseResponse> observable) {
-        this(bucket, bucket, password, observable);
-    }
-
-    public AbstractDCPRequest(String bucket, String username, String password, Subject<CouchbaseResponse,
-            CouchbaseResponse> observable) {
-        super(bucket, username, password, observable);
+        super(bucket, password, observable);
     }
 
     @Override

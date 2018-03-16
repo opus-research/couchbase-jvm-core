@@ -28,15 +28,9 @@ public class ConfigService extends AbstractOnDemandService {
      */
     private static final EndpointFactory FACTORY = new ConfigEndpointFactory();
 
-    @Deprecated
     public ConfigService(String hostname, String bucket, String password, int port, CoreEnvironment env,
-                         RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    public ConfigService(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
         RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, responseBuffer, FACTORY);
+        super(hostname, bucket, password, port, env, responseBuffer, FACTORY);
     }
 
     @Override
@@ -45,9 +39,10 @@ public class ConfigService extends AbstractOnDemandService {
     }
 
     static class ConfigEndpointFactory implements EndpointFactory {
-        public Endpoint create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
+        @Override
+        public Endpoint create(String hostname, String bucket, String password, int port, CoreEnvironment env,
             RingBuffer<ResponseEvent> responseBuffer) {
-            return new ConfigEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new ConfigEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 

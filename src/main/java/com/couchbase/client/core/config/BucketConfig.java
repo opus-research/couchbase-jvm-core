@@ -42,31 +42,16 @@ public interface BucketConfig {
     String name();
 
     /**
-     * User authorized for the bucket access.
+     * The password of the bucket.
      *
-     * @return username of the user.
-     */
-    String username();
-
-    /**
-     * Set user authorized for the bucket access.
-     *
-     * @param username the user authorized for bucket access
-     * @return the config for chaining
-     */
-    BucketConfig username(String username);
-
-    /**
-     * The password of the bucket/user.
-     *
-     * @return the password of the bucket/user.
+     * @return the password of the bucket.
      */
     String password();
 
     /**
      * Setter to inject the password manually into the config.
      *
-     * @param password the password of the bucket/user to inject.
+     * @param password the password of the bucket to inject.
      * @return the config for proper chaining.
      */
     BucketConfig password(String password);

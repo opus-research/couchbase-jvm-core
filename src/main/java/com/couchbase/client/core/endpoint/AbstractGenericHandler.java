@@ -240,15 +240,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
-        ENCODED request;
-        try {
-            request = encodeRequest(ctx, msg);
-        } catch (Exception ex) {
-            msg.observable().onError(new RequestCancelledException("Error while encoding Request, cancelling.", ex));
-            // we need to re-throw the error because netty expects either an exception
-            // or at least one message encoded. just returning won't work
-            throw ex;
-        }
+        ENCODED request = encodeRequest(ctx, msg);
         sentRequestQueue.offer(msg);
         out.add(request);
         sentRequestTimings.offer(System.nanoTime());
