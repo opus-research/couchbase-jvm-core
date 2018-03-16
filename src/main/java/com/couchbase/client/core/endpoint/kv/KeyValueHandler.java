@@ -459,6 +459,7 @@ public class KeyValueHandler
     }
 
     private BinaryMemcacheRequest handleStatRequest(StatRequest msg) {
+        msg.start();
         String key = msg.key();
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
         short keyLength = (short) msg.keyBytes().length;
@@ -498,8 +499,12 @@ public class KeyValueHandler
         }
 
         if (request instanceof StatRequest) {
-            if (((StatResponse)response).key() == null) {
+            if (((StatResponse) response).key() == null) {
+                if (((StatRequest) request).finish()) {
+                    request.observable().onCompleted();
+                }
                 finishedDecoding();
+                return null;
             }
         } else {
             finishedDecoding();
@@ -562,7 +567,7 @@ public class KeyValueHandler
      * @param status the response status code.
      * @return the decoded response or null if none did match.
      */
-    private static CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
+    private CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
         ResponseStatus status, boolean seqOnMutation) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
@@ -594,7 +599,7 @@ public class KeyValueHandler
             String value = content.toString(CHARSET);
             releaseContent(content);
 
-            response = new StatResponse(status, statusCode, key, value, bucket, request);
+            response = new StatResponse(status, statusCode, remoteHostname(), key, value, bucket, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
             long observedCas = 0;

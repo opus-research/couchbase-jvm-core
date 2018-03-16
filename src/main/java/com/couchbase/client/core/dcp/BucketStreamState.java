@@ -33,9 +33,9 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 @InterfaceAudience.Public
 public class BucketStreamState {
     /**
-     * The partition number (vBucket), to which this state belongs.
+     * Default state, which matches all changes in the stream.
      */
-    private final short partition;
+    public static final BucketStreamState BLANK = new BucketStreamState(0, 0, 0xffffffff, 0, 0xffffffff);
 
     /**
      * A unique identifier that is generated that is assigned to each VBucket.
@@ -67,19 +67,14 @@ public class BucketStreamState {
     private final long snapshotEndSequenceNumber;
 
 
-    public BucketStreamState(short partition, long vbucketUUID,
+    public BucketStreamState(long vbucketUUID,
                              long startSequenceNumber, long endSequenceNumber,
                              long snapshotStartSequenceNumber, long snapshotEndSequenceNumber) {
-        this.partition = partition;
         this.vbucketUUID = vbucketUUID;
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
         this.snapshotStartSequenceNumber = snapshotStartSequenceNumber;
         this.snapshotEndSequenceNumber = snapshotEndSequenceNumber;
-    }
-
-    public short partition() {
-        return partition;
     }
 
     public long vbucketUUID() {
@@ -103,14 +98,13 @@ public class BucketStreamState {
     }
 
     public String toString() {
-        return "BucketStreamState{"
-                + "partition=" + partition
-                + ", vbucketUUID=" + vbucketUUID
-                + ", startSequenceNumber=" + startSequenceNumber
-                + ", endSequenceNumber=" + endSequenceNumber
-                + ", snapshotStartSequenceNumber=" + snapshotStartSequenceNumber
-                + ", snapshotEndSequenceNumber=" + snapshotEndSequenceNumber
-                + '}';
+        return "BucketStreamState{" +
+                "vbucketUUID=" + vbucketUUID +
+                ", startSequenceNumber=" + startSequenceNumber +
+                ", endSequenceNumber=" + endSequenceNumber +
+                ", snapshotStartSequenceNumber=" + snapshotStartSequenceNumber +
+                ", snapshotEndSequenceNumber=" + snapshotEndSequenceNumber +
+                '}';
 
     }
 }

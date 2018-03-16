@@ -1,16 +1,16 @@
 /**
  * Copyright (C) 2014 Couchbase, Inc.
- * <p/>
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * <p/>
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * <p/>
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,23 +35,27 @@ import rx.subjects.Subject;
  */
 public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest implements BinaryRequest {
 
-    protected static final short DEFAULT_PARTITION = -1;
     /**
      * The opaque identifier used in the binary protocol to track requests/responses.
-     * <p/>
+     *
      * No overflow control is applied, since once it overflows it starts with negative values again.
      */
     private static volatile int GLOBAL_OPAQUE = 0;
+
+    protected static final short DEFAULT_PARTITION = -1;
+
     /**
      * The key of the document, should be null if not tied to any.
      */
     private final byte[] keyBytes;
     private final String key;
-    private final int opaque;
+
     /**
      * The partition (vbucket) of the document.
      */
     private short partition = DEFAULT_PARTITION;
+
+    private final int opaque;
 
     /**
      * Creates a new {@link AbstractKeyValueRequest}.
@@ -76,7 +80,7 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
                                       Subject<CouchbaseResponse, CouchbaseResponse> observable) {
         super(bucket, password, observable);
         this.key = key;
-        this.keyBytes = key == null || key.isEmpty() ? new byte[]{} : key.getBytes(CharsetUtil.UTF_8);
+        this.keyBytes = key == null || key.isEmpty() ? new byte[] {} : key.getBytes(CharsetUtil.UTF_8);
         opaque = GLOBAL_OPAQUE++;
     }
 

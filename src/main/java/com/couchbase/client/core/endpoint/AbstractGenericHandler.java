@@ -439,6 +439,13 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     }
 
     /**
+     * @return stringified version of the remote node's hostname
+     */
+    protected String remoteHostname() {
+        return remoteHostname;
+    }
+
+    /**
      * Returns environment.
      *
      * @return the environment

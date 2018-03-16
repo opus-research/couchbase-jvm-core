@@ -35,7 +35,7 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 @InterfaceAudience.Public
 public class BucketStreamStateUpdatedEvent {
     private final BucketStreamAggregatorState aggregatorState;
-    private final BucketStreamState partitionState;
+    private final int partition;
 
     /**
      * Creates {@link BucketStreamStateUpdatedEvent} which describes full update.
@@ -43,19 +43,19 @@ public class BucketStreamStateUpdatedEvent {
      * @param aggregatorState state of the {@link BucketStreamAggregator}
      */
     public BucketStreamStateUpdatedEvent(final BucketStreamAggregatorState aggregatorState) {
-        this(aggregatorState,  null);
+        this(aggregatorState, -1);
     }
 
     /**
      * Creates {@link BucketStreamStateUpdatedEvent} which describes partial update.
      *
      * @param aggregatorState state of the {@link BucketStreamAggregator}
-     * @param partitionState       new state for particular partition
+     * @param partition       index of partition which corresponds to updated stream state
      */
     public BucketStreamStateUpdatedEvent(final BucketStreamAggregatorState aggregatorState,
-                                         final BucketStreamState partitionState) {
+                                         int partition) {
         this.aggregatorState = aggregatorState;
-        this.partitionState = partitionState;
+        this.partition = partition;
     }
 
     /**
@@ -64,7 +64,7 @@ public class BucketStreamStateUpdatedEvent {
      * @return true for partial update
      */
     public boolean partialUpdate() {
-        return partitionState != null;
+        return partition >= 0;
     }
 
     /**
@@ -77,7 +77,7 @@ public class BucketStreamStateUpdatedEvent {
     /**
      * @return index of partition which corresponds to updated stream state
      */
-    public BucketStreamState partitionState() {
-        return partitionState;
+    public int partition() {
+        return partition;
     }
 }
