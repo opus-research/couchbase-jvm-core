@@ -48,33 +48,6 @@ public abstract class AbstractKeyValueResponse extends AbstractCouchbaseResponse
     }
 
     @Override
-    public int refCnt() {
-        return content.refCnt();
-    }
-
-    @Override
-    public BinaryResponse retain() {
-        content.retain();
-        return this;
-    }
-
-    @Override
-    public BinaryResponse retain(int increment) {
-        content.retain(increment);
-        return this;
-    }
-
-    @Override
-    public boolean release() {
-        return content.release();
-    }
-
-    @Override
-    public boolean release(int decrement) {
-        return content.release(decrement);
-    }
-
-    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("BinaryResponse{");
         sb.append("bucket='").append(bucket).append('\'');
