@@ -13,38 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.node.locate;
 
-package com.couchbase.client.core.config;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonValue;
+import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.service.ServiceType;
 
 /**
- * Describes the bucket capabilities in an abstract fashion as provided by
- * the server.
+ * Round robin node locator for Analytics.
  *
  * @author Michael Nitschinger
  * @since 1.4.3
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public enum BucketCapabilities {
+public class AnalyticsLocator extends QueryLocator {
 
-    CBHELLO("cbhello"),
-    TOUCH("touch"),
-    COUCHAPI("couchapi"),
-    CCCP("cccp"),
-    XDCR_CHECKPOINTING("xdcrCheckpointing"),
-    NODES_EXT("nodesExt"),
-    DCP("dcp");
-
-    private final String raw;
-
-    BucketCapabilities(String raw) {
-        this.raw = raw;
+    @Override
+    protected boolean checkNode(Node node) {
+        return node.serviceEnabled(ServiceType.ANALYTICS);
     }
 
-    @JsonValue
-    public String getRaw() {
-        return raw;
-    }
 }
