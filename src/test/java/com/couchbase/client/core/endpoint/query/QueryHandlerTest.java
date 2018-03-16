@@ -171,7 +171,6 @@ public class QueryHandlerTest {
         } else {
             assertNotEquals("application/json", outbound.headers().get(HttpHeaders.Names.CONTENT_TYPE));
         }
-        assertTrue(outbound.headers().contains(HttpHeaders.Names.HOST));
     }
 
     @Test
