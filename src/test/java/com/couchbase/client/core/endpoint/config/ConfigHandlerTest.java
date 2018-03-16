@@ -48,6 +48,8 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import rx.Observable;
@@ -117,6 +119,11 @@ public class ConfigHandlerTest {
         channel = new EmbeddedChannel(handler);
     }
 
+    @After
+    public void cleanup() {
+        channel.close().awaitUninterruptibly();
+    }
+
     @Test
     public void shouldEncodeBucketConfigRequest() throws Exception {
         BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket", "password");
@@ -128,6 +135,7 @@ public class ConfigHandlerTest {
         assertEquals(HttpVersion.HTTP_1_1, outbound.getProtocolVersion());
         assertEquals("/path/bucket", outbound.getUri());
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
+        assertTrue(outbound.headers().contains(HttpHeaders.Names.HOST));
         assertEquals("Basic YnVja2V0OnBhc3N3b3Jk", outbound.headers().get(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
     }
@@ -199,6 +207,7 @@ public class ConfigHandlerTest {
         assertEquals(HttpVersion.HTTP_1_1, outbound.getProtocolVersion());
         assertEquals("/pools/default/buckets/bucket/controller/doFlush", outbound.getUri());
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
+        assertTrue(outbound.headers().contains(HttpHeaders.Names.HOST));
         assertEquals("Basic YnVja2V0OnBhc3N3b3Jk", outbound.headers().get(HttpHeaders.Names.AUTHORIZATION));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
     }
@@ -288,6 +297,8 @@ public class ConfigHandlerTest {
         assertNotNull(event.configs());
         assertNotNull(event.host());
         assertEquals(0, requestQueue.size());
+        ReferenceCountUtil.releaseLater(event);
+        ReferenceCountUtil.releaseLater(responseHeader);
     }
 
     @Test
@@ -361,6 +372,9 @@ public class ConfigHandlerTest {
         assertNull(event.configs());
         assertNotNull(event.host());
         assertEquals(0, requestQueue.size());
+        ReferenceCountUtil.releaseLater(responseHeader);
+        ReferenceCountUtil.releaseLater(event);
+
     }
 
     @Test
@@ -465,6 +479,7 @@ public class ConfigHandlerTest {
         assertEquals("/path/bucket", outbound.getUri());
         assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
         assertNotNull(outbound.headers().get(HttpHeaders.Names.AUTHORIZATION));
+        assertTrue(outbound.headers().contains(HttpHeaders.Names.HOST));
         assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
     }
 
