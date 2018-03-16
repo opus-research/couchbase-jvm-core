@@ -25,7 +25,6 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.message.kv.GetRequest;
@@ -35,8 +34,6 @@ import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.state.LifecycleState;
 import org.junit.Test;
 import rx.Observable;
-import rx.subjects.AsyncSubject;
-
 import java.util.HashSet;
 import java.util.Set;
 
@@ -46,8 +43,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,7 +138,6 @@ public class RequestHandlerTest {
         RequestHandler handler = new DummyLocatorClusterNodeHandler(environment, mockConfigObservable);
         Node mockNode = mock(Node.class);
         when(mockNode.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(mockNode.state()).thenReturn(LifecycleState.CONNECTED);
         handler.addNode(mockNode).toBlocking().single();
 
         RequestEvent mockEvent = mock(RequestEvent.class);
@@ -232,43 +226,14 @@ public class RequestHandlerTest {
         QueryRequest mockQueryRequest = mock(QueryRequest.class);
         DCPRequest mockDcpRequest = mock(DCPRequest.class);
         CouchbaseRequest mockKeyValueRequest = mock(GetRequest.class);
-        CoreEnvironment env = DefaultCoreEnvironment
-            .builder()
-            .dcpEnabled(true)
-            .build();
+        CoreEnvironment env = DefaultCoreEnvironment.builder()
+                                                    .dcpEnabled(true)
+                                                    .build();
         RequestHandler handler = new DummyLocatorClusterNodeHandler(env);
 
         assertFeatureForRequest(handler, mockQueryRequest, false);
         assertFeatureForRequest(handler, mockDcpRequest, true);
         assertFeatureForRequest(handler, mockKeyValueRequest, true);
-    }
-
-    @Test(expected = RequestCancelledException.class)
-    public void shouldCancelOnRetryPolicyFailFast() throws Exception {
-        CoreEnvironment env = mock(CoreEnvironment.class);
-        when(env.retryPolicy()).thenReturn(RetryPolicy.FAIL_FAST);
-        ClusterConfig mockClusterConfig = mock(ClusterConfig.class);
-        when(mockClusterConfig.hasBucket(anyString())).thenReturn(Boolean.TRUE);
-        Observable<ClusterConfig> mockConfigObservable = Observable.just(mockClusterConfig);
-
-        RequestHandler handler = new DummyLocatorClusterNodeHandler(env, mockConfigObservable);
-        Node mockNode = mock(Node.class);
-        when(mockNode.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
-        when(mockNode.state()).thenReturn(LifecycleState.DISCONNECTED);
-        handler.addNode(mockNode).toBlocking().single();
-
-        RequestEvent mockEvent = mock(RequestEvent.class);
-        CouchbaseRequest mockRequest = mock(CouchbaseRequest.class);
-        AsyncSubject<CouchbaseResponse> response = AsyncSubject.create();
-        when(mockEvent.getRequest()).thenReturn(mockRequest);
-        when(mockRequest.observable()).thenReturn(response);
-        handler.onEvent(mockEvent, 0, true);
-
-        verify(mockNode, times(1)).send(SignalFlush.INSTANCE);
-        verify(mockNode, never()).send(mockRequest);
-        verify(mockEvent).setRequest(null);
-
-        response.toBlocking().single();
     }
 
     /**
@@ -295,12 +260,7 @@ public class RequestHandlerTest {
         class DummyLocator implements Locator {
             @Override
             public Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config) {
-                for (Node node : nodes) {
-                    if (node.state() == LifecycleState.CONNECTED) {
-                        return new Node[] { node };
-                    }
-                }
-                return new Node[] {};
+                return new Node[] { nodes.iterator().next() };
             }
         }
     }

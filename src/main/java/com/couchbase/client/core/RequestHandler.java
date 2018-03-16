@@ -190,7 +190,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 return;
             }
             if (found.length == 0) {
-                retryOrCancel(request);
+                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             }
             for (int i = 0; i < found.length; i++) {
                 try {
@@ -467,20 +467,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         }
 
         return Observable.merge(observables).last();
-    }
-
-    /**
-     * Depending on the policy set, either retry the operation or cancel it right away.
-     *
-     * @param request the request to retry or cancel.
-     */
-    private void retryOrCancel(final CouchbaseRequest request) {
-        if (environment.retryPolicy() == RetryPolicy.BEST_EFFORT) {
-            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
-        } else {
-            request.observable().onError(new RequestCancelledException("Could not dispatch request to a "
-                + "connected node."));
-        }
     }
 
 }

@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.env;
 
-import com.couchbase.client.core.RetryPolicy;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
@@ -186,11 +185,4 @@ public interface CoreEnvironment {
      * @return string containing package name and version
      */
     String packageNameAndVersion();
-
-    /**
-     * The retry policy on how to dispatch requests in the failure case.
-     *
-     * @return the retry policy set.
-     */
-    RetryPolicy retryPolicy();
 }
