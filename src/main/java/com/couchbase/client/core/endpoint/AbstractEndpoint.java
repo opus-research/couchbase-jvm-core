@@ -338,7 +338,21 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 bootstrap.connect().addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture cf) throws Exception {
-                        ss.onSuccess(cf);
+                        if (ss.isUnsubscribed()) {
+                            if (cf.isSuccess() && cf.channel() != null) {
+                                cf.channel().close().addListener(new ChannelFutureListener() {
+                                    @Override
+                                    public void operationComplete(ChannelFuture future) throws Exception {
+                                        if (!future.isSuccess()) {
+                                            LOGGER.debug("Got exception while disconnecting " +
+                                                "stray connect attempt.", future.cause());
+                                        }
+                                    }
+                                });
+                            }
+                        } else {
+                            ss.onSuccess(cf);
+                        }
                     }
                 });
             }
@@ -363,7 +377,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         .subscribe(new SingleSubscriber<ChannelFuture>() {
             @Override
             public void onSuccess(ChannelFuture future) {
-                if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
+                if (disconnected) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
                     transitionState(LifecycleState.DISCONNECTED);
@@ -545,10 +559,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * endpoint is in a connected or connecting state).
      */
     public void notifyChannelInactive() {
-        // if this socket is transient OR we already received an explicit call to disconnect this endpoint,
-        // there is no point in either reconnecting or signalling a config reload, since we are expecting
-        // that this method will be called.
-        if (isTransient || disconnected) {
+        if (isTransient) {
             return;
         }
         LOGGER.info(logIdent(channel, this) + "Got notified from Channel as inactive, " +
@@ -558,7 +569,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             signalConfigReload();
         }
 
-        if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
+        if (state() == LifecycleState.CONNECTED) {
             transitionState(LifecycleState.DISCONNECTED);
             connect(false).subscribe(new Subscriber<LifecycleState>() {
                 @Override
