@@ -21,11 +21,6 @@
  */
 package com.couchbase.client.core.env;
 
-import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.message.observe.Observe;
-import com.couchbase.client.core.metrics.MetricsCollector;
-import com.couchbase.client.core.retry.RetryStrategy;
-import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
@@ -62,13 +57,6 @@ public interface CoreEnvironment {
      * @return the scheduler used for internal operations.
      */
     Scheduler scheduler();
-
-    /**
-     * Identifies if DCP should be enabled.
-     *
-     * @return true if DCP is enabled, false otherwise.
-     */
-    boolean dcpEnabled();
 
     /**
      * Identifies if SSL should be enabled.
@@ -126,26 +114,6 @@ public interface CoreEnvironment {
 
     int computationPoolSize();
 
-    /**
-     * Returns the {@link Delay} for {@link Observe} poll operations.
-     *
-     * @return the observe interval delay.
-     */
-    Delay observeIntervalDelay();
-
-    /**
-     * Returns the {@link Delay} for node reconnects.
-     *
-     * @return the node reconnect delay.
-     */
-    Delay reconnectDelay();
-
-    /**
-     * Returns the {@link Delay} for request retries.
-     *
-     * @return the request retry delay.
-     */
-    Delay retryDelay();
 
     /**
      * Returns the size of the request ringbuffer.
@@ -195,59 +163,4 @@ public interface CoreEnvironment {
      * @return string containing package name and version
      */
     String packageNameAndVersion();
-
-    /**
-     * The retry strategy on how to dispatch requests in the failure case.
-     *
-     * @return the retry strategy.
-     */
-    RetryStrategy retryStrategy();
-
-    /**
-     * Returns the maximum time in milliseconds a request is allowed to life.
-     *
-     * If the best effort retry strategy is used, the request will still be cancelled after this
-     * period to make sure that requests are not sticking around forever. Make sure it is longer than any
-     * timeout you potentially have configured.
-     *
-     * @return the maximum request lifetime.
-     */
-    long maxRequestLifetime();
-
-    /**
-     * The time in milliseconds after which a non-subscribed observable is going to be automatically released.
-     *
-     * This prevents accidentally leaking buffers when requested but not consumed by the user.
-     *
-     * @return the time after which the buffers are released if not subscribed.
-     */
-    long autoreleaseAfter();
-
-    /**
-     * The time in milliseconds after which some service will issue a form of keep-alive request.
-     *
-     * @return the interval of idle time in milliseconds after which a keep-alive is triggered.
-     */
-    long keepAliveInterval();
-
-    /**
-     * Returns the event bus where events are broadcasted on and can be published to.
-     *
-     * @return the configured event bus.
-     */
-    EventBus eventBus();
-
-    MetricsCollector metricsCollector();
-
-    /**
-     * Returns if buffer pooling is enabled for greater GC efficiency.
-     *
-     * In general this is always set to true and should only be set to false if there are leaks reported
-     * that are not fixable by correcting user level code.
-     *
-     * @return true if enabled, false otherwise.
-     */
-    boolean bufferPoolingEnabled();
-
-
 }

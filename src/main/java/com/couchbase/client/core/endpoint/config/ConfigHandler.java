@@ -24,7 +24,6 @@ package com.couchbase.client.core.endpoint.config;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.config.BucketConfigRequest;
@@ -46,7 +45,6 @@ import com.couchbase.client.core.message.config.RemoveBucketRequest;
 import com.couchbase.client.core.message.config.RemoveBucketResponse;
 import com.couchbase.client.core.message.config.UpdateBucketRequest;
 import com.couchbase.client.core.message.config.UpdateBucketResponse;
-import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
@@ -103,8 +101,8 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
-        super(endpoint, responseBuffer, isTransient);
+    public ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer) {
+        super(endpoint, responseBuffer);
     }
 
     /**
@@ -114,8 +112,8 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue, boolean isTransient) {
-        super(endpoint, responseBuffer, queue, isTransient);
+    ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue) {
+        super(endpoint, responseBuffer, queue);
     }
 
     @Override
@@ -166,7 +164,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
         ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
         raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
-        ByteBuf encoded = Base64.encode(raw, false);
+        ByteBuf encoded = Base64.encode(raw);
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
@@ -208,7 +206,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                 return null;
             }
 
-            ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+            ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
             String body = responseContent.readableBytes() > 0
                 ? responseContent.toString(CHARSET) : responseHeader.getStatus().reasonPhrase();
 
@@ -248,7 +246,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
         String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
-        ResponseStatus status = ResponseStatusConverter.fromHttp(header.getStatus().code());
+        ResponseStatus status = statusFromCode(header.getStatus().code());
 
         Observable<String> scheduledObservable = null;
         if (status.isSuccess()) {
@@ -279,6 +277,29 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     }
 
     /**
+     * Converts a HTTP status code in its appropriate {@link ResponseStatus} representation.
+     *
+     * @param code the http code.
+     * @return the parsed status.
+     */
+    private static ResponseStatus statusFromCode(int code) {
+        ResponseStatus status;
+        switch (code) {
+            case 200:
+            case 201:
+            case 202:
+                status = ResponseStatus.SUCCESS;
+                break;
+            case 404:
+                status = ResponseStatus.NOT_EXISTS;
+                break;
+            default:
+                status = ResponseStatus.FAILURE;
+        }
+        return status;
+    }
+
+    /**
      * If it is still present and open, release the content buffer. Also set it
      * to null so that next decoding can take a new buffer from the pool.
      */
@@ -304,11 +325,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         }
         super.handlerRemoved(ctx);
         releaseResponseContent();
-    }
-
-    @Override
-    protected ServiceType serviceType() {
-        return ServiceType.CONFIG;
     }
 
 }

@@ -29,9 +29,8 @@ public class CounterResponse extends AbstractKeyValueResponse {
     private final long value;
     private final long cas;
 
-    public CounterResponse(ResponseStatus status, short serverStatusCode, String bucket, long value, long cas,
-                           CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, null, request);
+    public CounterResponse(ResponseStatus status, String bucket, long value, long cas, CouchbaseRequest request) {
+        super(status, bucket, null, request);
         this.value = value;
         this.cas = cas;
     }

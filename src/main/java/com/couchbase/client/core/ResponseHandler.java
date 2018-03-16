@@ -29,19 +29,19 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.kv.BinaryResponse;
-import com.couchbase.client.core.time.Delay;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.functions.Action0;
 import rx.subjects.Subject;
+import java.util.concurrent.TimeUnit;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
     private final ClusterFacade cluster;
     private final ConfigurationProvider configurationProvider;
-    private final CoreEnvironment environment;
+    private final Scheduler.Worker worker;
 
     /**
      * Creates a new {@link ResponseHandler}.
@@ -53,7 +53,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     public ResponseHandler(CoreEnvironment environment, ClusterFacade cluster, ConfigurationProvider provider) {
         this.cluster = cluster;
         this.configurationProvider = provider;
-        this.environment = environment;
+        this.worker = environment.scheduler().createWorker();
     }
 
     /**
@@ -90,26 +90,21 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             if (message instanceof SignalConfigReload) {
                 configurationProvider.signalOutdated();
             } else if (message instanceof CouchbaseResponse) {
-                final CouchbaseResponse response = (CouchbaseResponse) message;
+                CouchbaseResponse response = (CouchbaseResponse) message;
                 ResponseStatus status = response.status();
-                if (status == ResponseStatus.RETRY) {
-                    retry(event);
-                } else {
-                    final Scheduler.Worker worker = environment.scheduler().createWorker();
-                    final Subject<CouchbaseResponse, CouchbaseResponse> obs = event.getObservable();
-                    worker.schedule(new Action0() {
-                        @Override
-                        public void call() {
-                            try {
-                                obs.onNext(response);
-                                obs.onCompleted();
-                            } catch(Exception ex) {
-                                obs.onError(ex);
-                            } finally {
-                                worker.unsubscribe();
-                            }
-                        }
-                    });
+                switch (status) {
+                    case SUCCESS:
+                    case EXISTS:
+                    case NOT_EXISTS:
+                    case FAILURE:
+                        event.getObservable().onNext(response);
+                        event.getObservable().onCompleted();
+                        break;
+                    case RETRY:
+                        retry(event);
+                        break;
+                    default:
+                        throw new UnsupportedOperationException("The ResponseStatus " + status + " is not supported.");
                 }
             } else if (message instanceof CouchbaseRequest) {
                 retry(event);
@@ -152,19 +147,11 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        CoreEnvironment env = environment;
-        Delay delay = env.retryDelay();
-
-        final Scheduler.Worker worker = env.scheduler().createWorker();
         worker.schedule(new Action0() {
             @Override
             public void call() {
-                try {
-                    cluster.send(request);
-                } finally {
-                    worker.unsubscribe();
-                }
+                cluster.send(request);
             }
-        }, delay.calculate(request.incrementRetryCount()), delay.unit());
+        }, 10, TimeUnit.MILLISECONDS);
     }
 }

@@ -30,9 +30,6 @@ import com.couchbase.client.core.config.refresher.CarrierRefresher;
 import com.couchbase.client.core.config.refresher.HttpRefresher;
 import com.couchbase.client.core.config.refresher.Refresher;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.event.system.BucketClosedEvent;
-import com.couchbase.client.core.event.system.BucketOpenedEvent;
 import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -40,7 +37,6 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -56,7 +52,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * **The default implementation of a {@link ConfigurationProvider}.**
  *
- * The {@link ConfigurationProvider} is the central orchestrator for configuration management. Observers can observe
+ * The {@link ConfigurationProvider} is the central orchestrator for configuration management. Observers can subscribe
  * bucket and cluster configurations from this component. Behind the scenes, it facilitates configuration loaders and
  * configuration refreshers that grab initial configurations and keep them refreshed respectively. The structure
  * looks like this:
@@ -104,7 +100,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     /**
      * The observable which will push out new config changes to interested parties.
      */
-    private final Subject<ClusterConfig, ClusterConfig> configObservable;
+    private final PublishSubject<ClusterConfig> configObservable;
 
     /**
      * Represents the current cluster-wide configuration.
@@ -119,8 +115,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     private final List<Loader> loaderChain;
     private final Map<LoaderType, Refresher> refreshers;
     private final CoreEnvironment environment;
-    private final EventBus eventBus;
-
 
     /**
      * Signals if the provider is bootstrapped and serving configs.
@@ -169,9 +163,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         this.loaderChain = loaderChain;
         this.refreshers = refreshers;
         this.environment = environment;
-        this.eventBus = environment.eventBus();
 
-        configObservable = PublishSubject.<ClusterConfig>create().toSerialized();
+        configObservable = PublishSubject.create();
         seedHosts = new AtomicReference<Set<InetAddress>>();
         bootstrapped = false;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
@@ -263,9 +256,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                 @Override
                 public void call(ClusterConfig clusterConfig) {
                     LOGGER.info("Opened bucket " + bucket);
-                    if (eventBus != null) {
-                        eventBus.publish(new BucketOpenedEvent(bucket));
-                    }
                 }
             })
             .onErrorResumeNext(new Func1<Throwable, Observable<ClusterConfig>>() {
@@ -284,9 +274,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             public ClusterConfig call(String bucket) {
                 removeBucketConfig(bucket);
                 LOGGER.info("Closed bucket " + bucket);
-                if (eventBus != null) {
-                    eventBus.publish(new BucketClosedEvent(bucket));
-                }
                 return currentConfig.get();
             }
         });
@@ -326,6 +313,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         }
 
         BucketConfig config = BucketConfigParser.parse(rawConfig);
+        config.password(currentConfig.get().bucketConfig(bucket).password());
         upsertBucketConfig(config);
     }
 
@@ -360,36 +348,26 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
      *
      * This method also sends out an update to the subject afterwards, so that observers are notified.
      *
-     * @param newConfig the configuration of the bucket.
+     * @param config the configuration of the bucket.
      */
-    private void upsertBucketConfig(final BucketConfig newConfig) {
+    private void upsertBucketConfig(final BucketConfig config) {
         ClusterConfig cluster = currentConfig.get();
-        BucketConfig oldConfig = cluster.bucketConfig(newConfig.name());
-
-        if (newConfig.rev() > 0 && oldConfig != null && newConfig.rev() <= oldConfig.rev()) {
+        if (config.rev() > 0 && cluster.bucketConfig(config.name()) != null
+            && config.rev() <= cluster.bucketConfig(config.name()).rev()) {
             LOGGER.trace("Not applying new configuration, older rev ID.");
             return;
         }
 
-        // If the current password of the config is empty and an old config exists
-        // make sure to transfer the password over to the new config. Otherwise it
-        // is possible that authentication errors because of a null password arise.
-        // See JVMCBC-185
-        if (newConfig.password() == null && oldConfig != null) {
-            newConfig.password(oldConfig.password());
-        }
-
-        cluster.setBucketConfig(newConfig.name(), newConfig);
-        LOGGER.debug("Applying new configuration {}", newConfig);
-
+        cluster.setBucketConfig(config.name(), config);
+        LOGGER.debug("Applying new configuration {}", config);
         currentConfig.set(cluster);
 
-        boolean tainted = newConfig.tainted();
+        boolean tainted = config.tainted();
         for (Refresher refresher : refreshers.values()) {
             if (tainted) {
-                refresher.markTainted(newConfig);
+                refresher.markTainted(config);
             } else {
-                refresher.markUntainted(newConfig);
+                refresher.markUntainted(config);
             }
         }
 

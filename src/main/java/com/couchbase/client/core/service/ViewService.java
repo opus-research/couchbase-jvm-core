@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2015 Couchbase, Inc.
+/**
+ * Copyright (C) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@ import com.lmax.disruptor.RingBuffer;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class ViewService extends AbstractPoolingService {
+public class ViewService extends AbstractService {
 
     /**
      * The endpoint selection strategy.
@@ -59,8 +59,7 @@ public class ViewService extends AbstractPoolingService {
      */
     public ViewService(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.viewEndpoints(), env.viewEndpoints(), STRATEGY, responseBuffer,
-            FACTORY);
+        super(hostname, bucket, password, port, env, env.viewEndpoints(), STRATEGY, responseBuffer, FACTORY);
     }
 
     @Override
@@ -69,7 +68,7 @@ public class ViewService extends AbstractPoolingService {
     }
 
     /**
-     * The factory for {@link com.couchbase.client.core.endpoint.view.ViewEndpoint}s.
+     * The factory for {@link ViewEndpoint}s.
      */
     static class ViewEndpointFactory implements EndpointFactory {
         @Override

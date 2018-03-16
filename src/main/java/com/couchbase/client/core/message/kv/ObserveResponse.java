@@ -2,6 +2,7 @@ package com.couchbase.client.core.message.kv;
 
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
 
 /**
  * .
@@ -12,14 +13,11 @@ public class ObserveResponse extends AbstractKeyValueResponse {
 
     private final ObserveStatus observeStatus;
     private final boolean master;
-    private final long cas;
 
-    public ObserveResponse(ResponseStatus status, short serverStatusCode, byte obs, boolean master, long cas,
-                           String bucket, CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, null, request);
+    public ObserveResponse(ResponseStatus status, byte obs, boolean master, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         observeStatus = ObserveStatus.valueOf(obs);
         this.master = master;
-        this.cas = cas;
     }
 
     public ObserveStatus observeStatus() {
@@ -28,10 +26,6 @@ public class ObserveResponse extends AbstractKeyValueResponse {
 
     public boolean master() {
         return master;
-    }
-
-    public long cas() {
-        return cas;
     }
 
     public static enum ObserveStatus {
@@ -96,13 +90,6 @@ public class ObserveResponse extends AbstractKeyValueResponse {
         }
     }
 
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("ObserveResponse{");
-        sb.append("observeStatus=").append(observeStatus);
-        sb.append(", master=").append(master);
-        sb.append(", cas=").append(cas);
-        sb.append('}');
-        return sb.toString();
-    }
+
+
 }

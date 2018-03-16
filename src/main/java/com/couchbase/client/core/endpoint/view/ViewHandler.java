@@ -24,13 +24,6 @@ package com.couchbase.client.core.endpoint.view;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.util.ClosingPositionBufProcessor;
-import com.couchbase.client.core.lang.Tuple;
-import com.couchbase.client.core.lang.Tuple2;
-import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
@@ -42,8 +35,6 @@ import com.couchbase.client.core.message.view.UpsertDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.message.view.ViewRequest;
-import com.couchbase.client.core.service.ServiceType;
-import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufProcessor;
@@ -60,12 +51,9 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.util.CharsetUtil;
 import rx.Scheduler;
-import rx.subjects.AsyncSubject;
-
+import rx.subjects.ReplaySubject;
 import java.util.Queue;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The {@link ViewHandler} is responsible for encoding {@link ViewRequest}s into lower level
@@ -76,8 +64,6 @@ import java.util.concurrent.TimeUnit;
  * @since 1.0
  */
 public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest, ViewRequest> {
-
-    private static final int MAX_GET_LENGTH = 2048;
 
     private static final byte QUERY_STATE_INITIAL = 0;
     private static final byte QUERY_STATE_ROWS = 1;
@@ -98,17 +84,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     /**
      * Represents a observable that sends config chunks if instructed.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> viewRowObservable;
+    private ReplaySubject<ByteBuf> viewRowObservable;
 
     /**
      * Contains info-level data about the view response.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> viewInfoObservable;
-
-    /**
-     * Contains optional errors that happened during execution.
-     */
-    private AsyncSubject<String> viewErrorObservable;
+    private ReplaySubject<ByteBuf> viewInfoObservable;
 
     /**
      * Represents the current query parsing state.
@@ -121,8 +102,8 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
-        super(endpoint, responseBuffer, isTransient);
+    public ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer) {
+        super(endpoint, responseBuffer);
     }
 
     /**
@@ -132,54 +113,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ViewRequest> queue, boolean isTransient) {
-        super(endpoint, responseBuffer, queue, isTransient);
-    }
-
-    /**
-     * A utility method to split a GET-like query String into a {@link Tuple2} of Strings if size
-     * of the original gets above a threshold. If not, the original String is returned as value1
-     * of the tuple, and value2 is null. Otherwise, value1 is the original query string minus a "keys"
-     * parameter, and value2 is a json representation of the keys parameter.
-     *
-     * @param queryString the GET-like query string to process if length is above threshold.
-     * @param splitThreshold the size processing threshold.
-     * @return a {@link Tuple2} with keys parameter isolated in value2 as a JSON object.
-     */
-    protected Tuple2<String, String> extractKeysFromQueryString(String queryString, int splitThreshold) {
-        if (queryString.length() < splitThreshold) {
-            return Tuple.create(queryString, null);
-        }
-
-        //split
-        String[] params = queryString.split("&");
-        StringBuilder reworkedQueryParams = new StringBuilder();
-        StringBuilder keys = new StringBuilder(queryString.length());
-        for (String param : params) {
-            if (param.startsWith("keys=")) {
-                keys.append("{\"keys\":").append(param.substring(5)).append('}');
-            } else {
-                reworkedQueryParams.append(param).append('&');
-            }
-        }
-        //eliminate last & in reworkedQueryParams
-        if (reworkedQueryParams.length() > 0) {
-            reworkedQueryParams.deleteCharAt(reworkedQueryParams.length() - 1);
-        }
-
-        return Tuple.create(reworkedQueryParams.toString(), keys.toString());
+    ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ViewRequest> queue) {
+        super(endpoint, responseBuffer, queue);
     }
 
     @Override
     protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final ViewRequest msg) throws Exception {
-        if (msg instanceof KeepAliveRequest) {
-            FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, "/",
-                    Unpooled.EMPTY_BUFFER);
-            request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
-            request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, 0);
-            return request;
-        }
-
         StringBuilder path = new StringBuilder();
 
         HttpMethod method = HttpMethod.GET;
@@ -188,28 +127,9 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             ViewQueryRequest queryMsg = (ViewQueryRequest) msg;
             path.append("/").append(msg.bucket()).append("/_design/");
             path.append(queryMsg.development() ? "dev_" + queryMsg.design() : queryMsg.design());
-            if (queryMsg.spatial()) {
-                path.append("/_spatial/");
-            } else {
-                path.append("/_view/");
-            }
-            path.append(queryMsg.view());
-
+            path.append("/_view/").append(queryMsg.view());
             if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
-                Tuple2<String, String> splitIfPostNeeded = extractKeysFromQueryString(
-                        queryMsg.query(), MAX_GET_LENGTH);
-                if (splitIfPostNeeded.value2() == null) {
-                    //the query is short enough for GET
-                    path.append("?").append(queryMsg.query());
-                } else {
-                    //switch to POST
-                    method = HttpMethod.POST;
-                    //parameter string is the reworked one
-                    path.append('?').append(splitIfPostNeeded.value1());
-                    //body is "keys" but in JSON
-                    content = ctx.alloc().buffer(splitIfPostNeeded.value2().length());
-                    content.writeBytes(splitIfPostNeeded.value2().getBytes(CHARSET));
-                }
+                path.append("?").append(queryMsg.query());
             }
         } else if (msg instanceof GetDesignDocumentRequest) {
             GetDesignDocumentRequest queryMsg = (GetDesignDocumentRequest) msg;
@@ -258,11 +178,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             }
         }
 
-        if (request instanceof KeepAliveRequest) {
-            response = new KeepAliveResponse(ResponseStatusConverter.fromHttp(responseHeader.getStatus().code()), request);
-            responseContent.clear();
-            responseContent.discardReadBytes();
-        } else if (msg instanceof HttpContent) {
+        if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
 
             if (currentRequest() instanceof ViewQueryRequest) {
@@ -284,8 +200,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             } else if (request instanceof RemoveDesignDocumentRequest) {
                 response = handleRemoveDesignDocumentResponse((RemoveDesignDocumentRequest) request);
                 finishedDecoding();
-            } else if (request instanceof KeepAliveRequest) {
-                finishedDecoding();
             }
         }
 
@@ -299,18 +213,18 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * @return the parsed response.
      */
     private CouchbaseResponse handleGetDesignDocumentResponse(final GetDesignDocumentRequest request) {
-        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         return new GetDesignDocumentResponse(request.name(), request.development(), responseContent.copy(), status,
             request);
     }
 
     private CouchbaseResponse handleUpsertDesignDocumentResponse(final UpsertDesignDocumentRequest request) {
-        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         return new UpsertDesignDocumentResponse(status, responseContent.copy(), request);
     }
 
     private CouchbaseResponse handleRemoveDesignDocumentResponse(final RemoveDesignDocumentRequest request) {
-        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         return new RemoveDesignDocumentResponse(status, responseContent.copy(), request);
     }
 
@@ -324,17 +238,14 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     private CouchbaseResponse handleViewQueryResponse() {
         int code = responseHeader.getStatus().code();
         String phrase = responseHeader.getStatus().reasonPhrase();
-        ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
+        ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         Scheduler scheduler = env().scheduler();
-        long ttl = env().autoreleaseAfter();
-        viewRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        viewInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        viewErrorObservable = AsyncSubject.create();
 
+        viewRowObservable = ReplaySubject.create();
+        viewInfoObservable = ReplaySubject.create();
         return new ViewQueryResponse(
             viewRowObservable.onBackpressureBuffer().observeOn(scheduler),
             viewInfoObservable.onBackpressureBuffer().observeOn(scheduler),
-            viewErrorObservable.observeOn(scheduler),
             code,
             phrase,
             status,
@@ -356,12 +267,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             parseViewInfo();
         }
 
-        if (viewParsingState == QUERY_STATE_ROWS) {
-            parseViewRows(last);
-        }
-
         if (viewParsingState == QUERY_STATE_ERROR) {
             parseViewError(last);
+        }
+
+        if (viewParsingState == QUERY_STATE_ROWS) {
+            parseViewRows(last);
         }
 
         if (viewParsingState == QUERY_STATE_DONE) {
@@ -376,7 +287,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         finishedDecoding();
         viewInfoObservable = null;
         viewRowObservable = null;
-        viewErrorObservable = null;
         viewParsingState = QUERY_STATE_INITIAL;
     }
 
@@ -389,7 +299,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
                 viewParsingState = QUERY_STATE_INFO;
                 break;
             default:
-                viewInfoObservable.onCompleted();
                 viewRowObservable.onCompleted();
                 viewParsingState = QUERY_STATE_ERROR;
         }
@@ -405,18 +314,9 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             return;
         }
 
-        if (responseHeader.getStatus().code() == 200) {
-            int openBracketPos = responseContent.bytesBefore((byte) '[') + responseContent.readerIndex();
-            int closeBracketLength = findSectionClosingPosition(responseContent, '[', ']') - openBracketPos + 1;
-            ByteBuf slice = responseContent.slice(openBracketPos, closeBracketLength);
-            viewErrorObservable.onNext("{\"errors\":" + slice.toString(CharsetUtil.UTF_8) + "}");
-        } else {
-            viewErrorObservable.onNext("{\"errors\":[" + responseContent.toString(CharsetUtil.UTF_8) + "]}");
-        }
-
-        viewErrorObservable.onCompleted();
+        viewInfoObservable.onNext(responseContent.copy());
+        viewInfoObservable.onCompleted();
         viewParsingState = QUERY_STATE_DONE;
-        responseContent.discardReadBytes();
     }
 
     /**
@@ -467,16 +367,21 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     private void parseViewRows(boolean last) {
         while (true) {
             int openBracketPos = responseContent.bytesBefore((byte) '{');
-            int errorBlockPosition = findErrorBlockPosition(openBracketPos);
-
-            if (errorBlockPosition > 0 && errorBlockPosition < openBracketPos) {
-                responseContent.readerIndex(errorBlockPosition + responseContent.readerIndex());
-                viewRowObservable.onCompleted();
-                viewParsingState = QUERY_STATE_ERROR;
-                return;
+            int closeBracketPos = -1;
+            int openBrackets = 0;
+            for (int i = responseContent.readerIndex(); i <= responseContent.writerIndex(); i++) {
+                byte current = responseContent.getByte(i);
+                if (current == '{') {
+                    openBrackets++;
+                } else if (current == '}' && openBrackets > 0) {
+                    openBrackets--;
+                    if (openBrackets == 0) {
+                        closeBracketPos = i;
+                        break;
+                    }
+                }
             }
 
-            int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
             if (closeBracketPos == -1) {
                 break;
             }
@@ -485,32 +390,13 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             int to = closeBracketPos - openBracketPos - responseContent.readerIndex() + 1;
             viewRowObservable.onNext(responseContent.slice(from, to).copy());
             responseContent.readerIndex(closeBracketPos);
-            responseContent.discardReadBytes();
         }
 
-
+        responseContent.discardReadBytes();
         if (last) {
             viewRowObservable.onCompleted();
-            viewErrorObservable.onCompleted();
             viewParsingState = QUERY_STATE_DONE;
         }
-    }
-
-    private int findErrorBlockPosition(int openBracketPos) {
-        int errorPosition = -1;
-
-        int readerIndex = responseContent.readerIndex();
-        for (int i = readerIndex; i < readerIndex + openBracketPos - 2; i++) {
-            byte curr = responseContent.getByte(i);
-            byte f1 = responseContent.getByte(i + 1);
-            byte f2 = responseContent.getByte(i + 2);
-
-            if (curr == '"' && f1 == 'e' && f2 == 'r') {
-                errorPosition = i;
-                break;
-            }
-        }
-        return errorPosition > -1 ? errorPosition - responseContent.readerIndex() : errorPosition;
     }
 
     /**
@@ -530,65 +416,43 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
 
         ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
         raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
-        ByteBuf encoded = Base64.encode(raw, false);
+        ByteBuf encoded = Base64.encode(raw);
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
+    }
+
+    /**
+     * Converts a HTTP status code in its appropriate {@link ResponseStatus} representation.
+     *
+     * @param code the http code.
+     * @return the parsed status.
+     */
+    private static ResponseStatus statusFromCode(int code) {
+        ResponseStatus status;
+        switch (code) {
+            case 200:
+            case 201:
+                status = ResponseStatus.SUCCESS;
+                break;
+            case 404:
+                status = ResponseStatus.NOT_EXISTS;
+                break;
+            default:
+                status = ResponseStatus.FAILURE;
+        }
+        return status;
     }
 
     @Override
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (viewRowObservable != null) {
             viewRowObservable.onCompleted();
-            viewRowObservable = null;
         }
         if (viewInfoObservable != null) {
             viewInfoObservable.onCompleted();
-            viewInfoObservable = null;
-        }
-        if (viewErrorObservable != null) {
-            viewErrorObservable.onCompleted();
-            viewErrorObservable = null;
         }
         cleanupViewStates();
-        if (responseContent != null && responseContent.refCnt() > 0) {
-            responseContent.release();
-        }
         super.handlerRemoved(ctx);
-    }
-
-    /**
-     * Finds the position of the correct closing character, taking into account the fact that before the correct one,
-     * other sub section with same opening and closing characters can be encountered.
-     *
-     * @param buf the {@link ByteBuf} where to search for the end of a section enclosed in openingChar and closingChar.
-     * @param openingChar the section opening char, used to detect a sub-section.
-     * @param closingChar the section closing char, used to detect the end of a sub-section / this section.
-     * @return
-     */
-    private static int findSectionClosingPosition(ByteBuf buf, char openingChar, char closingChar) {
-        return buf.forEachByte(new ClosingPositionBufProcessor(openingChar, closingChar));
-    }
-
-    @Override
-    protected CouchbaseRequest createKeepAliveRequest() {
-        return new KeepAliveRequest();
-    }
-
-    @Override
-    protected ServiceType serviceType() {
-        return ServiceType.VIEW;
-    }
-
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest {
-        protected KeepAliveRequest() {
-            super(null, null);
-        }
-    }
-
-    protected static class KeepAliveResponse extends AbstractCouchbaseResponse {
-        protected KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
-            super(status, request);
-        }
     }
 }

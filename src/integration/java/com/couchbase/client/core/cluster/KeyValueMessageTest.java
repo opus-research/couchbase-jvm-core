@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.cluster;
 
-import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.CounterRequest;
 import com.couchbase.client.core.message.kv.CounterResponse;
@@ -40,12 +39,12 @@ import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.Test;
 import rx.Observable;
-import rx.functions.Action1;
 import rx.functions.Func1;
 
 import static org.junit.Assert.assertEquals;
@@ -60,33 +59,17 @@ import static org.junit.Assert.assertTrue;
 public class KeyValueMessageTest extends ClusterDependentTest {
 
     @Test
-    public void foo() {
-        env().eventBus().get().subscribe(new Action1<CouchbaseEvent>() {
-            @Override
-            public void call(CouchbaseEvent couchbaseEvent) {
-                System.err.println(couchbaseEvent);
-            }
-        });
-
-        while(true) {
-            GetRequest request = new GetRequest("foobar", bucket());
-            GetResponse getResponse = cluster().<GetResponse>send(request).toBlocking().single();
-            ReferenceCountUtil.releaseLater(getResponse.content());
-        }
-    }
-
-    @Test
     public void shouldUpsertAndGetDocument() throws Exception {
         String key = "upsert-key";
         String content = "Hello World!";
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         GetRequest request = new GetRequest(key, bucket());
         GetResponse getResponse = cluster().<GetResponse>send(request).toBlocking().single();
         assertEquals(content, getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
     }
 
     @Test
@@ -95,14 +78,14 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         String content = "Hello World!";
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), 1, 0, bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         Thread.sleep(2000);
 
         GetRequest request = new GetRequest(key, bucket());
         GetResponse getResponse = cluster().<GetResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, getResponse.status());
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
     }
 
     @Test
@@ -112,12 +95,11 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         InsertRequest insert = new InsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         InsertResponse insertResponse = cluster().<InsertResponse>send(insert).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, insertResponse.status());
-        ReferenceCountUtil.releaseLater(insertResponse.content());
+        insertResponse.content().release();
 
         insert = new InsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         insertResponse = cluster().<InsertResponse>send(insert).toBlocking().single();
         assertEquals(ResponseStatus.EXISTS, insertResponse.status());
-        ReferenceCountUtil.releaseLater(insertResponse.content());
     }
 
     @Test
@@ -128,19 +110,19 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         ReplaceRequest insert = new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         ReplaceResponse response = cluster().<ReplaceResponse>send(insert).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer("insert content", CharsetUtil.UTF_8), bucket());
-        response = cluster()
-            .<UpsertResponse>send(upsert)
+        response = cluster().<UpsertResponse>send(upsert)
             .flatMap(new Func1<UpsertResponse, Observable<ReplaceResponse>>() {
-                 @Override
-                 public Observable<ReplaceResponse> call(UpsertResponse response) {
-                     ReferenceCountUtil.releaseLater(response.content());
-                     return cluster().send(new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket()));
-                 }
-            }).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+                @Override
+                public Observable<ReplaceResponse> call(UpsertResponse response) {
+                    response.content().release();
+                    return cluster().send(new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket()));
+                }
+            }
+        ).toBlocking().single();
+        response.content().release();
 
         assertEquals(ResponseStatus.SUCCESS, response.status());
     }
@@ -153,18 +135,19 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         ReplaceRequest insert = new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         ReplaceResponse response = cluster().<ReplaceResponse>send(insert).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer("insert content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(upsert)
             .flatMap(new Func1<UpsertResponse, Observable<ReplaceResponse>>() {
                 @Override
                 public Observable<ReplaceResponse> call(UpsertResponse response) {
-                    ReferenceCountUtil.releaseLater(response.content());
-                    return cluster().send(new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), 24234234L, bucket()));
+                    response.content().release();
+                 return cluster().send(new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), 24234234L, bucket()));
                 }
             }).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
+
         assertEquals(ResponseStatus.EXISTS, response.status());
     }
 
@@ -176,18 +159,19 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         ReplaceRequest insert = new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         ReplaceResponse response = cluster().<ReplaceResponse>send(insert).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer("insert content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(upsert)
             .flatMap(new Func1<UpsertResponse, Observable<ReplaceResponse>>() {
                 @Override
                 public Observable<ReplaceResponse> call(UpsertResponse response) {
-                    ReferenceCountUtil.releaseLater(response.content());
+                    response.content().release();
                     return cluster().send(new ReplaceRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), response.cas(), bucket()));
                 }
             }).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
+
         assertEquals(ResponseStatus.SUCCESS, response.status());
     }
 
@@ -198,18 +182,18 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         UpsertResponse upsertResponse = cluster().<UpsertResponse>send(upsert).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, upsertResponse.status());
-        ReferenceCountUtil.releaseLater(upsertResponse.content());
+        upsertResponse.content().release();
 
         RemoveRequest remove = new RemoveRequest(key, bucket());
         RemoveResponse response = cluster().<RemoveResponse>send(remove).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
         assertTrue(response.cas() != 0);
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         GetRequest get = new GetRequest(key, bucket());
         GetResponse getResponse = cluster().<GetResponse>send(get).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, getResponse.status());
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
     }
 
     @Test
@@ -219,18 +203,17 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
         UpsertResponse upsertResponse = cluster().<UpsertResponse>send(upsert).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, upsertResponse.status());
-        ReferenceCountUtil.releaseLater(upsertResponse.content());
+        upsertResponse.content().release();
 
         RemoveRequest remove = new RemoveRequest(key, 1233443, bucket());
         RemoveResponse response = cluster().<RemoveResponse>send(remove).toBlocking().single();
         assertEquals(ResponseStatus.EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
-
+        response.content().release();
         remove = new RemoveRequest(key, upsertResponse.cas(), bucket());
         response = cluster().<RemoveResponse>send(remove).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
         assertTrue(response.cas() != 0);
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
     }
 
     @Test
@@ -274,21 +257,21 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), 3, 0, bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         Thread.sleep(2000);
 
         GetResponse getResponse = cluster().<GetResponse>send(new GetRequest(key, bucket(), false, true, 3)).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, getResponse.status());
         assertEquals("content", getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
 
         Thread.sleep(2000);
 
         getResponse = cluster().<GetResponse>send(new GetRequest(key, bucket(), false, true, 3)).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, getResponse.status());
         assertEquals("content", getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
     }
 
     @Test
@@ -298,28 +281,23 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         GetResponse getResponse = cluster().<GetResponse>send(new GetRequest(key, bucket(), true, false, 2)).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, getResponse.status());
         assertEquals("content", getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
 
         request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
-
-        GetResponse secondLockResponse = (GetResponse) cluster().send(new GetRequest(key, bucket(), true, false, 2))
-                .toBlocking().single();
-        assertEquals(ResponseStatus.TEMPORARY_FAILURE, secondLockResponse.status());
-        ReferenceCountUtil.releaseLater(secondLockResponse.content());
+        response.content().release();
 
         Thread.sleep(3000);
 
         request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(request).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
         assertEquals(ResponseStatus.SUCCESS, response.status());
     }
 
@@ -330,20 +308,20 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), 3, 0, bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         Thread.sleep(2000);
 
         TouchResponse touchResponse = cluster().<TouchResponse>send(new TouchRequest(key, 3, bucket())).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, touchResponse.status());
-        ReferenceCountUtil.releaseLater(touchResponse.content());
+        touchResponse.content().release();
 
         Thread.sleep(2000);
 
         GetResponse getResponse = cluster().<GetResponse>send(new GetRequest(key, bucket())).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, getResponse.status());
         assertEquals("content", getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
     }
 
     @Test
@@ -353,41 +331,27 @@ public class KeyValueMessageTest extends ClusterDependentTest {
         UpsertRequest request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         UpsertResponse response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         GetResponse getResponse = cluster().<GetResponse>send(new GetRequest(key, bucket(), true, false, 15)).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, getResponse.status());
         assertEquals("content", getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        getResponse.content().release();
 
         request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.EXISTS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
+        response.content().release();
 
         UnlockRequest unlockRequest = new UnlockRequest(key, getResponse.cas(), bucket());
         UnlockResponse unlockResponse = cluster().<UnlockResponse>send(unlockRequest).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, unlockResponse.status());
-        ReferenceCountUtil.releaseLater(unlockResponse.content());
+        unlockResponse.content().release();
 
         request = new UpsertRequest(key, Unpooled.copiedBuffer("content", CharsetUtil.UTF_8), bucket());
         response = cluster().<UpsertResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
-        ReferenceCountUtil.releaseLater(response.content());
-    }
-
-    @Test
-    public void shouldHandleSpecialKeyChars() {
-        String key = "AVERY® READY INDEX®";
-        String content = "Hello World!";
-        UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
-        UpsertResponse response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
-        ReferenceCountUtil.releaseLater(response.content());
-
-        GetRequest request = new GetRequest(key, bucket());
-        GetResponse getResponse = cluster().<GetResponse>send(request).toBlocking().single();
-        assertEquals(content, getResponse.content().toString(CharsetUtil.UTF_8));
-        ReferenceCountUtil.releaseLater(getResponse.content());
+        response.content().release();
     }
 
 }
