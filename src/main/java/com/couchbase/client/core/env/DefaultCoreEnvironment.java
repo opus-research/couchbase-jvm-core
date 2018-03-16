@@ -39,8 +39,6 @@ import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.MetricsCollectorConfig;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
 import com.couchbase.client.core.metrics.RuntimeMetricsCollector;
-import com.couchbase.client.core.node.DefaultMemcachedHashingStrategy;
-import com.couchbase.client.core.node.MemcachedHashingStrategy;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -88,9 +86,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
-    public static final int VIEW_ENDPOINTS = 12;
-    public static final int QUERY_ENDPOINTS = 12;
-    public static final int SEARCH_ENDPOINTS = 12;
+    public static final int VIEW_ENDPOINTS = 1;
+    public static final int QUERY_ENDPOINTS = 1;
+    public static final int SEARCH_ENDPOINTS = 1;
     public static final Delay OBSERVE_INTERVAL_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 10);
     public static final Delay RECONNECT_DELAY = Delay.exponential(TimeUnit.MILLISECONDS, 4096, 32);
     public static final Delay RETRY_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 100);
@@ -104,8 +102,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
     public static final boolean CALLBACKS_ON_IO_POOL = false;
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
-    public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
-        DefaultMemcachedHashingStrategy.INSTANCE;
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -214,30 +210,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean callbacksOnIoPool;
     private final long disconnectTimeout;
     private final WaitStrategyFactory requestBufferWaitStrategy;
-    private final MemcachedHashingStrategy memcachedHashingStrategy;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
 
     private final EventLoopGroup ioPool;
-    private final EventLoopGroup kvIoPool;
-    private final EventLoopGroup queryIoPool;
-    private final EventLoopGroup viewIoPool;
-    private final EventLoopGroup searchIoPool;
     private final Scheduler coreScheduler;
     private final EventBus eventBus;
 
     private final ShutdownHook ioPoolShutdownHook;
-    private final ShutdownHook kvIoPoolShutdownHook;
-    private final ShutdownHook queryIoPoolShutdownHook;
-    private final ShutdownHook viewIoPoolShutdownHook;
-    private final ShutdownHook searchIoPoolShutdownHook;
-
-    private final KeyValueServiceConfig keyValueServiceConfig;
-    private final QueryServiceConfig queryServiceConfig;
-    private final ViewServiceConfig viewServiceConfig;
-    private final SearchServiceConfig searchServiceConfig;
-
     private final ShutdownHook nettyShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
 
@@ -290,7 +271,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
         sslKeystore = builder.sslKeystore;
-        memcachedHashingStrategy = builder.memcachedHashingStrategy;
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -315,43 +295,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             this.ioPoolShutdownHook = builder.ioPoolShutdownHook == null
                     ? new NoOpShutdownHook()
                     : builder.ioPoolShutdownHook;
-        }
-
-        if (builder.kvIoPool != null) {
-            this.kvIoPool = builder.kvIoPool;
-            this.kvIoPoolShutdownHook = builder.kvIoPoolShutdownHook == null
-                    ? new NoOpShutdownHook()
-                    : builder.kvIoPoolShutdownHook;
-        } else {
-            this.kvIoPool = null;
-            this.kvIoPoolShutdownHook = new NoOpShutdownHook();
-        }
-        if (builder.queryIoPool != null) {
-            this.queryIoPool = builder.queryIoPool;
-            this.queryIoPoolShutdownHook = builder.queryIoPoolShutdownHook == null
-                ? new NoOpShutdownHook()
-                : builder.queryIoPoolShutdownHook;
-        } else {
-            this.queryIoPool = null;
-            this.queryIoPoolShutdownHook = new NoOpShutdownHook();
-        }
-        if (builder.viewIoPool != null) {
-            this.viewIoPool = builder.viewIoPool;
-            this.viewIoPoolShutdownHook = builder.viewIoPoolShutdownHook == null
-                ? new NoOpShutdownHook()
-                : builder.viewIoPoolShutdownHook;
-        } else {
-            this.viewIoPool = null;
-            this.viewIoPoolShutdownHook = new NoOpShutdownHook();
-        }
-        if (builder.searchIoPool != null) {
-            this.searchIoPool = builder.searchIoPool;
-            this.searchIoPoolShutdownHook = builder.searchIoPoolShutdownHook == null
-                ? new NoOpShutdownHook()
-                : builder.searchIoPoolShutdownHook;
-        } else {
-            this.searchIoPool = null;
-            this.searchIoPoolShutdownHook = new NoOpShutdownHook();
         }
 
         if (!(this.ioPoolShutdownHook instanceof NoOpShutdownHook)) {
@@ -409,33 +352,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             };
         } else {
             requestBufferWaitStrategy = builder.requestBufferWaitStrategy;
-        }
-
-        if (builder.keyValueServiceConfig != null) {
-            this.keyValueServiceConfig = builder.keyValueServiceConfig;
-        } else {
-            this.keyValueServiceConfig = KeyValueServiceConfig.create(kvEndpoints());
-        }
-
-        if (builder.viewServiceConfig != null) {
-            this.viewServiceConfig = builder.viewServiceConfig;
-        } else {
-            int minEndpoints = viewEndpoints() == VIEW_ENDPOINTS ? 0 : viewEndpoints();
-            this.viewServiceConfig = ViewServiceConfig.create(minEndpoints, viewEndpoints());
-        }
-
-        if (builder.queryServiceConfig != null) {
-            this.queryServiceConfig = builder.queryServiceConfig;
-        } else {
-            int minEndpoints = queryEndpoints() == VIEW_ENDPOINTS ? 0 : queryEndpoints();
-            this.queryServiceConfig = QueryServiceConfig.create(minEndpoints, queryEndpoints());
-        }
-
-        if (builder.searchServiceConfig != null) {
-            this.searchServiceConfig = builder.searchServiceConfig;
-        } else {
-            int minEndpoints = searchEndpoints() == VIEW_ENDPOINTS ? 0 : searchEndpoints();
-            this.searchServiceConfig = SearchServiceConfig.create(minEndpoints, searchEndpoints());
         }
 
         if (emitEnvWarnMessage) {
@@ -513,10 +429,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         Observable<Boolean> result = Observable.merge(
                 wrapShutdown(ioPoolShutdownHook.shutdown(), "IoPool"),
                 wrapBestEffortShutdown(nettyShutdownHook.shutdown(), "Netty"),
-                wrapShutdown(kvIoPoolShutdownHook.shutdown(), "kvIoPool"),
-                wrapShutdown(viewIoPoolShutdownHook.shutdown(), "viewIoPool"),
-                wrapShutdown(queryIoPoolShutdownHook.shutdown(), "queryIoPool"),
-                wrapShutdown(searchIoPoolShutdownHook.shutdown(), "searchIoPool"),
                 wrapShutdown(coreSchedulerShutdownHook.shutdown(), "Core Scheduler"),
                 wrapShutdown(Observable.just(runtimeMetricsCollector.shutdown()), "Runtime Metrics Collector"),
                 wrapShutdown(Observable.just(networkLatencyMetricsCollector.shutdown()), "Latency Metrics Collector"))
@@ -811,53 +723,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return requestBufferWaitStrategy;
     }
 
-    @Override
-    public MemcachedHashingStrategy memcachedHashingStrategy() {
-        return memcachedHashingStrategy;
-    }
-
-    @Override
-    public EventLoopGroup kvIoPool() {
-        return kvIoPool;
-    }
-
-    @Override
-    public EventLoopGroup viewIoPool() {
-        return viewIoPool;
-    }
-
-    @Override
-    public EventLoopGroup queryIoPool() {
-        return queryIoPool;
-    }
-
-    @Override
-    public EventLoopGroup searchIoPool() {
-        return searchIoPool;
-    }
-
     public static int instanceCounter() {
         return instanceCounter;
-    }
-
-    @Override
-    public KeyValueServiceConfig kvServiceConfig() {
-        return keyValueServiceConfig;
-    }
-
-    @Override
-    public QueryServiceConfig queryServiceConfig() {
-        return queryServiceConfig;
-    }
-
-    @Override
-    public ViewServiceConfig viewServiceConfig() {
-        return viewServiceConfig;
-    }
-
-    @Override
-    public SearchServiceConfig searchServiceConfig() {
-        return searchServiceConfig;
     }
 
     public static class Builder {
@@ -891,15 +758,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private Delay retryDelay = RETRY_DELAY;
         private RetryStrategy retryStrategy = RETRY_STRATEGY;
         private EventLoopGroup ioPool;
-        private EventLoopGroup kvIoPool;
-        private EventLoopGroup viewIoPool;
-        private EventLoopGroup queryIoPool;
-        private EventLoopGroup searchIoPool;
         private ShutdownHook ioPoolShutdownHook;
-        private ShutdownHook kvIoPoolShutdownHook;
-        private ShutdownHook viewIoPoolShutdownHook;
-        private ShutdownHook queryIoPoolShutdownHook;
-        private ShutdownHook searchIoPoolShutdownHook;
         private Scheduler scheduler;
         private ShutdownHook schedulerShutdownHook;
         private EventBus eventBus;
@@ -913,17 +772,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean callbacksOnIoPool = CALLBACKS_ON_IO_POOL;
         private long disconnectTimeout = DISCONNECT_TIMEOUT;
         private WaitStrategyFactory requestBufferWaitStrategy;
-        private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
         private LoggingConsumer defaultMetricsLoggingConsumer = LoggingConsumer.create();
-
-        private KeyValueServiceConfig keyValueServiceConfig;
-        private QueryServiceConfig queryServiceConfig;
-        private ViewServiceConfig viewServiceConfig;
-        private SearchServiceConfig searchServiceConfig;
-
 
         protected Builder() {
         }
@@ -1110,8 +962,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          *
          * Only tune to more if IO has been identified as the most probable bottleneck,
          * since it can reduce batching on the tcp/network level.
-         *
-         * @deprecated Please use {@link Builder#keyValueServiceConfig(KeyValueServiceConfig)} going forward.
          */
         public Builder kvEndpoints(final int kvEndpoints) {
             this.kvEndpoints = kvEndpoints;
@@ -1122,8 +972,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Sets the number of View endpoints to open per node in the cluster (default value {@value #VIEW_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy view workloads.
-         *
-         * @deprecated Please use {@link Builder#viewServiceConfig(ViewServiceConfig)} going forward.
          */
         public Builder viewEndpoints(final int viewEndpoints) {
             this.viewEndpoints = viewEndpoints;
@@ -1135,8 +983,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * (default value {@value #QUERY_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy query workloads.
-         *
-         * @deprecated Please use {@link Builder#queryServiceConfig(QueryServiceConfig)} going forward.
          */
         public Builder queryEndpoints(final int queryEndpoints) {
             this.queryEndpoints = queryEndpoints;
@@ -1148,8 +994,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * (default value {@value #SEARCH_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy query workloads.
-         *
-         * @deprecated Please use {@link Builder#searchServiceConfig(SearchServiceConfig)} going forward.
          */
         public Builder searchEndpoints(final int searchEndpoints) {
             this.searchEndpoints = searchEndpoints;
@@ -1222,50 +1066,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder ioPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
             this.ioPool = group;
             this.ioPoolShutdownHook = shutdownHook;
-            return this;
-        }
-
-        /**
-         * Sets the KV I/O Pool implementation for the underlying IO framework, along with the action
-         * to execute when this environment is shut down.
-         * This is an advanced configuration that should only be used if you know what you are doing.
-         */
-        public Builder kvIoPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
-            this.kvIoPool = group;
-            this.kvIoPoolShutdownHook = shutdownHook;
-            return this;
-        }
-
-        /**
-         * Sets the View I/O Pool implementation for the underlying IO framework, along with the action
-         * to execute when this environment is shut down.
-         * This is an advanced configuration that should only be used if you know what you are doing.
-         */
-        public Builder viewIoPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
-            this.viewIoPool = group;
-            this.viewIoPoolShutdownHook = shutdownHook;
-            return this;
-        }
-
-        /**
-         * Sets the Query I/O Pool implementation for the underlying IO framework, along with the action
-         * to execute when this environment is shut down.
-         * This is an advanced configuration that should only be used if you know what you are doing.
-         */
-        public Builder queryIoPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
-            this.queryIoPool = group;
-            this.queryIoPoolShutdownHook = shutdownHook;
-            return this;
-        }
-
-        /**
-         * Sets the Search I/O Pool implementation for the underlying IO framework, along with the action
-         * to execute when this environment is shut down.
-         * This is an advanced configuration that should only be used if you know what you are doing.
-         */
-        public Builder searchIoPool(final EventLoopGroup group, final ShutdownHook shutdownHook) {
-            this.searchIoPool = group;
-            this.searchIoPoolShutdownHook = shutdownHook;
             return this;
         }
 
@@ -1459,56 +1259,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Sets a custom memcached node hashing strategy, mainly used for compatibility with other clients.
-         *
-         * @param memcachedHashingStrategy the strategy to use.
-         */
-        public Builder memcachedHashingStrategy(MemcachedHashingStrategy memcachedHashingStrategy) {
-            this.memcachedHashingStrategy = memcachedHashingStrategy;
-            return this;
-        }
-
-        /**
-         * Allows to set a custom configuration for the KV service.
-         *
-         * @param keyValueServiceConfig the config to apply.
-         */
-        public Builder keyValueServiceConfig(KeyValueServiceConfig keyValueServiceConfig) {
-            this.keyValueServiceConfig = keyValueServiceConfig;
-            return this;
-        }
-
-        /**
-         * Allows to set a custom configuration for the View service.
-         *
-         * @param viewServiceConfig the config to apply.
-         */
-        public Builder viewServiceConfig(ViewServiceConfig viewServiceConfig) {
-            this.viewServiceConfig = viewServiceConfig;
-            return this;
-        }
-
-        /**
-         * Allows to set a custom configuration for the Query service.
-         *
-         * @param queryServiceConfig the config to apply.
-         */
-        public Builder queryServiceConfig(QueryServiceConfig queryServiceConfig) {
-            this.queryServiceConfig = queryServiceConfig;
-            return this;
-        }
-
-        /**
-         * Allows to set a custom configuration for the Search service.
-         *
-         * @param searchServiceConfig the config to apply.
-         */
-        public Builder searchServiceConfig(SearchServiceConfig searchServiceConfig) {
-            this.searchServiceConfig = searchServiceConfig;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1544,44 +1294,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");
         }
-        if (kvIoPool != null) {
-            sb.append(", kvIoPool=").append(kvIoPool.getClass().getSimpleName());
-            if (kvIoPoolShutdownHook == null || kvIoPoolShutdownHook instanceof  NoOpShutdownHook) {
-                sb.append("!unmanaged");
-            }
-        } else {
-            sb.append(", kvIoPool=").append("null");
-        }
-        if (viewIoPool != null) {
-            sb.append(", viewIoPool=").append(viewIoPool.getClass().getSimpleName());
-            if (viewIoPoolShutdownHook == null || viewIoPoolShutdownHook instanceof  NoOpShutdownHook) {
-                sb.append("!unmanaged");
-            }
-        } else {
-            sb.append(", viewIoPool=").append("null");
-        }
-        if (searchIoPool != null) {
-            sb.append(", searchIoPool=").append(searchIoPool.getClass().getSimpleName());
-            if (searchIoPoolShutdownHook == null || searchIoPoolShutdownHook instanceof  NoOpShutdownHook) {
-                sb.append("!unmanaged");
-            }
-        } else {
-            sb.append(", searchIoPool=").append("null");
-        }
-        if (queryIoPool != null) {
-            sb.append(", queryIoPool=").append(queryIoPool.getClass().getSimpleName());
-            if (queryIoPoolShutdownHook == null || queryIoPoolShutdownHook instanceof  NoOpShutdownHook) {
-                sb.append("!unmanaged");
-            }
-        } else {
-            sb.append(", queryIoPool=").append("null");
-        }
-
         sb.append(", coreScheduler=").append(coreScheduler.getClass().getSimpleName());
         if (coreSchedulerShutdownHook == null || coreSchedulerShutdownHook instanceof NoOpShutdownHook) {
             sb.append("!unmanaged");
         }
-        sb.append(", memcachedHashingStrategy=").append(memcachedHashingStrategy.getClass().getSimpleName());
         sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);

@@ -25,7 +25,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
@@ -163,9 +162,8 @@ public class KeyValueHandler
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient,
-                           final boolean pipeline) {
-        super(endpoint, responseBuffer, isTransient, pipeline);
+    public KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
+        super(endpoint, responseBuffer, isTransient);
     }
 
     /**
@@ -175,8 +173,8 @@ public class KeyValueHandler
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue, boolean isTransient, final boolean pipeline) {
-        super(endpoint, responseBuffer, queue, isTransient, pipeline);
+    KeyValueHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<BinaryRequest> queue, boolean isTransient) {
+        super(endpoint, responseBuffer, queue, isTransient);
     }
 
     @Override
@@ -627,14 +625,6 @@ public class KeyValueHandler
         throws Exception {
         BinaryRequest request = currentRequest();
 
-        //Throw only the malformedmemcachedheaderexception back
-        if (msg.getDecoderResult().isFailure()) {
-            Throwable cause = msg.getDecoderResult().cause();
-            if (cause instanceof MalformedMemcacheHeaderException) {
-                throw (MalformedMemcacheHeaderException)cause;
-            }
-        }
-
         if (request.opaque() != msg.getOpaque()) {
             throw new IllegalStateException("Opaque values for " + msg.getClass() + " do not match.");
         }
@@ -948,10 +938,7 @@ public class KeyValueHandler
             MutationToken descr = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
             response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
         } else if (request instanceof StatRequest) {
-            String key = null;
-            if (msg.getKey() != null) {
-                key = new String(msg.getKey(), CHARSET);
-            }
+            String key = new String(msg.getKey(), CHARSET);
             String value = content.toString(CHARSET);
             releaseContent(content);
 
@@ -1089,7 +1076,7 @@ public class KeyValueHandler
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractKeyValueRequest implements KeepAlive {
+    protected static class KeepAliveRequest extends AbstractKeyValueRequest {
 
         protected KeepAliveRequest() {
             super(null, null, null);

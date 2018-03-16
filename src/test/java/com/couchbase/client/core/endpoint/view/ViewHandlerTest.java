@@ -15,7 +15,6 @@
  */
 package com.couchbase.client.core.endpoint.view;
 
-import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
@@ -28,7 +27,6 @@ import com.couchbase.client.core.message.view.GetDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.message.view.ViewRequest;
-import com.couchbase.client.core.retry.FailFastRetryStrategy;
 import com.couchbase.client.core.util.Resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventFactory;
@@ -58,10 +56,7 @@ import org.junit.Before;
 import org.junit.Test;
 import rx.Observable;
 import rx.functions.Action1;
-import rx.observers.TestSubscriber;
 import rx.schedulers.Schedulers;
-import rx.subjects.AsyncSubject;
-import rx.subjects.Subject;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -128,13 +123,12 @@ public class ViewHandlerTest {
         when(environment.scheduler()).thenReturn(Schedulers.computation());
         when(environment.maxRequestLifetime()).thenReturn(10000L); // 10 seconds
         when(environment.autoreleaseAfter()).thenReturn(2000L);
-        when(environment.retryStrategy()).thenReturn(FailFastRetryStrategy.INSTANCE);
         endpoint = mock(AbstractEndpoint.class);
         when(endpoint.environment()).thenReturn(environment);
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
 
         queue = new ArrayDeque<ViewRequest>();
-        handler = new ViewHandler(endpoint, responseRingBuffer, queue, false, false);
+        handler = new ViewHandler(endpoint, responseRingBuffer, queue, false);
         channel = new EmbeddedChannel(handler);
     }
 
@@ -363,7 +357,7 @@ public class ViewHandlerTest {
         final AtomicInteger keepAliveEventCounter = new AtomicInteger();
         final AtomicReference<ChannelHandlerContext> ctxRef = new AtomicReference();
 
-        ViewHandler testHandler = new ViewHandler(endpoint, responseRingBuffer, queue, false, false) {
+        ViewHandler testHandler = new ViewHandler(endpoint, responseRingBuffer, queue, false) {
             @Override
             public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
                 super.channelRegistered(ctx);
@@ -625,35 +619,6 @@ public class ViewHandlerTest {
                 }).count()
                 .toBlocking()
                 .singleOrDefault(0);
-    }
-
-    @Test
-    public void shouldHavePipeliningDisabled() {
-        Subject<CouchbaseResponse,CouchbaseResponse> obs1 = AsyncSubject.create();
-        ViewQueryRequest requestMock1 = mock(ViewQueryRequest.class);
-        when(requestMock1.query()).thenReturn("{...}");
-        when(requestMock1.bucket()).thenReturn("foo");
-        when(requestMock1.password()).thenReturn("");
-        when(requestMock1.observable()).thenReturn(obs1);
-
-        Subject<CouchbaseResponse,CouchbaseResponse> obs2 = AsyncSubject.create();
-        ViewQueryRequest requestMock2 = mock(ViewQueryRequest.class);
-        when(requestMock2.query()).thenReturn("{...}");
-        when(requestMock2.bucket()).thenReturn("foo");
-        when(requestMock2.password()).thenReturn("");
-        when(requestMock2.observable()).thenReturn(obs2);
-
-
-        TestSubscriber<CouchbaseResponse> t1 = TestSubscriber.create();
-        TestSubscriber<CouchbaseResponse> t2 = TestSubscriber.create();
-
-        obs1.subscribe(t1);
-        obs2.subscribe(t2);
-
-        channel.writeOutbound(requestMock1, requestMock2);
-
-        t1.assertNotCompleted();
-        t2.assertError(RequestCancelledException.class);
     }
 
 }

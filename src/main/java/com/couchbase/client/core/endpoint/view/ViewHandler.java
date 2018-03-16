@@ -24,7 +24,6 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
 import com.couchbase.client.core.message.view.GetDesignDocumentResponse;
@@ -114,9 +113,8 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
-                       final boolean pipeline) {
-        super(endpoint, responseBuffer, isTransient, pipeline);
+    public ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
+        super(endpoint, responseBuffer, isTransient);
     }
 
     /**
@@ -126,9 +124,8 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ViewRequest> queue,
-                boolean isTransient, final boolean pipeline) {
-        super(endpoint, responseBuffer, queue, isTransient, pipeline);
+    ViewHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<ViewRequest> queue, boolean isTransient) {
+        super(endpoint, responseBuffer, queue, isTransient);
     }
 
     @Override
@@ -555,7 +552,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest, KeepAlive {
+    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest {
         protected KeepAliveRequest() {
             super(null, null);
         }

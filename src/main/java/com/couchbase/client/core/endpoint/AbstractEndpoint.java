@@ -22,7 +22,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.state.AbstractStateMachine;
@@ -40,11 +39,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.ConnectTimeoutException;
-import io.netty.channel.DefaultChannelPromise;
-import io.netty.channel.EventLoop;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.oio.OioEventLoopGroup;
@@ -54,10 +49,7 @@ import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
 import rx.Observable;
-import rx.Single;
-import rx.SingleSubscriber;
 import rx.Subscriber;
-import rx.functions.Func1;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -67,9 +59,6 @@ import java.net.ConnectException;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static com.couchbase.client.core.utils.Observables.failSafe;
 
 /**
  * The common parent implementation for all {@link Endpoint}s.
@@ -96,12 +85,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Pre-created not connected exception for performance reasons.
      */
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
-
-    /**
-     * If the callback does not return, what additional delay should be set over the socket connect
-     * timeout so that it returns eventually and is not stuck for a long time (in ms).
-     */
-    private static final String DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD = "2000";
 
     /**
      * The netty bootstrap adapter.
@@ -133,13 +116,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private final boolean isTransient;
 
-
-    private final int connectCallbackGracePeriod;
-
-    private final EventLoopGroup ioPool;
-
-    private final boolean pipeline;
-
     /**
      * Factory which handles {@link SSLEngine} creation.
      */
@@ -165,10 +141,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private volatile boolean disconnected;
 
-    private volatile boolean free;
-
-    private volatile long lastResponse;
-
     /**
      * Preset the stack trace for the static exceptions.
      */
@@ -180,28 +152,23 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Constructor to which allows to pass in an artificial bootstrap adapter.
      *
      * This method should not be used outside of tests. Please use the
-     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup, boolean)}
-     * constructor instead.
+     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean)} constructor
+     * instead.
      *
      * @param bucket the name of the bucket.
      * @param password the password of the bucket.
      * @param adapter the bootstrap adapter.
      */
     protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient, CoreEnvironment env, final boolean pipeline) {
+        final boolean isTransient) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = null;
-        this.env = env;
+        this.env = null;
         this.isTransient = isTransient;
         this.disconnected = false;
-        this.pipeline = pipeline;
-        this.free = true;
-        this.connectCallbackGracePeriod = Integer.parseInt(DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD);
-        this.ioPool = env.ioPool();
-        this.lastResponse = 0;
     }
 
     /**
@@ -215,29 +182,21 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param responseBuffer the response buffer for passing responses up the stack.
      */
     protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
-        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
-        final EventLoopGroup ioPool, final boolean pipeline) {
+        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = responseBuffer;
         this.env = environment;
         this.isTransient = isTransient;
-        this.ioPool = ioPool;
-        this.pipeline = pipeline;
-        this.connectCallbackGracePeriod = Integer.parseInt(
-            System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
-        );
-        LOGGER.debug("Using a connectCallbackGracePeriod of {} on Endpoint {}:{}", connectCallbackGracePeriod,
-            hostname, port);
         if (environment.sslEnabled()) {
             this.sslEngineFactory = new SSLEngineFactory(environment);
         }
 
         Class<? extends Channel> channelClass = NioSocketChannel.class;
-        if (ioPool instanceof EpollEventLoopGroup) {
+        if (environment.ioPool() instanceof EpollEventLoopGroup) {
             channelClass = EpollSocketChannel.class;
-        } else if (ioPool instanceof OioEventLoopGroup) {
+        } else if (environment.ioPool() instanceof OioEventLoopGroup) {
             channelClass = OioSocketChannel.class;
         }
 
@@ -247,7 +206,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         boolean tcpNodelay = environment().tcpNodelayEnabled();
         bootstrap = new BootstrapAdapter(new Bootstrap()
             .remoteAddress(hostname, port)
-            .group(ioPool)
+            .group(environment.ioPool())
             .channel(channelClass)
             .option(ChannelOption.ALLOCATOR, allocator)
             .option(ChannelOption.TCP_NODELAY, tcpNodelay)
@@ -310,37 +269,9 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      *                      some errors (like socket connect timeout).
      */
     protected void doConnect(final Subject<LifecycleState, LifecycleState> observable, final boolean bootstrapping) {
-        Single.create(new Single.OnSubscribe<ChannelFuture>() {
+        bootstrap.connect().addListener(new ChannelFutureListener() {
             @Override
-            public void call(final SingleSubscriber<? super ChannelFuture> ss) {
-                bootstrap.connect().addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture cf) throws Exception {
-                        ss.onSuccess(cf);
-                    }
-                });
-            }
-        })
-        // Safeguard if the callback doesn't return after the socket timeout + a grace period of one second.
-        .timeout(env.socketConnectTimeout() + connectCallbackGracePeriod, TimeUnit.MILLISECONDS)
-        .onErrorResumeNext(new Func1<Throwable, Single<? extends ChannelFuture>>() {
-            @Override
-            public Single<? extends ChannelFuture> call(Throwable throwable) {
-                ChannelPromise promise = new DefaultChannelPromise(null, ioPool.next());
-                if (throwable instanceof TimeoutException) {
-                    // Explicitly convert our timeout safeguard into a ConnectTimeoutException to simulate
-                    // a socket connect timeout.
-                    promise.setFailure(new ConnectTimeoutException("Connect callback did not return, "
-                        + "hit safeguarding timeout."));
-                } else {
-                    promise.setFailure(throwable);
-                }
-                return Single.just(promise);
-            }
-        })
-        .subscribe(new SingleSubscriber<ChannelFuture>() {
-            @Override
-            public void onSuccess(ChannelFuture future) {
+            public void operationComplete(final ChannelFuture future) throws Exception {
                 if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
@@ -354,17 +285,17 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     } else {
                         if (future.cause() instanceof AuthenticationException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                    + "Authentication Failure.");
+                                + "Authentication Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof SSLHandshakeException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                    + "SSL Handshake Failure during connect.");
+                                + "SSL Handshake Failure during connect.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof ClosedChannelException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                    + "Generic Failure.");
+                                + "Generic Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
@@ -413,8 +344,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                         SignalConfigReload.INSTANCE, null);
                             }
                             transitionState(LifecycleState.CONNECTING);
-                            EventLoop ev = future.channel() != null ? future.channel().eventLoop() : ioPool.next();
-                            ev.schedule(new Runnable() {
+                            future.channel().eventLoop().schedule(new Runnable() {
                                 @Override
                                 public void run() {
                                     // Make sure to avoid a race condition where the reconnect could override
@@ -437,13 +367,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
                 observable.onNext(state());
                 observable.onCompleted();
-            }
-
-            @Override
-            public void onError(Throwable error) {
-                // All errors are converted to failed ChannelFutures before, so this observable
-                // should never fail.
-                LOGGER.warn("Unexpected error on connect callback wrapper, this is a bug.", error);
             }
         });
     }
@@ -492,9 +415,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
             } else {
                 if (channel.isActive() && channel.isWritable()) {
-                    if (!pipeline) {
-                        free = false;
-                    }
                     channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
@@ -505,7 +425,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             if (request instanceof SignalFlush) {
                 return;
             }
-            failSafe(env.scheduler(), true, request.observable(), NOT_CONNECTED_EXCEPTION);
+            request.observable().onError(NOT_CONNECTED_EXCEPTION);
         }
     }
 
@@ -522,11 +442,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * endpoint is in a connected or connecting state).
      */
     public void notifyChannelInactive() {
+        LOGGER.debug(logIdent(channel, this) + "Got notified from Channel as inactive.");
         if (isTransient) {
             return;
         }
-        LOGGER.info(logIdent(channel, this) + "Got notified from Channel as inactive, " +
-                "attempting reconnect.");
 
         if (state() != LifecycleState.DISCONNECTED && state() != LifecycleState.DISCONNECTING) {
             signalConfigReload();
@@ -550,36 +469,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     }
 
     /**
-     * Called by the underlying channel to notify when the channel finished decoding the current response.
-     *
-     * If hidden is set to true, the last response time will not be updated.
-     */
-    public void notifyResponseDecoded(boolean hidden) {
-        free = true;
-        if (!hidden) {
-            lastResponse = System.nanoTime();
-        }
-    }
-
-    @Override
-    public long lastResponse() {
-        return lastResponse;
-    }
-
-    /**
      * Signal a "config reload" event to the upper config layers.
      */
     public void signalConfigReload() {
         responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
-    }
-
-    @Override
-    public boolean isFree() {
-        if (pipeline) {
-            return true;
-        } else {
-            return free;
-        }
     }
 
     /**
