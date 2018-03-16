@@ -6,6 +6,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.binary.BinaryResponse;
+import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
@@ -59,6 +60,9 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
     @Override
     public void onEvent(final ResponseEvent event, long sequence, boolean endOfBatch) throws Exception {
         CouchbaseMessage message = event.getMessage();
+        if (message instanceof SignalConfigReload) {
+            configurationProvider.signalOutdated();
+        }
         if (message instanceof CouchbaseResponse) {
             CouchbaseResponse response = (CouchbaseResponse) message;
             ResponseStatus status = response.status();
