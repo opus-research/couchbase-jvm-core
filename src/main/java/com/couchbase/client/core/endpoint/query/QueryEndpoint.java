@@ -45,6 +45,6 @@ public class QueryEndpoint extends AbstractEndpoint {
         }
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer(), false, false));
+            .addLast(new QueryHandler(this, responseBuffer(), false));
     }
 }
