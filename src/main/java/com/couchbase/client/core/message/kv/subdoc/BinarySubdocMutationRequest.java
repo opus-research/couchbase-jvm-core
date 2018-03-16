@@ -34,7 +34,7 @@ import io.netty.buffer.ByteBuf;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public interface BinarySubdocMutationRequest extends BinarySubdocRequest {
 

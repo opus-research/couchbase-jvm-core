@@ -29,7 +29,7 @@ import io.netty.util.CharsetUtil;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubCounterRequest extends AbstractSubdocMutationRequest {
     /**
