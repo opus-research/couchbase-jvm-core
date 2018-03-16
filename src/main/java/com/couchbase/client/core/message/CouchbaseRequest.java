@@ -15,6 +15,7 @@
  */
 package com.couchbase.client.core.message;
 
+import rx.Subscriber;
 import rx.subjects.Subject;
 
 import java.util.Observable;
@@ -68,4 +69,15 @@ public interface CouchbaseRequest extends CouchbaseMessage {
      */
     int retryCount();
 
+    /**
+     * Checks if the request is unsubscribed on a timeout
+     *
+     * @return true if timed out, else false
+     */
+    boolean isTimedOut();
+
+    /**
+     * Optionally add subscriber to check for the timeouts
+     */
+    void addSubscriber(Subscriber subscriber);
 }
