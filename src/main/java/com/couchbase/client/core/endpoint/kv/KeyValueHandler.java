@@ -348,7 +348,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
         byte extrasLength = (byte) extras.readableBytes();
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content().copy());
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
 
         if (msg instanceof InsertRequest) {
             request.setOpcode(OP_INSERT);
