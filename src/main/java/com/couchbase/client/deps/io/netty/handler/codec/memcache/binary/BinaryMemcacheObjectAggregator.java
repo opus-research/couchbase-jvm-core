@@ -177,9 +177,6 @@ public class BinaryMemcacheObjectAggregator extends AbstractMemcacheObjectAggreg
         fullResponse.setCAS(response.getCAS());
         fullResponse.setStatus(response.getStatus());
 
-        //Use the original decoder result back when reconstructing message
-        fullResponse.setDecoderResult(response.getDecoderResult());
-
         return fullResponse;
     }
 
