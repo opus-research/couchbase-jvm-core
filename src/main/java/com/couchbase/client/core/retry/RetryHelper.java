@@ -20,7 +20,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 
 /**
@@ -39,7 +38,7 @@ public class RetryHelper {
      * @param responseBuffer the response buffer where to maybe retry on.
      */
     public static void retryOrCancel(final CoreEnvironment environment, final CouchbaseRequest request,
-        final EventSink<ResponseEvent> responseBuffer) {
+        final RingBuffer<ResponseEvent> responseBuffer) {
         if (environment.retryStrategy().shouldRetry(request, environment)) {
             responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
         } else {
