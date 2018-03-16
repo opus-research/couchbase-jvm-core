@@ -42,12 +42,7 @@ public interface CouchbaseRequest extends CouchbaseMessage {
     String bucket();
 
     /**
-     * User authorized for bucket access
-     */
-    String username();
-
-    /**
-     * The password associated with the bucket user
+     * The password associated with the bucket for this request.
      *
      * @return the password.
      */

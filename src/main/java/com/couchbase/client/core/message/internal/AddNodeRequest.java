@@ -24,7 +24,7 @@ public class AddNodeRequest extends AbstractCouchbaseRequest implements Internal
     private final InetAddress hostname;
 
     public AddNodeRequest(final InetAddress hostname) {
-        super(null, null, null);
+        super(null, null);
         this.hostname = hostname;
     }
 

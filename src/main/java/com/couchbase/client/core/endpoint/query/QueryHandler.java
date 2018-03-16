@@ -756,7 +756,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null, null);
+            super(null, null);
         }
     }
 

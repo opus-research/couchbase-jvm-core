@@ -20,8 +20,8 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 public class BucketsConfigRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
-    public BucketsConfigRequest(String username, String password) {
-        super(username, username, password);
+    public BucketsConfigRequest(String bucket, String password) {
+        super(bucket, password);
     }
 
     @Override
