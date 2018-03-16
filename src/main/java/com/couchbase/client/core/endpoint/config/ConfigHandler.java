@@ -94,6 +94,11 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     private BehaviorSubject<String> streamingConfigObservable;
 
     /**
+     * Only needed to reset the request for a streaming config.
+     */
+    private ConfigRequest previousRequest = null;
+
+    /**
      * Creates a new {@link ConfigHandler} with the default queue for requests.
      *
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
@@ -190,6 +195,10 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
             if (streamingConfigObservable != null) {
+                if (currentRequest() == null) {
+                    currentRequest(previousRequest);
+                    previousRequest = null;
+                }
                 maybePushConfigChunk();
             }
         }
@@ -200,7 +209,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                     streamingConfigObservable.onCompleted();
                     streamingConfigObservable = null;
                 }
-                finishedDecoding();
                 return null;
             }
 
@@ -226,8 +234,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                 boolean done = responseHeader.getStatus().code() != 201;
                 response = new FlushResponse(done, body, status);
             }
-
-            finishedDecoding();
         }
 
         return response;
@@ -247,6 +253,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         if (status.isSuccess()) {
             streamingConfigObservable = BehaviorSubject.create();
         }
+        previousRequest = currentRequest();
         return new BucketStreamingResponse(streamingConfigObservable, host, status, currentRequest());
     }
 
