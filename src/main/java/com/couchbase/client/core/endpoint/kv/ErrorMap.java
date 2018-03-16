@@ -150,12 +150,6 @@ public class ErrorMap implements Comparable<ErrorMap> {
 
     public enum ErrorAttribute {
         /**
-         * The operation was successful for those situations
-         * where the error code is indicating successful (i.e. subdoc
-         * operations carried out on a deleted document)
-         */
-        SUCCESS("success"),
-        /**
          * This attribute means that the error is related to a constraint
          * failure regarding the item itself, i.e. the item does not exist,
          * already exists, or its current value makes the current operation
@@ -224,16 +218,7 @@ public class ErrorMap implements Comparable<ErrorMap> {
         /**
          * Use retry specifications from the server
          */
-        AUTO_RETRY("auto-retry"),
-        /**
-         * This attribute specifies that the requested item is currently locked.
-         */
-        ITEM_LOCKED("item-locked"),
-        /**
-         * This attribute means that the error is related
-         to operating on a soft-deleted document.
-         */
-        ITEM_DELETED("item-deleted");
+        AUTO_RETRY("auto-retry");
 
         private final String raw;
 
