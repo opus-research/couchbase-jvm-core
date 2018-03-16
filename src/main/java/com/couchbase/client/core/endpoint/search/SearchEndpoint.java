@@ -35,8 +35,7 @@ public class SearchEndpoint extends AbstractEndpoint {
 
     public SearchEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
                           RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false,
-                environment.searchIoPool() == null ? environment.ioPool() : environment.searchIoPool());
+        super(hostname, bucket, password, port, environment, responseBuffer, false);
     }
 
     @Override
