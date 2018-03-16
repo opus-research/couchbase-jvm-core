@@ -641,13 +641,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     }
 
     /**
-     * Get the underlying channel
-     *
-     * @return the channel
-     */
-    public Channel channel() { return channel; }
-
-    /**
      * Simple log helper to give logs a common prefix.
      *
      * @param chan the address.
