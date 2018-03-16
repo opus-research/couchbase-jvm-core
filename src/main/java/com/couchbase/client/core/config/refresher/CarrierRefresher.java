@@ -27,7 +27,6 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.Buffers;
-import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.Subscriber;
@@ -317,7 +316,7 @@ public class CarrierRefresher extends AbstractRefresher {
      * @param hostname the hostname of the node to fetch from.
      * @return a raw configuration or an error.
      */
-    private Observable<String> refreshAgainstNode(final String bucketName, final NetworkAddress hostname) {
+    private Observable<String> refreshAgainstNode(final String bucketName, final InetAddress hostname) {
         return Buffers.wrapColdWithAutoRelease(Observable.defer(new Func0<Observable<GetBucketConfigResponse>>() {
             @Override
             public Observable<GetBucketConfigResponse> call() {
@@ -342,7 +341,7 @@ public class CarrierRefresher extends AbstractRefresher {
                 if (response.content().refCnt() > 0) {
                     response.content().release();
                 }
-                return raw.replace("$HOST", response.hostname().address());
+                return raw.replace("$HOST", response.hostname().getHostName());
             }
         })
         .doOnError(new Action1<Throwable>() {

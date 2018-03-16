@@ -51,7 +51,6 @@ import com.couchbase.client.core.message.config.UpdateBucketResponse;
 import com.couchbase.client.core.message.config.UpsertUserRequest;
 import com.couchbase.client.core.message.config.UpsertUserResponse;
 import com.couchbase.client.core.service.ServiceType;
-import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
@@ -275,8 +274,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
     private CouchbaseResponse handleBucketStreamingResponse(final ChannelHandlerContext ctx,
         final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
-        String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getAddress().getHostAddress()
-            : addr.toString();
+        String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
         ResponseStatus status = ResponseStatusConverter.fromHttp(header.getStatus().code());
 
         Observable<String> scheduledObservable = null;

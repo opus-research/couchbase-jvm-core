@@ -31,7 +31,6 @@ import com.couchbase.client.core.message.config.GetDesignDocumentsRequest;
 import com.couchbase.client.core.message.config.GetDesignDocumentsResponse;
 import com.couchbase.client.core.retry.FailFastRetryStrategy;
 import com.couchbase.client.core.util.CollectingResponseEventSink;
-import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -128,7 +127,7 @@ public class ConfigHandlerTest {
 
     @Test
     public void shouldEncodeBucketConfigRequest() throws Exception {
-        BucketConfigRequest request = new BucketConfigRequest("/path/", NetworkAddress.localhost(), "bucket", "password");
+        BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket", "password");
 
         channel.writeOutbound(request);
         HttpRequest outbound = (HttpRequest) channel.readOutbound();
@@ -470,7 +469,7 @@ public class ConfigHandlerTest {
     public void shouldNotBreakLinesOnLongAuth() throws Exception {
         String longPassword = "thisIsAveryLongPasswordWhichShouldNotContainLineBreaksAfterEncodingOtherwise"
             + "itWillBreakTheRequestResponseFlowWithTheServer";
-        BucketConfigRequest request = new BucketConfigRequest("/path/", NetworkAddress.localhost(), "bucket",
+        BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket",
             longPassword);
 
         channel.writeOutbound(request);
