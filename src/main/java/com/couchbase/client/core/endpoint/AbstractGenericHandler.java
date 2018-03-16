@@ -31,6 +31,8 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.metrics.LatencyMetricCollector;
+import com.couchbase.client.core.metrics.Object;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
@@ -85,6 +87,11 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private final Queue<REQUEST> sentRequestQueue;
 
     /**
+     * Store the start times of requests in the queue, similar to the outstanding requests.
+     */
+    private final Queue<Long> sentRequestStartTimes;
+
+    /**
      * If this handler is transient (will close after one request).
      */
     private final boolean isTransient;
@@ -126,6 +133,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
         this.traceEnabled = LOGGER.isTraceEnabled();
+        this.sentRequestStartTimes = new ArrayDeque<Long>();
     }
 
     /**
@@ -162,17 +170,32 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     protected abstract ServiceType serviceType();
 
     @Override
-    protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<java.lang.Object> out) throws Exception {
         ENCODED request = encodeRequest(ctx, msg);
         sentRequestQueue.offer(msg);
         out.add(request);
+        sentRequestStartTimes.offer(System.nanoTime());
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, RESPONSE msg, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, RESPONSE msg, List<java.lang.Object> out) throws Exception {
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
+            long currentStartTime = sentRequestStartTimes.poll();
             currentDecodingState = DecodingState.STARTED;
+
+            if (currentRequest != null && env() != null) {
+                Object identifier = new Object(
+                    ctx.channel().remoteAddress().toString(), // TODO optimize me
+                    serviceType(),
+                    currentRequest.getClass().getSimpleName()
+                );
+                LatencyMetricCollector collector = env().networkLatencyMetricCollector(); // TODO optimize me
+                if (collector != null) {
+                    collector.recordLatency(identifier, System.nanoTime() - currentStartTime);
+                }
+            }
+
             if (traceEnabled) {
                 LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
             }
@@ -280,7 +303,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     }
 
     /**
-     * Cancells any outstanding operations which are currently on the wire.
+     * Cancels any outstanding operations which are currently on the wire.
      *
      * @param ctx the handler context.
      */
@@ -300,6 +323,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
         }
+
+        sentRequestStartTimes.clear();
     }
 
 
@@ -316,7 +341,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     }
 
     @Override
-    public void userEventTriggered(final ChannelHandlerContext ctx, Object evt) throws Exception {
+    public void userEventTriggered(final ChannelHandlerContext ctx, java.lang.Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent e = (IdleStateEvent) evt;
             if (e.state() == IdleState.ALL_IDLE) {

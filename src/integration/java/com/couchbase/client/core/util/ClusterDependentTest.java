@@ -33,6 +33,7 @@ import com.couchbase.client.core.message.cluster.SeedNodesResponse;
 import com.couchbase.client.core.message.config.ClusterConfigRequest;
 import com.couchbase.client.core.message.config.ClusterConfigResponse;
 import com.couchbase.client.core.message.config.FlushRequest;
+import com.couchbase.client.core.metrics.DefaultMetricCollectorConfig;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
@@ -65,6 +66,7 @@ public class ClusterDependentTest {
             .builder()
             .dcpEnabled(true)
             .mutationTokensEnabled(true)
+            .networkLatencyMetricCollectorConfig(DefaultMetricCollectorConfig.builder().emitFrequency(5))
             .build();
 
     private static ClusterFacade cluster;

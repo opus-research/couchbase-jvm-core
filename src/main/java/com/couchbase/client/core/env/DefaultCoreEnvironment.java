@@ -30,6 +30,10 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
+import com.couchbase.client.core.metrics.CoreNetworkLatencyMetricCollector;
+import com.couchbase.client.core.metrics.DefaultMetricCollectorConfig;
+import com.couchbase.client.core.metrics.LatencyMetricCollector;
+import com.couchbase.client.core.metrics.MetricCollectorConfig;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -173,6 +177,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
     private final EventBus eventBus;
+    private final LatencyMetricCollector networkLatencyMetricCollector;
 
     private final ShutdownHook ioPoolShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
@@ -251,6 +256,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                     : builder.schedulerShutdownHook;
         }
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
+        this.networkLatencyMetricCollector = new CoreNetworkLatencyMetricCollector(
+            eventBus(),
+            scheduler(),
+            builder.networkLatencyMetricCollectorConfig() == null
+                ? DefaultMetricCollectorConfig.create() : builder.networkLatencyMetricCollectorConfig()
+        );
     }
 
     public static DefaultCoreEnvironment create() {
@@ -474,6 +485,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return mutationTokensEnabled;
     }
 
+    @Override
+    public LatencyMetricCollector networkLatencyMetricCollector() {
+        return networkLatencyMetricCollector;
+    }
+
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -506,6 +522,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private Scheduler scheduler;
         private ShutdownHook schedulerShutdownHook;
         private EventBus eventBus;
+        private MetricCollectorConfig networkLatencyMetricCollectorConfig;
         private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
         private long keepAliveInterval = KEEPALIVEINTERVAL;
         private long autoreleaseAfter = AUTORELEASE_AFTER;
@@ -1057,6 +1074,20 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder mutationTokensEnabled(boolean mutationTokensEnabled) {
             this.mutationTokensEnabled = mutationTokensEnabled;
             return this;
+        }
+
+        @Override
+        public LatencyMetricCollector networkLatencyMetricCollector() {
+            return null;
+        }
+
+        public Builder networkLatencyMetricCollectorConfig(MetricCollectorConfig config) {
+            this.networkLatencyMetricCollectorConfig = config;
+            return this;
+        }
+
+        public MetricCollectorConfig networkLatencyMetricCollectorConfig() {
+            return networkLatencyMetricCollectorConfig;
         }
 
         public DefaultCoreEnvironment build() {
