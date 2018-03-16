@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.endpoint.query;
 
+import java.util.Queue;
+
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
@@ -47,8 +49,6 @@ import io.netty.handler.codec.http.LastHttpContent;
 import rx.Scheduler;
 import rx.subjects.AsyncSubject;
 import rx.subjects.ReplaySubject;
-
-import java.util.Queue;
 
 /**
  * The {@link QueryHandler} is responsible for encoding {@link QueryRequest}s into lower level
@@ -559,9 +559,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             queryStatusObservable.onCompleted();
         }
         cleanupQueryStates();
-        if (responseContent != null && responseContent.refCnt() > 0) {
-            responseContent.release();
-        }
         super.handlerRemoved(ctx);
     }
 
