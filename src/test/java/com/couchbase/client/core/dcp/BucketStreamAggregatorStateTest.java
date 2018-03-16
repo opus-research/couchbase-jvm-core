@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,43 +19,26 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.event;
 
-import rx.Observable;
-import rx.Scheduler;
-import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
+package com.couchbase.client.core.dcp;
 
-/**
- * The default event bus implementation.
- *
- * @author Michael Nitschinger
- * @since 1.1.0
- */
-public class DefaultEventBus implements EventBus {
+import org.junit.Test;
 
-    private final Subject<CouchbaseEvent, CouchbaseEvent> bus;
-    private final Scheduler scheduler;
+import static org.junit.Assert.assertEquals;
 
-    public DefaultEventBus(final Scheduler scheduler) {
-        bus = PublishSubject.<CouchbaseEvent>create().toSerialized();
-        this.scheduler = scheduler;
+public class BucketStreamAggregatorStateTest {
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void shouldCheckStreamListBoundsOnSet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        aggregator.set(3, new BucketStreamState(0, 0, 0, 0, 0));
     }
 
-    @Override
-    public Observable<CouchbaseEvent> get() {
-        return bus.onBackpressureDrop().observeOn(scheduler);
+    @Test
+    public void shouldNotCheckStreamListBoundsOnGet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        BucketStreamState state = aggregator.get(3);
+        assertEquals(0, state.vbucketUUID());
     }
 
-    @Override
-    public void publish(final CouchbaseEvent event) {
-        if (bus.hasObservers()) {
-            bus.onNext(event);
-        }
-    }
-
-    @Override
-    public boolean hasSubscribers() {
-        return bus.hasObservers();
-    }
 }

@@ -261,7 +261,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                 @Override
                 public void call(ClusterConfig clusterConfig) {
                     LOGGER.info("Opened bucket " + bucket);
-                    if (eventBus != null) {
+                    if (eventBus != null && eventBus.hasSubscribers()) {
                         eventBus.publish(new BucketOpenedEvent(bucket));
                     }
                 }
@@ -282,7 +282,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             public ClusterConfig call(String bucket) {
                 removeBucketConfig(bucket);
                 LOGGER.info("Closed bucket " + bucket);
-                if (eventBus != null) {
+                if (eventBus != null && eventBus.hasSubscribers()) {
                     eventBus.publish(new BucketClosedEvent(bucket));
                 }
                 return currentConfig;

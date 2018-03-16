@@ -1,6 +1,5 @@
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -65,10 +64,6 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
 
     private void populateKetamaNodes() {
         for (NodeInfo node : nodes()) {
-            if (!node.services().containsKey(ServiceType.BINARY)) {
-                continue;
-            }
-
             for (int i = 0; i < 40; i++) {
                 MessageDigest md5;
                 try {

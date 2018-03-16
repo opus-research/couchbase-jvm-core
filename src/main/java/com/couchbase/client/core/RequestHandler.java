@@ -157,7 +157,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     LOGGER.debug("Got notified of a new configuration arriving.");
                     configuration = config;
                     reconfigure(config).subscribe();
-                    if (eventBus != null) {
+                    if (eventBus != null && eventBus.hasSubscribers()) {
                         eventBus.publish(new ConfigUpdatedEvent(config));
                     }
                 } catch (Exception ex) {
