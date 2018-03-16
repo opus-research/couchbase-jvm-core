@@ -27,6 +27,9 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpClientCodec;
+import io.netty.handler.timeout.IdleStateHandler;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * This endpoint defines the pipeline for query requests and responses (N1QL).
@@ -38,13 +41,16 @@ public class QueryEndpoint extends AbstractEndpoint {
 
     public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
         RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer);
+        super(hostname, bucket, password, port, environment, responseBuffer, false);
     }
 
     @Override
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
+        if (environment().keepAliveInterval() > 0) {
+            pipeline.addLast(new IdleStateHandler(0, 0, environment().keepAliveInterval(), TimeUnit.MILLISECONDS));
+        }
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer()));
+            .addLast(new QueryHandler(this, responseBuffer(), false));
     }
 }

@@ -23,14 +23,21 @@
 package com.couchbase.client.core.message.observe;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.DocumentConcurrentlyModifiedException;
+import com.couchbase.client.core.ReplicaNotConfiguredException;
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.message.cluster.GetClusterConfigRequest;
 import com.couchbase.client.core.message.cluster.GetClusterConfigResponse;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveResponse;
+import com.couchbase.client.core.retry.RetryStrategy;
+import com.couchbase.client.core.time.Delay;
 import rx.Observable;
 import rx.functions.Func0;
 import rx.functions.Func1;
+import rx.functions.Func2;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +49,14 @@ import java.util.concurrent.TimeUnit;
  * @author Michael Nitschinger
  * @since 1.0.1
  */
+@InterfaceStability.Uncommitted
+@InterfaceAudience.Private
 public class Observe {
+
+    /**
+     * The default observe delay for backwards compatibility.
+     */
+    private static final Delay DEFAULT_DELAY = Delay.fixed(10, TimeUnit.MILLISECONDS);
 
     /**
      * Defines the possible disk persistence constraints to observe.
@@ -176,25 +190,50 @@ public class Observe {
     }
 
     public static Observable<Boolean> call(final ClusterFacade core, final String bucket, final String id,
-        final long cas, final boolean remove, final PersistTo persistTo, final ReplicateTo replicateTo) {
+        final long cas, final boolean remove, final PersistTo persistTo, final ReplicateTo replicateTo,
+        final RetryStrategy retryStrategy) {
+        return call(core, bucket, id, cas, remove, persistTo, replicateTo, DEFAULT_DELAY, retryStrategy);
+    }
+
+    public static Observable<Boolean> call(final ClusterFacade core, final String bucket, final String id,
+        final long cas, final boolean remove, final PersistTo persistTo, final ReplicateTo replicateTo,
+        final Delay delay, final RetryStrategy retryStrategy) {
 
         final ObserveResponse.ObserveStatus persistIdentifier;
         final ObserveResponse.ObserveStatus replicaIdentifier;
         if (remove) {
-            persistIdentifier = ObserveResponse.ObserveStatus.FOUND_NOT_PERSISTED;
+            persistIdentifier = ObserveResponse.ObserveStatus.NOT_FOUND_PERSISTED;
             replicaIdentifier = ObserveResponse.ObserveStatus.NOT_FOUND_NOT_PERSISTED;
         } else {
             persistIdentifier = ObserveResponse.ObserveStatus.FOUND_PERSISTED;
-            replicaIdentifier = ObserveResponse.ObserveStatus.NOT_FOUND_PERSISTED;
+            replicaIdentifier = ObserveResponse.ObserveStatus.FOUND_NOT_PERSISTED;
         }
 
         Observable<ObserveResponse> observeResponses = sendObserveRequests(core, bucket, id, cas, persistTo,
-            replicateTo);
+            replicateTo, retryStrategy);
 
         return observeResponses
                 .toList()
-                .delay(10, TimeUnit.MILLISECONDS)
-                .repeat()
+                .repeatWhen(new Func1<Observable<? extends Void>, Observable<?>>() {
+                    @Override
+                    public Observable<?> call(Observable<? extends Void> observable) {
+                        return observable.zipWith(
+                            Observable.range(1, Integer.MAX_VALUE),
+                            new Func2<Void, Integer, Integer>() {
+                                @Override
+                                public Integer call(Void aVoid, Integer attempt) {
+                                    return attempt;
+                                }
+                            }
+                        )
+                        .flatMap(new Func1<Integer, Observable<?>>() {
+                            @Override
+                            public Observable<?> call(Integer attempt) {
+                                return Observable.timer(delay.calculate(attempt), delay.unit());
+                            }
+                        });
+                    }
+                })
                 .skipWhile(new Func1<List<ObserveResponse>, Boolean>() {
                     @Override
                     public Boolean call(List<ObserveResponse> observeResponses) {
@@ -202,13 +241,29 @@ public class Observe {
                         int persisted = 0;
                         boolean persistedMaster = false;
                         for (ObserveResponse response : observeResponses) {
+                            if (response.content() != null && response.content().refCnt() > 0) {
+                                response.content().release();
+                            }
                             ObserveResponse.ObserveStatus status = response.observeStatus();
+
+                            // the CAS values always need to match up to make sure we are still observing the right
+                            // document. The only exclusion from that rule is when a real delete is returned, because
+                            // then the cas value is 0.
+                            boolean validCas = cas == response.cas()
+                                || (remove && response.cas() == 0 && status == persistIdentifier);
+
                             if (response.master()) {
+                                if (!validCas) {
+                                    throw new DocumentConcurrentlyModifiedException("The CAS on the active node "
+                                        + "changed for ID \"" + id + "\", indicating it has been modified in the "
+                                        + "meantime.");
+                                }
+
                                 if (status == persistIdentifier) {
                                     persisted++;
                                     persistedMaster = true;
                                 }
-                            } else {
+                            } else if (validCas) {
                                 if (status == persistIdentifier) {
                                     persisted++;
                                     replicated++;
@@ -221,8 +276,10 @@ public class Observe {
                         boolean persistDone = false;
                         boolean replicateDone = false;
 
-                        if (persistTo == PersistTo.MASTER && persistedMaster) {
-                            persistDone = true;
+                        if (persistTo == PersistTo.MASTER) {
+                            if (persistedMaster) {
+                                persistDone = true;
+                            }
                         } else if (persisted >= persistTo.value()) {
                             persistDone = true;
                         }
@@ -244,7 +301,9 @@ public class Observe {
     }
 
     private static Observable<ObserveResponse> sendObserveRequests(final ClusterFacade core, final String bucket,
-        final String id, final long cas, final PersistTo persistTo, final ReplicateTo replicateTo) {
+        final String id, final long cas, final PersistTo persistTo, final ReplicateTo replicateTo,
+        final RetryStrategy retryStrategy) {
+        final boolean swallowErrors = retryStrategy.shouldRetryObserve();
         return Observable.defer(new Func0<Observable<ObserveResponse>>() {
             @Override
             public Observable<ObserveResponse> call() {
@@ -254,27 +313,39 @@ public class Observe {
                             @Override
                             public Integer call(GetClusterConfigResponse response) {
                                 CouchbaseBucketConfig conf =
-                                    (CouchbaseBucketConfig) response.config().bucketConfig(bucket);
-                                return conf.numberOfReplicas();
+                                        (CouchbaseBucketConfig) response.config().bucketConfig(bucket);
+                                int numReplicas = conf.numberOfReplicas();
+
+                                if (replicateTo.touchesReplica() && replicateTo.value() > numReplicas) {
+                                    throw new ReplicaNotConfiguredException("Not enough replicas configured on " +
+                                            "the bucket.");
+                                }
+                                if (persistTo.touchesReplica() && persistTo.value() - 1 > numReplicas) {
+                                    throw new ReplicaNotConfiguredException("Not enough replicas configured on " +
+                                            "the bucket.");
+                                }
+                                return numReplicas;
                             }
                         })
                         .flatMap(new Func1<Integer, Observable<ObserveResponse>>() {
                             @Override
                             public Observable<ObserveResponse> call(Integer replicas) {
                                 List<Observable<ObserveResponse>> obs = new ArrayList<Observable<ObserveResponse>>();
-                                if (persistTo != PersistTo.NONE) {
-                                    obs.add(core.<ObserveResponse>send(new ObserveRequest(id, cas, true, (short) 0, bucket)));
+                                Observable<ObserveResponse> masterRes = core.send(new ObserveRequest(id, cas, true, (short) 0, bucket));
+                                if (swallowErrors) {
+                                    obs.add(masterRes.onErrorResumeNext(Observable.<ObserveResponse>empty()));
+                                } else {
+                                    obs.add(masterRes);
                                 }
 
                                 if (persistTo.touchesReplica() || replicateTo.touchesReplica()) {
-                                    if (replicas >= 1) {
-                                        obs.add(core.<ObserveResponse>send(new ObserveRequest(id, cas, false, (short) 1, bucket)));
-                                    }
-                                    if (replicas >= 2) {
-                                        obs.add(core.<ObserveResponse>send(new ObserveRequest(id, cas, false, (short) 2, bucket)));
-                                    }
-                                    if (replicas == 3) {
-                                        obs.add(core.<ObserveResponse>send(new ObserveRequest(id, cas, false, (short) 3, bucket)));
+                                    for (short i = 1; i <= replicas; i++) {
+                                        Observable<ObserveResponse> res = core.send(new ObserveRequest(id, cas, false, i, bucket));
+                                        if (swallowErrors) {
+                                            obs.add(res.onErrorResumeNext(Observable.<ObserveResponse>empty()));
+                                        } else {
+                                            obs.add(res);
+                                        }
                                     }
                                 }
                                 return Observable.merge(obs);

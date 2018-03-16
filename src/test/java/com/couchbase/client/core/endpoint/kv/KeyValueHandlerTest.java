@@ -21,7 +21,12 @@
  */
 package com.couchbase.client.core.endpoint.kv;
 
+import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
+import com.couchbase.client.core.endpoint.ResponseStatusConverter;
+import com.couchbase.client.core.env.CoreEnvironment;
+import com.couchbase.client.core.env.DefaultCoreEnvironment;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -50,19 +55,26 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBina
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.Before;
 import org.junit.Test;
 import rx.subjects.AsyncSubject;
+
 import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -103,7 +115,7 @@ public class KeyValueHandlerTest {
     public void setup() {
         eventSink = new CollectingResponseEventSink();
         requestQueue = new ArrayDeque<BinaryRequest>();
-        channel = new EmbeddedChannel(new KeyValueHandler(mock(AbstractEndpoint.class), eventSink, requestQueue));
+        channel = new EmbeddedChannel(new KeyValueHandler(mock(AbstractEndpoint.class), eventSink, requestQueue, false));
     }
 
     @Test
@@ -121,6 +133,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_GET, outbound.getOpcode());
         assertEquals(0, outbound.getExtrasLength());
+        assertEquals(request.opaque(), outbound.getOpaque());
     }
 
     @Test
@@ -600,7 +613,7 @@ public class KeyValueHandlerTest {
         ByteBuf content = Unpooled.copiedBuffer("{someconfig...}", CharsetUtil.UTF_8);
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("", Unpooled.EMPTY_BUFFER,
             content.copy());
-        response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
+        response.setStatus(ResponseStatusConverter.BINARY_ERR_NOT_MY_VBUCKET);
 
         ObserveRequest requestMock = mock(ObserveRequest.class);
         requestQueue.add(requestMock);
@@ -624,7 +637,7 @@ public class KeyValueHandlerTest {
 
         assertEquals(1, eventSink.responseEvents().size());
         CounterResponse event = (CounterResponse) eventSink.responseEvents().get(0).getMessage();
-        assertEquals(ResponseStatus.FAILURE, event.status());
+        assertEquals(ResponseStatus.INVALID_ARGUMENTS, event.status());
         assertEquals(0, event.value());
     }
 
@@ -689,7 +702,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(0, requestContent.refCnt());
     }
 
@@ -698,7 +711,7 @@ public class KeyValueHandlerTest {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
-        response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
+        response.setStatus(ResponseStatusConverter.BINARY_ERR_NOT_MY_VBUCKET);
 
         UpsertRequest requestMock = mock(UpsertRequest.class);
         ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
@@ -710,7 +723,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
     }
 
@@ -731,7 +744,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(0, requestContent.refCnt());
     }
 
@@ -740,7 +753,7 @@ public class KeyValueHandlerTest {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
-        response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
+        response.setStatus(ResponseStatusConverter.BINARY_ERR_NOT_MY_VBUCKET);
 
         AppendRequest requestMock = mock(AppendRequest.class);
         ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
@@ -751,7 +764,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
     }
 
@@ -772,7 +785,7 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(0, requestContent.refCnt());
     }
 
@@ -781,7 +794,7 @@ public class KeyValueHandlerTest {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
-        response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
+        response.setStatus(ResponseStatusConverter.BINARY_ERR_NOT_MY_VBUCKET);
 
         PrependRequest requestMock = mock(PrependRequest.class);
         ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
@@ -793,8 +806,81 @@ public class KeyValueHandlerTest {
         assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
+        assertEquals(1, content.refCnt());
         assertEquals(1, requestContent.refCnt());
-
     }
+
+    @Test(expected = CouchbaseException.class)
+    public void shouldFailWhenOpaqueDoesNotMatch() throws Exception {
+        ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
+                content);
+        response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
+        response.setOpaque(1);
+
+        PrependRequest requestMock = mock(PrependRequest.class);
+        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
+        when(requestMock.bucket()).thenReturn("bucket");
+        AsyncSubject<CouchbaseResponse> responseSubject = AsyncSubject.<CouchbaseResponse>create();
+        when(requestMock.observable()).thenReturn(responseSubject);
+        when(requestMock.content()).thenReturn(requestContent);
+        when(requestMock.opaque()).thenReturn(3);
+        requestQueue.add(requestMock);
+
+        channel.writeInbound(response);
+        assertEquals(0, content.refCnt());
+        responseSubject.toBlocking().single();
+    }
+
+    @Test
+    public void shouldFireKeepAlive() throws Exception {
+        final AtomicInteger keepAliveEventCounter = new AtomicInteger();
+        final AtomicReference<ChannelHandlerContext> ctxRef = new AtomicReference();
+
+        KeyValueHandler testHandler = new KeyValueHandler(mock(AbstractEndpoint.class), eventSink,
+                requestQueue, false) {
+
+            @Override
+            public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+                super.channelRegistered(ctx);
+                ctxRef.compareAndSet(null, ctx);
+            }
+
+            @Override
+            protected void onKeepAliveFired(ChannelHandlerContext ctx, CouchbaseRequest keepAliveRequest) {
+                assertEquals(1, keepAliveEventCounter.incrementAndGet());
+            }
+
+            @Override
+            protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
+                assertEquals(2, keepAliveEventCounter.incrementAndGet());
+            }
+
+            @Override
+            protected CoreEnvironment env() {
+                return DefaultCoreEnvironment.create();
+            }
+        };
+        EmbeddedChannel channel = new EmbeddedChannel(testHandler);
+
+        //test idle event triggers a k/v keepAlive request and hook is called
+        testHandler.userEventTriggered(ctxRef.get(), IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT);
+
+        assertEquals(1, keepAliveEventCounter.get());
+        assertTrue(requestQueue.peek() instanceof KeyValueHandler.KeepAliveRequest);
+        KeyValueHandler.KeepAliveRequest keepAliveRequest = (KeyValueHandler.KeepAliveRequest) requestQueue.peek();
+
+        //test responding to the request with memcached response is interpreted into a KeepAliveResponse, hook is called
+        DefaultFullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("", Unpooled.EMPTY_BUFFER);
+        response.setOpaque(keepAliveRequest.opaque());
+        response.setStatus(ResponseStatusConverter.BINARY_ERR_NO_MEM);
+        channel.writeInbound(response);
+        KeyValueHandler.KeepAliveResponse keepAliveResponse = keepAliveRequest.observable()
+                .cast(KeyValueHandler.KeepAliveResponse.class)
+                .timeout(1, TimeUnit.SECONDS).toBlocking().single();
+
+        assertEquals(2, keepAliveEventCounter.get());
+        assertEquals(ResponseStatus.OUT_OF_MEMORY, keepAliveResponse.status());
+    }
+
 }

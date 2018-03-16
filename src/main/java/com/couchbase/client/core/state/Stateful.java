@@ -52,4 +52,11 @@ public interface Stateful<S extends Enum> {
      * @return true if it is the same, false otherwise.
      */
     boolean isState(S state);
+
+    /**
+     * Returns true if there are subscribers observing the state stream.
+     *
+     * @return true if at least one does, false otherwise.
+     */
+    boolean hasSubscribers();
 }

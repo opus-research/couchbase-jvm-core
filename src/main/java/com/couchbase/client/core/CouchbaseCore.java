@@ -47,6 +47,8 @@ import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.AddServiceResponse;
+import com.couchbase.client.core.message.internal.GetConfigProviderRequest;
+import com.couchbase.client.core.message.internal.GetConfigProviderResponse;
 import com.couchbase.client.core.message.internal.InternalRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeResponse;
@@ -200,16 +202,17 @@ public class CouchbaseCore implements ClusterFacade {
     public <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request) {
         if (request instanceof InternalRequest) {
             handleInternalRequest(request);
+            return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else if (request instanceof ClusterRequest) {
             handleClusterRequest(request);
+            return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else {
             boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
             if (!published) {
                 request.observable().onError(BACKPRESSURE_EXCEPTION);
             }
+            return (Observable<R>) request.observable();
         }
-
-        return (Observable<R>) request.observable().observeOn(environment.scheduler());
     }
 
     /**
@@ -300,7 +303,10 @@ public class CouchbaseCore implements ClusterFacade {
      * @param request the request to dispatch.
      */
     private void handleInternalRequest(final CouchbaseRequest request) {
-        if (request instanceof AddNodeRequest) {
+        if (request instanceof GetConfigProviderRequest) {
+            request.observable().onNext(new GetConfigProviderResponse(configProvider));
+            request.observable().onCompleted();
+        } else if (request instanceof AddNodeRequest) {
             requestHandler
                 .addNode(((AddNodeRequest) request).hostname())
                 .map(new Func1<LifecycleState, AddNodeResponse>() {

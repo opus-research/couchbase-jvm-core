@@ -24,6 +24,7 @@ package com.couchbase.client.core.endpoint.config;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
+import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.config.BucketConfigRequest;
@@ -101,8 +102,8 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer) {
-        super(endpoint, responseBuffer);
+    public ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
+        super(endpoint, responseBuffer, isTransient);
     }
 
     /**
@@ -112,8 +113,8 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue) {
-        super(endpoint, responseBuffer, queue);
+    ConfigHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<ConfigRequest> queue, boolean isTransient) {
+        super(endpoint, responseBuffer, queue, isTransient);
     }
 
     @Override
@@ -164,7 +165,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
         ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
         raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
-        ByteBuf encoded = Base64.encode(raw);
+        ByteBuf encoded = Base64.encode(raw, false);
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
@@ -206,7 +207,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                 return null;
             }
 
-            ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
+            ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
             String body = responseContent.readableBytes() > 0
                 ? responseContent.toString(CHARSET) : responseHeader.getStatus().reasonPhrase();
 
@@ -246,7 +247,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
         String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
-        ResponseStatus status = statusFromCode(header.getStatus().code());
+        ResponseStatus status = ResponseStatusConverter.fromHttp(header.getStatus().code());
 
         Observable<String> scheduledObservable = null;
         if (status.isSuccess()) {
@@ -274,29 +275,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
             responseContent.clear();
             responseContent.writeBytes(currentChunk.substring(separatorIndex + 4).getBytes(CHARSET));
         }
-    }
-
-    /**
-     * Converts a HTTP status code in its appropriate {@link ResponseStatus} representation.
-     *
-     * @param code the http code.
-     * @return the parsed status.
-     */
-    private static ResponseStatus statusFromCode(int code) {
-        ResponseStatus status;
-        switch (code) {
-            case 200:
-            case 201:
-            case 202:
-                status = ResponseStatus.SUCCESS;
-                break;
-            case 404:
-                status = ResponseStatus.NOT_EXISTS;
-                break;
-            default:
-                status = ResponseStatus.FAILURE;
-        }
-        return status;
     }
 
     /**

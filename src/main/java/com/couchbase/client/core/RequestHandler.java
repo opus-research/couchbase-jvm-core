@@ -29,20 +29,23 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
+import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
+import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.node.locate.KeyValueLocator;
 import com.couchbase.client.core.node.locate.ConfigLocator;
+import com.couchbase.client.core.node.locate.DCPLocator;
+import com.couchbase.client.core.node.locate.KeyValueLocator;
 import com.couchbase.client.core.node.locate.Locator;
 import com.couchbase.client.core.node.locate.QueryLocator;
 import com.couchbase.client.core.node.locate.ViewLocator;
+import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
@@ -54,12 +57,11 @@ import rx.functions.Func1;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -101,6 +103,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     private final Locator configLocator = new ConfigLocator();
 
     /**
+     * The node locator for DCP service.
+     */
+    private final Locator dcpLocator = new DCPLocator();
+
+    /**
      * The list of currently managed nodes against the cluster.
      */
     private final Set<Node> nodes;
@@ -125,8 +132,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(Collections.newSetFromMap(new ConcurrentHashMap<Node, Boolean>(INITIAL_NODE_SIZE)), environment,
-            configObservable, responseBuffer);
+        this(new CopyOnWriteArraySet<Node>(), environment, configObservable, responseBuffer);
     }
 
     /**
@@ -162,22 +168,30 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         try {
             final CouchbaseRequest request = event.getRequest();
 
+            ClusterConfig config = configuration.get();
             //prevent non-bootstrap requests to go through if bucket not part of config
             if (!(request instanceof BootstrapMessage)) {
-                ClusterConfig config = configuration.get();
                 if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
                     request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
                     return;
                 }
+
+                //short-circuit some kind of requests for which we know there won't be any handler to respond.
+                try {
+                    checkFeaturesForRequest(request, config.bucketConfig(request.bucket()));
+                } catch (ServiceNotAvailableException e) {
+                    request.observable().onError(e);
+                    return;
+                }
             }
 
-            Node[] found = locator(request).locate(request, nodes, configuration.get());
+            Node[] found = locator(request).locate(request, nodes, config);
 
             if (found == null) {
                 return;
             }
             if (found.length == 0) {
-                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+                RetryHelper.retryOrCancel(environment, request, responseBuffer);
             }
             for (int i = 0; i < found.length; i++) {
                 try {
@@ -193,6 +207,25 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             }
         } finally {
             event.setRequest(null);
+        }
+    }
+
+    /**
+     * Checks, for a sub-set of {@link CouchbaseRequest}, if the current environment has
+     * the necessary feature activated. If not, throws an {@link ServiceNotAvailableException}.
+     *
+     * @param request the request to check.
+     * @throws ServiceNotAvailableException if the request type needs a particular feature which isn't activated.
+     */
+    protected void checkFeaturesForRequest(CouchbaseRequest request, BucketConfig config) {
+        if (request instanceof BinaryRequest && !config.serviceEnabled(ServiceType.BINARY)) {
+            throw new ServiceNotAvailableException("The KeyValue service is not enabled or no node in the cluster supports it.");
+        } else if (request instanceof ViewRequest && !config.serviceEnabled(ServiceType.VIEW)) {
+            throw new ServiceNotAvailableException("The View service is not enabled or no node in the cluster supports it.");
+        } else if (request instanceof QueryRequest && !(environment.queryEnabled() || config.serviceEnabled(ServiceType.QUERY))) {
+            throw new ServiceNotAvailableException("The Query service is not enabled or no node in the cluster supports it.");
+        } else if (request instanceof  DCPRequest && !(environment.dcpEnabled() || config.serviceEnabled(ServiceType.DCP))) {
+            throw new ServiceNotAvailableException("The DCP service is not enabled or no node in the cluster supports it.");
         }
     }
 
@@ -313,6 +346,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return queryLocator;
         } else if (request instanceof ConfigRequest) {
             return configLocator;
+        } else if (request instanceof DCPRequest) {
+            return dcpLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -333,7 +368,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 return Observable.just(config);
             }
 
-            return Observable.from(nodes).doOnNext(new Action1<Node>() {
+            return Observable.from(new HashSet<Node>(nodes)).doOnNext(new Action1<Node>() {
                 @Override
                 public void call(Node node) {
                     removeNode(node);
@@ -406,6 +441,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                                 environment.sslEnabled() ? nodeInfo.sslServices() : nodeInfo.services();
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
+                        }
+                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
+                            services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);
                     }

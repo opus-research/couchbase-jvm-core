@@ -113,7 +113,7 @@ public class ConfigHandlerTest {
 
         eventSink = new CollectingResponseEventSink();
         requestQueue = new ArrayDeque<ConfigRequest>();
-        handler = new ConfigHandler(endpoint, eventSink, requestQueue);
+        handler = new ConfigHandler(endpoint, eventSink, requestQueue, true);
         channel = new EmbeddedChannel(handler);
     }
 
@@ -448,6 +448,24 @@ public class ConfigHandlerTest {
         channel.pipeline().remove(handler);
         channel.disconnect().awaitUninterruptibly();
         assertTrue(latch.await(1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void shouldNotBreakLinesOnLongAuth() throws Exception {
+        String longPassword = "thisIsAveryLongPasswordWhichShouldNotContainLineBreaksAfterEncodingOtherwise"
+            + "itWillBreakTheRequestResponseFlowWithTheServer";
+        BucketConfigRequest request = new BucketConfigRequest("/path/", InetAddress.getLocalHost(), "bucket",
+            longPassword);
+
+        channel.writeOutbound(request);
+        HttpRequest outbound = (HttpRequest) channel.readOutbound();
+
+        assertEquals(HttpMethod.GET, outbound.getMethod());
+        assertEquals(HttpVersion.HTTP_1_1, outbound.getProtocolVersion());
+        assertEquals("/path/bucket", outbound.getUri());
+        assertTrue(outbound.headers().contains(HttpHeaders.Names.AUTHORIZATION));
+        assertNotNull(outbound.headers().get(HttpHeaders.Names.AUTHORIZATION));
+        assertEquals("Couchbase Client Mock", outbound.headers().get(HttpHeaders.Names.USER_AGENT));
     }
 
 }
