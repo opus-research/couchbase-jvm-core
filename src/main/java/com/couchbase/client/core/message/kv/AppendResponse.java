@@ -29,9 +29,8 @@ public class AppendResponse extends AbstractKeyValueResponse {
 
     private final long cas;
 
-    public AppendResponse(ResponseStatus status, short serverStatusCode, long cas, String bucket, ByteBuf content,
-                          CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, content, request);
+    public AppendResponse(ResponseStatus status, long cas, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         this.cas = cas;
     }
 
