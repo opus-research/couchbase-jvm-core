@@ -195,7 +195,7 @@ public class SearchHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements SearchRequest {
         protected KeepAliveRequest() {
-            super(null, null);
+            super(null, null, null);
         }
 
         @Override
