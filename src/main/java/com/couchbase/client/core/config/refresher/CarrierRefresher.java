@@ -31,12 +31,10 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
-import com.couchbase.client.core.utils.Buffers;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action1;
-import rx.functions.Func0;
 import rx.functions.Func1;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -212,40 +210,36 @@ public class CarrierRefresher extends AbstractRefresher {
      * @return a raw configuration or an error.
      */
     private Observable<String> refreshAgainstNode(final String bucketName, final InetAddress hostname) {
-        return Buffers.wrapColdWithAutoRelease(Observable.defer(new Func0<Observable<GetBucketConfigResponse>>() {
-            @Override
-            public Observable<GetBucketConfigResponse> call() {
-                return cluster().send(new GetBucketConfigRequest(bucketName, hostname));
-            }
-        }))
-        .doOnNext(new Action1<GetBucketConfigResponse>() {
-            @Override
-            public void call(GetBucketConfigResponse response) {
-                if (!response.status().isSuccess()) {
-                    if (response.content() != null && response.content().refCnt() > 0) {
+        return cluster()
+            .<GetBucketConfigResponse>send(new GetBucketConfigRequest(bucketName, hostname))
+            .doOnNext(new Action1<GetBucketConfigResponse>() {
+                @Override
+                public void call(GetBucketConfigResponse response) {
+                    if (!response.status().isSuccess()) {
+                        if (response.content() != null && response.content().refCnt() > 0) {
+                            response.content().release();
+                        }
+                        throw new ConfigurationException("Could not fetch config from node: " + response);
+                    }
+                }
+            })
+            .map(new Func1<GetBucketConfigResponse, String>() {
+                @Override
+                public String call(GetBucketConfigResponse response) {
+                    String raw = response.content().toString(CharsetUtil.UTF_8).trim();
+                    if (response.content().refCnt() > 0) {
                         response.content().release();
                     }
-                    throw new ConfigurationException("Could not fetch config from node: " + response);
+                    return raw.replace("$HOST", response.hostname().getHostName());
                 }
-            }
-        })
-        .map(new Func1<GetBucketConfigResponse, String>() {
-            @Override
-            public String call(GetBucketConfigResponse response) {
-                String raw = response.content().toString(CharsetUtil.UTF_8).trim();
-                if (response.content().refCnt() > 0) {
-                    response.content().release();
-                }
-                return raw.replace("$HOST", response.hostname().getHostName());
-            }
-        })
-        .doOnError(new Action1<Throwable>() {
-            @Override
-            public void call(Throwable ex) {
-                LOGGER.debug("Could not fetch config from bucket \"" + bucketName + "\" against \""
+            })
+            .doOnError(new Action1<Throwable>() {
+                @Override
+                public void call(Throwable ex) {
+                    LOGGER.debug("Could not fetch config from bucket \"" + bucketName + "\" against \""
                         + hostname + "\".", ex);
-            }
-        });
+                }
+            });
     }
 
 }
