@@ -110,7 +110,7 @@ public class AbstractLoaderTest {
         Observable<Tuple2<LoaderType, BucketConfig>> configObservable = loader.loadConfig(seedNodes, "default", "password");
 
         List<Tuple2<LoaderType, BucketConfig>> loadedConfigs = configObservable.toList().toBlocking().single();
-        assertEquals(1, loadedConfigs.size());
+        assertEquals(3, loadedConfigs.size());
     }
 
     @Test
@@ -161,7 +161,6 @@ public class AbstractLoaderTest {
         configObservable.subscribe(new Subscriber<Tuple2<LoaderType, BucketConfig>>() {
             @Override
             public void onCompleted() {
-                latch.countDown();
             }
 
             @Override
@@ -173,12 +172,11 @@ public class AbstractLoaderTest {
             @Override
             public void onNext(Tuple2<LoaderType, BucketConfig> bucketConfigs) {
                 success.incrementAndGet();
-
             }
         });
         assertTrue(latch.await(2, TimeUnit.SECONDS));
-        assertEquals(1, success.get());
-        assertEquals(0, failure.get());
+        assertEquals(2, success.get());
+        assertEquals(1, failure.get());
     }
 
     @Test

@@ -407,7 +407,7 @@ public class KeyValueHandler
         ResponseStatus status = convertStatus(msg.getStatus());
 
         CouchbaseResponse response;
-        ByteBuf content = msg.content().retain();
+        ByteBuf content = msg.content().copy();
         long cas = msg.getCAS();
         String bucket = request.bucket();
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
