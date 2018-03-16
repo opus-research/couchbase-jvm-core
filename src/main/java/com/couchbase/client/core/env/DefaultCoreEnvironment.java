@@ -24,6 +24,7 @@ package com.couchbase.client.core.env;
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -438,6 +439,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return dcpEnabled;
         }
 
+        /**
+         * Set if DCP should be enabled (default {@value #DCP_ENABLED}).
+         */
         public Builder dcpEnabled(final boolean dcpEnabled) {
             this.dcpEnabled = dcpEnabled;
             return this;
@@ -448,6 +452,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return sslEnabled;
         }
 
+        /**
+         * Set if SSL should be enabled (default value {@value #SSL_ENABLED}).
+         */
         public Builder sslEnabled(final boolean sslEnabled) {
             this.sslEnabled = sslEnabled;
             return this;
@@ -458,6 +465,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return sslKeystoreFile;
         }
 
+        /**
+         * Defines the location of the SSL Keystore file (default value null, none).
+         */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
             return this;
@@ -468,6 +478,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return sslKeystorePassword;
         }
 
+        /**
+         * Sets the SSL Keystore password to be used with the Keystore file (default value null, none).
+         * @see #sslKeystoreFile(String)
+         */
         public Builder sslKeystorePassword(final String sslKeystorePassword) {
             this.sslKeystorePassword = sslKeystorePassword;
             return this;
@@ -478,6 +492,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return queryEnabled;
         }
 
+        /**
+         * Toggles the N1QL Query feature (default value {@value #QUERY_ENABLED}).
+         */
         public Builder queryEnabled(final boolean queryEnabled) {
             this.queryEnabled = queryEnabled;
             return this;
@@ -488,6 +505,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return queryPort;
         }
 
+        /**
+         * Defines the port for N1QL Query (default value {@value #QUERY_PORT}).
+         */
         public Builder queryPort(final int queryPort) {
             this.queryPort = queryPort;
             return this;
@@ -498,6 +518,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapHttpEnabled;
         }
 
+        /**
+         * Toggles bootstrap via Http (default value {@value #BOOTSTRAP_HTTP_ENABLED}).
+         */
         public Builder bootstrapHttpEnabled(final boolean bootstrapHttpEnabled) {
             this.bootstrapHttpEnabled = bootstrapHttpEnabled;
             return this;
@@ -508,6 +531,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapCarrierEnabled;
         }
 
+        /**
+         * Toggles bootstrap via carrier, CCCP (default value {@value #BOOTSTRAP_CARRIER_ENABLED}).
+         */
         public Builder bootstrapCarrierEnabled(final boolean bootstrapCarrierEnabled) {
             this.bootstrapCarrierEnabled = bootstrapCarrierEnabled;
             return this;
@@ -518,6 +544,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapHttpDirectPort;
         }
 
+        /**
+         * If Http bootstrap is enabled and not SSL, sets the port to use
+         * (default value {@value #BOOTSTRAP_HTTP_DIRECT_PORT}).
+         */
         public Builder bootstrapHttpDirectPort(final int bootstrapHttpDirectPort) {
             this.bootstrapHttpDirectPort = bootstrapHttpDirectPort;
             return this;
@@ -528,6 +558,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapHttpSslPort;
         }
 
+        /**
+         * If Http bootstrap and SSL are enabled, sets the port to use
+         * (default value {@value #BOOTSTRAP_HTTP_SSL_PORT}).
+         */
         public Builder bootstrapHttpSslPort(final int bootstrapHttpSslPort) {
             this.bootstrapHttpSslPort = bootstrapHttpSslPort;
             return this;
@@ -538,6 +572,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapCarrierDirectPort;
         }
 
+        /**
+         * If CCCP bootstrap is enabled and not SSL, sets the port to use
+         * (default value {@value #BOOTSTRAP_CARRIER_DIRECT_PORT}).
+         */
         public Builder bootstrapCarrierDirectPort(final int bootstrapCarrierDirectPort) {
             this.bootstrapCarrierDirectPort = bootstrapCarrierDirectPort;
             return this;
@@ -548,6 +586,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return bootstrapCarrierSslPort;
         }
 
+        /**
+         * If CCCP bootstrap and SSL are enabled, sets the port to use
+         * (default value {@value #BOOTSTRAP_CARRIER_SSL_PORT}).
+         */
         public Builder bootstrapCarrierSslPort(final int bootstrapCarrierSslPort) {
             this.bootstrapCarrierSslPort = bootstrapCarrierSslPort;
             return this;
@@ -558,6 +600,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return ioPoolSize;
         }
 
+        /**
+         * Sets the pool size (number of threads to use) for I/O
+         * operations (default value is the number of CPUs).
+         */
         public Builder ioPoolSize(final int ioPoolSize) {
             this.ioPoolSize = ioPoolSize;
             return this;
@@ -568,6 +614,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return computationPoolSize;
         }
 
+        /**
+         * Sets the pool size (number of threads to use) for computation-intensive
+         * operations (default value is the number of CPUs).
+         */
         public Builder computationPoolSize(final int computationPoolSize) {
             this.computationPoolSize = computationPoolSize;
             return this;
@@ -578,6 +628,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return requestBufferSize;
         }
 
+        /**
+         * Sets the size of the RingBuffer structure that queues requests (default value {@value #REQUEST_BUFFER_SIZE}).
+         */
         public Builder requestBufferSize(final int requestBufferSize) {
             this.requestBufferSize = requestBufferSize;
             return this;
@@ -588,6 +641,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return responseBufferSize;
         }
 
+        /**
+         * Sets the size of the RingBuffer structure that queues responses
+         * (default value {@value #RESPONSE_BUFFER_SIZE}).
+         */
         public Builder responseBufferSize(final int responseBufferSize) {
             this.responseBufferSize = responseBufferSize;
             return this;
@@ -598,6 +655,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return kvServiceEndpoints;
         }
 
+        /**
+         * Sets the number of Key/Value endpoints to open (default value {@value #KEYVALUE_ENDPOINTS}).
+         */
         public Builder kvEndpoints(final int kvServiceEndpoints) {
             this.kvServiceEndpoints = kvServiceEndpoints;
             return this;
@@ -608,6 +668,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return viewServiceEndpoints;
         }
 
+        /**
+         * Sets the number of View endpoints to open (default value {@value #VIEW_ENDPOINTS}).
+         */
         public Builder viewEndpoints(final int viewServiceEndpoints) {
             this.viewServiceEndpoints = viewServiceEndpoints;
             return this;
@@ -618,6 +681,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return queryServiceEndpoints;
         }
 
+        /**
+         * Sets the number of Query (N1QL) endpoints to open (default value {@value #QUERY_ENDPOINTS}).
+         */
         public Builder queryEndpoints(final int queryServiceEndpoints) {
             this.queryServiceEndpoints = queryServiceEndpoints;
             return this;
@@ -628,6 +694,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return userAgent;
         }
 
+        /**
+         * Sets the USER-AGENT String to be sent in HTTP requests headers
+         * (default value is computed from the SDK {@link #packageNameAndVersion()}).
+         */
         public Builder userAgent(final String userAgent) {
             this.userAgent = userAgent;
             return this;
@@ -638,6 +708,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return packageNameAndVersion;
         }
 
+        /**
+         * Sets the String to be used as identifier for the library namespace and version.
+         * This is used in {@link #userAgent()} notably.
+         * (default value is computed at build time from VCS tags/commits).
+         */
         public Builder packageNameAndVersion(final String packageNameAndVersion) {
             this.packageNameAndVersion = packageNameAndVersion;
             return this;
@@ -648,6 +723,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return observeIntervalDelay;
         }
 
+        /**
+         * Sets the {@link Delay} for {@link Observe} poll operations (default value
+         * is a delay growing exponentially between 10us and 100ms).
+         */
         public Builder observeIntervalDelay(final Delay observeIntervalDelay) {
             this.observeIntervalDelay = observeIntervalDelay;
             return this;
@@ -658,6 +737,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return reconnectDelay;
         }
 
+        /**
+         * Sets the {@link Delay} for node reconnects (default value is a delay growing exponentially
+         * between 32ms and 4096ms).
+         */
         public Builder reconnectDelay(final Delay reconnectDelay) {
             this.reconnectDelay = reconnectDelay;
             return this;
@@ -668,11 +751,20 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return retryDelay;
         }
 
+        /**
+         * Sets the {@Delay} for retries of requests (default value is a delay growing exponentially
+         * between 100us and 100ms).
+         */
         public Builder retryDelay(final Delay retryDelay) {
             this.retryDelay = retryDelay;
             return this;
         }
 
+        /**
+         * This operation doesn't make sense on the Builder and will throw an {@link UnsupportedOperationException}.
+         * @return never.
+         * @throws UnsupportedOperationException when invoked.
+         */
         @Override
         public Observable<Boolean> shutdown() {
             throw new UnsupportedOperationException("Shutdown should not be called on the Builder.");
@@ -683,6 +775,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return ioPool;
         }
 
+        /**
+         * Sets the I/O Pool implementation for the underlying IO framework.
+         * This is an advanced configuration that should only be used if you know what you are doing.
+         */
         public Builder ioPool(final EventLoopGroup group) {
             this.ioPool = group;
             return this;
@@ -693,6 +789,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return scheduler;
         }
 
+        /**
+         * Sets the Scheduler implementation for the underlying computation framework.
+         * This is an advanced configuration that should only be used if you know what you are doing.
+         */
         public Builder scheduler(final Scheduler scheduler) {
             this.scheduler = scheduler;
             return this;
@@ -703,6 +803,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return retryStrategy;
         }
 
+        /**
+         * Sets the {@link RetryStrategy} to be used during request retries
+         * (default value is a {@link BestEffortRetryStrategy}).
+         */
         public Builder retryStrategy(final RetryStrategy retryStrategy) {
             this.retryStrategy = retryStrategy;
             return this;
@@ -713,6 +817,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return maxRequestLifetime;
         }
 
+        /**
+         * Sets the maximum time in milliseconds a request is allowed to live.
+         *
+         * If the best effort retry strategy is used, the request will still be cancelled after this
+         * period to make sure that requests are not sticking around forever. Make sure it is longer than any
+         * timeout you potentially have configured.
+         *
+         * Default is 75s.
+         */
         public Builder maxRequestLifetime(final long maxRequestLifetime) {
             this.maxRequestLifetime = maxRequestLifetime;
             return this;
