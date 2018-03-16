@@ -310,6 +310,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (traceEnabled) {
             LOGGER.trace("{}Finished decoding of {}", logIdent(ctx, endpoint), currentRequest);
         }
+        endpoint.notifyResponseDecoded();
         currentRequest = null;
         currentDecodingState = DecodingState.INITIAL;
     }
