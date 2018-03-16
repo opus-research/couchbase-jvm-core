@@ -35,9 +35,8 @@ public class InsertResponse extends AbstractKeyValueResponse {
 
     private long cas;
 
-    public InsertResponse(ResponseStatus status, short serverStatusCode, long cas, String bucket, ByteBuf content,
-                          CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, content, request);
+    public InsertResponse(ResponseStatus status, long cas, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         this.cas = cas;
     }
 
