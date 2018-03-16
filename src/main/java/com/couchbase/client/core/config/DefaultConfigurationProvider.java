@@ -281,9 +281,8 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             return Observable.just(true);
         }
 
-        Set<String> configs = new HashSet<String>(currentConfig.get().bucketConfigs().keySet());
         return Observable
-            .from(configs)
+            .from(currentConfig.get().bucketConfigs().keySet())
             .subscribeOn(environment.scheduler())
             .flatMap(new Func1<String, Observable<? extends ClusterConfig>>() {
                 @Override
