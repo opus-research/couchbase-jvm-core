@@ -54,7 +54,7 @@ public class RandomSelectionStrategyTest {
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         for (int i = 0; i < 1000; i++) {
-            Endpoint selected = strategy.select(mock(CouchbaseRequest.class), endpoints);
+            Endpoint selected = strategy.selectOne(mock(CouchbaseRequest.class), endpoints);
             assertNotNull(selected);
             assertFalse(selected.equals(endpoint2));
             assertTrue(selected.equals(endpoint1) || selected.equals(endpoint3));
@@ -65,7 +65,7 @@ public class RandomSelectionStrategyTest {
     public void shouldReturnIfEmptyArrayPassedIn() {
         SelectionStrategy strategy = new RandomSelectionStrategy();
 
-        Endpoint selected = strategy.select(mock(CouchbaseRequest.class),  new Endpoint[] {});
+        Endpoint selected = strategy.selectOne(mock(CouchbaseRequest.class), new Endpoint[]{});
         assertNull(selected);
     }
 }

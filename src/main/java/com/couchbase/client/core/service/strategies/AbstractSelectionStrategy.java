@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,42 +19,49 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+
 package com.couchbase.client.core.service.strategies;
 
 import com.couchbase.client.core.endpoint.Endpoint;
-import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.state.LifecycleState;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
- * Selects the {@link Endpoint} based on a random selection of connected {@link Endpoint}s.
- *
  * @author Michael Nitschinger
- * @since 1.0
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public class RandomSelectionStrategy extends AbstractSelectionStrategy {
-
+public abstract class AbstractSelectionStrategy implements SelectionStrategy {
     /**
-     * Random number generator, statically initialized and designed to be reused.
+     * Helper method to select the first connected endpoint if no particular pinning is needed.
+     *
+     * @param endpoints the list of endpoints.
+     * @return the first connected or null if none found.
      */
-    private static final Random RANDOM = new Random();
-
-    @Override
-    public Endpoint selectOne(final CouchbaseRequest request, final Endpoint[] endpoints) {
-        List<Endpoint> selected = selectAllConnected(endpoints);
-        if (selected.size() > 0) {
-            Collections.shuffle(selected, RANDOM);
-            return selected.get(0);
-        } else {
-            return null;
+    protected static Endpoint selectFirstConnected(final Endpoint[] endpoints) {
+        for (Endpoint endpoint : endpoints) {
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
+                return endpoint;
+            }
         }
+        return null;
     }
 
-    @Override
-    public Endpoint[] selectAll(CouchbaseRequest request, Endpoint[] endpoints) {
-        List<Endpoint> endpointList = selectAllConnected(endpoints);
-        return endpointList.toArray(new Endpoint[endpointList.size()]);
+    /**
+     * Helper method to select all connected endpoints.
+     *
+     * @param endpoints the list of endpoints.
+     * @return the all connected endpoints.
+     */
+    protected static List<Endpoint> selectAllConnected(Endpoint[] endpoints) {
+        List<Endpoint> selected = new ArrayList<Endpoint>();
+        for (Endpoint endpoint : endpoints) {
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
+                selected.add(endpoint);
+            }
+        }
+        return selected;
     }
 }

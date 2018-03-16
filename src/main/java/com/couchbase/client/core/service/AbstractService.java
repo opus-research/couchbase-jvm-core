@@ -148,7 +148,7 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
             return;
         }
 
-        Endpoint endpoint = strategy.select(request, endpoints);
+        Endpoint endpoint = strategy.selectOne(request, endpoints);
         if (endpoint == null) {
             responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
         } else {

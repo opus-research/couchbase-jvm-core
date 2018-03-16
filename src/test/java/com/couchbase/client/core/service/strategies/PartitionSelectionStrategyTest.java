@@ -28,7 +28,9 @@ import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.state.LifecycleState;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +55,7 @@ public class PartitionSelectionStrategyTest {
         Endpoint[] endpoints = new Endpoint[] {endpoint1, endpoint2, endpoint3};
 
         GetBucketConfigRequest request = mock(GetBucketConfigRequest.class);
-        Endpoint selected = strategy.select(request, endpoints);
+        Endpoint selected = strategy.selectOne(request, endpoints);
 
         assertNotNull(selected);
         assertTrue(selected.equals(endpoint2));
@@ -73,7 +75,7 @@ public class PartitionSelectionStrategyTest {
 
         GetRequest request = mock(GetRequest.class);
         when(request.partition()).thenReturn((short) -1);
-        Endpoint selected = strategy.select(request, endpoints);
+        Endpoint selected = strategy.selectOne(request, endpoints);
 
         assertNotNull(selected);
         assertTrue(selected.equals(endpoint3));
@@ -93,7 +95,7 @@ public class PartitionSelectionStrategyTest {
 
         GetRequest request = mock(GetRequest.class);
         when(request.partition()).thenReturn((short) 12);
-        Endpoint selected = strategy.select(request, endpoints);
+        Endpoint selected = strategy.selectOne(request, endpoints);
 
         for (int i = 0; i < 1000; i++) {
             assertNotNull(selected);
@@ -115,7 +117,7 @@ public class PartitionSelectionStrategyTest {
 
         GetRequest request = mock(GetRequest.class);
         when(request.partition()).thenReturn((short) 12);
-        Endpoint selected = strategy.select(request, endpoints);
+        Endpoint selected = strategy.selectOne(request, endpoints);
 
         for (int i = 0; i < 1000; i++) {
             assertNull(selected);
@@ -126,7 +128,7 @@ public class PartitionSelectionStrategyTest {
     public void shouldReturnIfEmptyArrayPassedIn() {
         SelectionStrategy strategy = new PartitionSelectionStrategy();
 
-        Endpoint selected = strategy.select(mock(CouchbaseRequest.class),  new Endpoint[] {});
+        Endpoint selected = strategy.selectOne(mock(CouchbaseRequest.class), new Endpoint[]{});
         assertNull(selected);
     }
 }
