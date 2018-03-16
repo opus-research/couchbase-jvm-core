@@ -24,7 +24,6 @@ package com.couchbase.client.core;
 public class CouchbaseException extends RuntimeException {
 
     public CouchbaseException() {
-	super();
     }
 
     public CouchbaseException(String message) {
