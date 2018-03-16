@@ -75,7 +75,7 @@ public class KeyValueLocatorTest {
         when(configMock.bucketConfig("bucket")).thenReturn(bucketMock);
         when(bucketMock.nodes()).thenReturn(Arrays.asList(nodeInfo1, nodeInfo2));
         when(bucketMock.numberOfPartitions()).thenReturn(1024);
-        when(bucketMock.nodeIndexForMaster(656, false)).thenReturn((short) 0);
+        when(bucketMock.nodeIndexForMaster(656)).thenReturn((short) 0);
         when(bucketMock.nodeAtIndex(0)).thenReturn(nodeInfo1);
 
         locator.locateAndDispatch(getRequestMock, nodes, configMock, null, null);
