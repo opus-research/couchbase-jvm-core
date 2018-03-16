@@ -30,7 +30,7 @@ public class RemoveSearchIndexRequest extends AbstractCouchbaseRequest implement
     private final String indexName;
 
     public RemoveSearchIndexRequest(String indexName, String username, String password) {
-        super(null, username, password);
+        super(username, password);
         this.indexName = indexName;
     }
 

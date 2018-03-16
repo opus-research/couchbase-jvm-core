@@ -66,21 +66,14 @@ public class SnapshotMarkerMessage extends AbstractDCPMessage {
      */
     private final boolean ack;
 
-    @Deprecated
     public SnapshotMarkerMessage(int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket) {
         this(totalBodyLength, partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
     }
 
-    @Deprecated
     public SnapshotMarkerMessage(int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket, String password) {
-        this(totalBodyLength, partition, startSequenceNumber, endSequenceNumber, flags, bucket, bucket, password);
-    }
-
-    public SnapshotMarkerMessage(int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
-                                 int flags, String bucket, String username, String password) {
-        super(totalBodyLength, partition, null, bucket, username, password);
+        super(totalBodyLength, partition, null, bucket, password);
         partition(partition);
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
