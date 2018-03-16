@@ -16,18 +16,19 @@
 package com.couchbase.client.core.message.internal;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.utils.NetworkAddress;
+
+import java.net.InetAddress;
 
 public class AddNodeRequest extends AbstractCouchbaseRequest implements InternalRequest {
 
-    private final NetworkAddress hostname;
+    private final InetAddress hostname;
 
-    public AddNodeRequest(final NetworkAddress hostname) {
+    public AddNodeRequest(final InetAddress hostname) {
         super(null, null);
         this.hostname = hostname;
     }
 
-    public NetworkAddress hostname() {
+    public InetAddress hostname() {
         return hostname;
     }
 }

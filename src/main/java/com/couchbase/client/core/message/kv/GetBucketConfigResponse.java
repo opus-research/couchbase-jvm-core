@@ -16,8 +16,9 @@
 package com.couchbase.client.core.message.kv;
 
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.utils.NetworkAddress;
 import io.netty.buffer.ByteBuf;
+
+import java.net.InetAddress;
 
 /**
  * Represents a response with a bucket configuration.
@@ -27,15 +28,15 @@ import io.netty.buffer.ByteBuf;
  */
 public class GetBucketConfigResponse extends AbstractKeyValueResponse {
 
-    private NetworkAddress hostname;
+    private InetAddress hostname;
 
     public GetBucketConfigResponse(final ResponseStatus status, final short serverStatusCode, final String bucket,
-                                   final ByteBuf content, final NetworkAddress hostname) {
+                                   final ByteBuf content, final InetAddress hostname) {
         super(status, serverStatusCode, bucket, content, null);
         this.hostname = hostname;
     }
 
-    public NetworkAddress hostname() {
+    public InetAddress hostname() {
         return hostname;
     }
 }

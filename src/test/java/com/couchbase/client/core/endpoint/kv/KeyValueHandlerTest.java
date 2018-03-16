@@ -42,7 +42,6 @@ import com.couchbase.client.core.message.kv.TouchRequest;
 import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.util.CollectingResponseEventSink;
-import com.couchbase.client.core.utils.NetworkAddress;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheResponse;
@@ -60,11 +59,13 @@ import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import rx.Subscriber;
 import rx.observers.TestSubscriber;
 import rx.schedulers.Schedulers;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
+import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -284,7 +285,7 @@ public class KeyValueHandlerTest {
 
     @Test
     public void shouldEncodeGetBucketConfigRequest() {
-        GetBucketConfigRequest request = new GetBucketConfigRequest("bucket", mock(NetworkAddress.class));
+        GetBucketConfigRequest request = new GetBucketConfigRequest("bucket", mock(InetAddress.class));
 
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
@@ -644,7 +645,7 @@ public class KeyValueHandlerTest {
 
         GetBucketConfigRequest requestMock = mock(GetBucketConfigRequest.class);
         when(requestMock.bucket()).thenReturn("bucket");
-        when(requestMock.hostname()).thenReturn(NetworkAddress.localhost());
+        when(requestMock.hostname()).thenReturn(InetAddress.getLocalHost());
         requestQueue.add(requestMock);
         channel.writeInbound(response);
 
@@ -652,7 +653,7 @@ public class KeyValueHandlerTest {
         GetBucketConfigResponse event = (GetBucketConfigResponse) eventSink.responseEvents().get(0).getMessage();
         assertEquals(BUCKET, event.bucket());
         assertEquals(ResponseStatus.SUCCESS, event.status());
-        assertEquals(NetworkAddress.localhost(), event.hostname());
+        assertEquals(InetAddress.getLocalHost(), event.hostname());
         assertEquals("content", event.content().toString(CHARSET));
 
         ReferenceCountUtil.release(content);
