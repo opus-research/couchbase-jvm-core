@@ -44,10 +44,10 @@ import rx.subjects.AsyncSubject;
 import rx.subjects.PublishSubject;
 import rx.subjects.Subject;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -70,7 +70,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldAddNodes() {
-        Set<Node> nodes = new HashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         assertEquals(0, nodes.size());
@@ -82,7 +82,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldIgnoreAlreadyAddedNode() throws Exception {
-        Set<Node> nodes = new HashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         assertEquals(0, nodes.size());
@@ -96,7 +96,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldRemoveNodes() {
-        Set<Node> nodes = new HashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         Node node1 = mock(Node.class);
@@ -130,7 +130,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldRemoveNodeEvenIfNotDisconnected() throws Exception {
-        Set<Node> nodes = new HashSet<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         Node node1 = mock(Node.class);
@@ -303,7 +303,7 @@ public class RequestHandlerTest {
         final Subject<ClusterConfig, ClusterConfig> configObservable = PublishSubject.<ClusterConfig>create();
 
         //this simulates the race condition in JVMCBC-231, otherwise calls all methods of HashSet
-        final Set<Node> nodes = Mockito.spy(new HashSet<Node>());
+        List<Node> nodes = Mockito.spy(new ArrayList<Node>());
         when(nodes.isEmpty()).thenReturn(false);
 
         final RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
@@ -362,7 +362,7 @@ public class RequestHandlerTest {
 
         class DummyLocator implements Locator {
             @Override
-            public Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config) {
+            public Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config) {
                 for (Node node : nodes) {
                     if (node.state() == LifecycleState.CONNECTED) {
                         return new Node[] { node };
