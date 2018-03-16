@@ -99,7 +99,7 @@ public class KeyValueHandler
     /**
      * Represents the "Not My VBucket" status response.
      */
-    public static final byte STATUS_NOT_MY_VBUCKET = 0x07;
+    private static final byte STATUS_NOT_MY_VBUCKET = 0x07;
 
     /**
      * Creates a new {@link KeyValueHandler} with the default queue for requests.
@@ -432,18 +432,13 @@ public class KeyValueHandler
         } else if (request instanceof RemoveRequest) {
             response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
-            long value = status.isSuccess() ? msg.content().readLong() : 0;
-            if (msg.content() != null) {
-                msg.content().release();
-            }
-            response = new CounterResponse(status, bucket, value, cas, request);
+            response = new CounterResponse(status, bucket, msg.content().readLong(), cas, request);
         } else if (request instanceof UnlockRequest) {
             response = new UnlockResponse(status, bucket, content, request);
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, bucket, content, request);
         } else if (request instanceof ObserveRequest) {
-            byte observed = status.isSuccess()
-                ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
+            byte observed = content.getByte(content.getShort(2) + 4);
             response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket,
                 content, request);
         } else if (request instanceof AppendRequest) {
