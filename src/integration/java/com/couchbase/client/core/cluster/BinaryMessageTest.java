@@ -142,13 +142,7 @@ public class BinaryMessageTest {
         assertEquals(ResponseStatus.EXISTS, response.status());
 
         // TODO: add CAS() response to all binary responses (get, upsert, insert, replace)
-    }
-
-    @Test
-    public void shouldRemoveDocument() {
-        // TODO: test with enoent key
-        // TODO: test with existent key
-            // make sure its gone.
+        // TODO: implement remove
     }
 
 }
