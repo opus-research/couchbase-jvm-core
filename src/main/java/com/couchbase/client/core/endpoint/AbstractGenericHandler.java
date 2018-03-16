@@ -261,8 +261,11 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 @Override
                 public void call() {
                     try {
+                        DecodingState decodingState = currentDecodingState;
                         observable.onNext(response);
-                        observable.onCompleted();
+                        if (decodingState == DecodingState.FINISHED) {
+                            observable.onCompleted();
+                        }
                     } catch(Exception ex) {
                         LOGGER.warn("Caught exception while onNext on observable", ex);
                         observable.onError(ex);
@@ -459,6 +462,13 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected void currentRequest(REQUEST request) {
         currentRequest = request;
+    }
+
+    /**
+     * @return stringified version of the remote node's hostname
+     */
+    protected String remoteHostname() {
+        return remoteHostname;
     }
 
     /**
