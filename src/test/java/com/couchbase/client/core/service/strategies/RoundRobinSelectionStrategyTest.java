@@ -39,10 +39,15 @@ public class RoundRobinSelectionStrategyTest {
         Endpoint d = Mockito.mock(Endpoint.class);
         Endpoint e = Mockito.mock(Endpoint.class);
         when(a.isState(any(LifecycleState.class))).thenReturn(true);
+        when(a.isFree()).thenReturn(true);
         when(b.isState(any(LifecycleState.class))).thenReturn(true);
+        when(b.isFree()).thenReturn(true);
         when(c.isState(any(LifecycleState.class))).thenReturn(true);
+        when(c.isFree()).thenReturn(true);
         when(d.isState(any(LifecycleState.class))).thenReturn(true);
+        when(d.isFree()).thenReturn(true);
         when(e.isState(any(LifecycleState.class))).thenReturn(true);
+        when(e.isFree()).thenReturn(true);
         Endpoint[] endpoints = new Endpoint[] { a, b, c, d, e };
         CouchbaseRequest request = Mockito.mock(CouchbaseRequest.class);
 
