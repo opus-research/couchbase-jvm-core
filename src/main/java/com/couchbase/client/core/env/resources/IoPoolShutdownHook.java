@@ -27,8 +27,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.Subscriber;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * {@link ShutdownHook} hook for an {@link EventLoopGroup}.
  *
@@ -49,8 +47,7 @@ public class IoPoolShutdownHook implements ShutdownHook {
         return Observable.create(new Observable.OnSubscribe<Boolean>() {
             @Override
             public void call(final Subscriber<? super Boolean> subscriber) {
-                ioPool.shutdownGracefully(0, 10, TimeUnit.MILLISECONDS)
-                    .addListener(new GenericFutureListener() {
+                ioPool.shutdownGracefully().addListener(new GenericFutureListener() {
                     @Override
                     public void operationComplete(final Future future) throws Exception {
                         if (!subscriber.isUnsubscribed()) {
@@ -69,7 +66,7 @@ public class IoPoolShutdownHook implements ShutdownHook {
                     }
                 });
             }
-        });
+        }).onErrorResumeNext(Observable.just(true));
     }
 
     @Override
