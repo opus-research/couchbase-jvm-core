@@ -35,8 +35,6 @@ public class FixedDelayTest {
         assertEquals(3, fixedDelay.calculate(1));
         assertEquals(3, fixedDelay.calculate(2));
         assertEquals(3, fixedDelay.calculate(3));
-
-        assertEquals("FixedDelay{3 SECONDS}", fixedDelay.toString());
     }
 
 }
