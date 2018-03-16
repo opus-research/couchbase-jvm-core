@@ -36,43 +36,6 @@ public class MutationCommand {
     private final String path;
     private final ByteBuf fragment;
     private final boolean createIntermediaryPath;
-    private final boolean attributeAccess;
-    private final boolean expandMacros;
-
-    /**
-     * Create a multi-mutation command.
-     *
-     * @param mutation the mutation type.
-     * @param path the path to mutate inside the document.
-     * @param fragment the target value for the mutation. This will be released when the request is sent.
-     * @param createIntermediaryPath true if missing parts of the path should be created if possible, false otherwise.
-     * @param attributeAccess true if accessing extended attributes, false otherwise.
-     * @param expandMacros true if macros are used in value for extended attributes, false otherwise.
-     */
-    public MutationCommand(Mutation mutation, String path, ByteBuf fragment, boolean createIntermediaryPath, boolean attributeAccess, boolean expandMacros) {
-        this.mutation = mutation;
-        this.path = path;
-        this.fragment = (fragment == null) ? Unpooled.EMPTY_BUFFER : fragment;
-        this.createIntermediaryPath = createIntermediaryPath;
-        if(!attributeAccess && expandMacros) {
-           throw new IllegalArgumentException("Macros can be used only with extended attributes");
-        }
-        this.attributeAccess = attributeAccess;
-        this.expandMacros = expandMacros;
-    }
-
-    /**
-     * Create a multi-mutation command.
-     *
-     * @param mutation the mutation type.
-     * @param path the path to mutate inside the document.
-     * @param fragment the target value for the mutation. This will be released when the request is sent.
-     * @param createIntermediaryPath true if missing parts of the path should be created if possible, false otherwise.
-     * @param attributeAccess true if accessing extended attributes, false otherwise.
-     */
-    public MutationCommand(Mutation mutation, String path, ByteBuf fragment, boolean createIntermediaryPath, boolean attributeAccess) {
-        this(mutation, path, fragment, createIntermediaryPath, attributeAccess, false);
-    }
 
     /**
      * Create a multi-mutation command.
@@ -83,7 +46,10 @@ public class MutationCommand {
      * @param createIntermediaryPath true if missing parts of the path should be created if possible, false otherwise.
      */
     public MutationCommand(Mutation mutation, String path, ByteBuf fragment, boolean createIntermediaryPath) {
-        this(mutation, path, fragment, createIntermediaryPath, false, false);
+        this.mutation = mutation;
+        this.path = path;
+        this.fragment = (fragment == null) ? Unpooled.EMPTY_BUFFER : fragment;
+        this.createIntermediaryPath = createIntermediaryPath;
     }
 
     /**
@@ -95,19 +61,6 @@ public class MutationCommand {
      */
     public MutationCommand(Mutation mutation, String path, ByteBuf fragment) {
         this(mutation, path, fragment, false);
-    }
-
-    /**
-     * Create a multi-mutation without a fragment (should be restricted to DELETE, not to be confused with
-     * an empty string fragment where ByteBuf contains "<code>""</code>", or the null fragment where
-     * ByteBuf contains "<code>NULL</code>").
-     *
-     * @param mutation the mutation type.
-     * @param path the path to mutate inside the document.
-     * @param attributeAccess true if accessing extended attributes, false otherwise.
-     */
-    public MutationCommand(Mutation mutation, String path, boolean attributeAccess) {
-        this(mutation, path, Unpooled.EMPTY_BUFFER, false, attributeAccess);
     }
 
     /**
@@ -140,14 +93,4 @@ public class MutationCommand {
     public boolean createIntermediaryPath() {
         return createIntermediaryPath;
     }
-
-
-    public boolean attributeAccess() { return this.attributeAccess; }
-
-    /**
-     * Expand macros on the values set on extended attribute section
-     *
-     * @return true if expanding macros
-     */
-    public boolean expandMacros(){ return this.expandMacros; }
 }
