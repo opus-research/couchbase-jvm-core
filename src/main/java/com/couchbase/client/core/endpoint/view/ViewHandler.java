@@ -24,7 +24,6 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.view.GetDesignDocumentRequest;
 import com.couchbase.client.core.message.view.GetDesignDocumentResponse;
@@ -555,7 +554,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest, KeepAlive {
+    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest {
         protected KeepAliveRequest() {
             super(null, null);
         }
