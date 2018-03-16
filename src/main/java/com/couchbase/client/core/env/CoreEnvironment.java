@@ -21,6 +21,7 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
+import com.couchbase.client.core.node.MemcachedNodeHashingStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
@@ -413,4 +414,6 @@ public interface CoreEnvironment {
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     WaitStrategyFactory requestBufferWaitStrategy();
+
+    MemcachedNodeHashingStrategy memcachedKeyHashingStrategy();
 }
