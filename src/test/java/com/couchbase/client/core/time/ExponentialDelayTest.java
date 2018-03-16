@@ -38,9 +38,6 @@ public class ExponentialDelayTest {
         assertEquals(8, exponentialDelay.calculate(4));
         assertEquals(16, exponentialDelay.calculate(5));
         assertEquals(32, exponentialDelay.calculate(6));
-
-        assertEquals("ExponentialDelay{growBy 1.0 SECONDS; lower=0, upper=2147483647}", exponentialDelay.toString());
-
     }
 
     @Test
@@ -53,8 +50,6 @@ public class ExponentialDelayTest {
         assertEquals(10, exponentialDelay.calculate(4));
         assertEquals(16, exponentialDelay.calculate(5));
         assertEquals(32, exponentialDelay.calculate(6));
-
-        assertEquals("ExponentialDelay{growBy 1.0 SECONDS; lower=10, upper=2147483647}", exponentialDelay.toString());
     }
 
     @Test
@@ -67,8 +62,6 @@ public class ExponentialDelayTest {
         assertEquals(8, exponentialDelay.calculate(4));
         assertEquals(9, exponentialDelay.calculate(5));
         assertEquals(9, exponentialDelay.calculate(6));
-
-        assertEquals("ExponentialDelay{growBy 1.0 SECONDS; lower=0, upper=9}", exponentialDelay.toString());
     }
 
     @Test
@@ -81,8 +74,6 @@ public class ExponentialDelayTest {
         assertEquals(16, exponentialDelay.calculate(4));
         assertEquals(32, exponentialDelay.calculate(5));
         assertEquals(64, exponentialDelay.calculate(6));
-
-        assertEquals("ExponentialDelay{growBy 2.0 SECONDS; lower=0, upper=2147483647}", exponentialDelay.toString());
     }
 
 }
