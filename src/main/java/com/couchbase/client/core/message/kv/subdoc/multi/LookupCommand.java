@@ -32,6 +32,20 @@ public class LookupCommand {
 
     private final Lookup lookup;
     private final String path;
+    private final boolean attributeAccess;
+
+    /**
+     * Create a multi-lookup command.
+     *
+     * @param lookup the lookup type.
+     * @param path the path to look-up inside the document.
+     * @param attributeAccess access extended attributes
+     */
+    public LookupCommand(Lookup lookup, String path, boolean attributeAccess) {
+        this.lookup = lookup;
+        this.path = path;
+        this.attributeAccess = attributeAccess;
+    }
 
     /**
      * Create a multi-lookup command.
@@ -40,9 +54,9 @@ public class LookupCommand {
      * @param path the path to look-up inside the document.
      */
     public LookupCommand(Lookup lookup, String path) {
-        this.lookup = lookup;
-        this.path = path;
+        this(lookup, path, false);
     }
+
 
     public Lookup lookup() {
         return lookup;
@@ -55,4 +69,13 @@ public class LookupCommand {
     public byte opCode() {
         return lookup.opCode();
     }
+
+
+    /**
+     * Access to extended attribute section of the couchbase document
+     *
+     * @return true if accessing extended attribute section
+     */
+    public boolean attributeAccess() { return this.attributeAccess; }
+
 }
