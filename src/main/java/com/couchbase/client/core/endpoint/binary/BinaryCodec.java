@@ -24,7 +24,6 @@ package com.couchbase.client.core.endpoint.binary;
 import com.couchbase.client.core.env.Environment;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.binary.AbstractCoreDocumentBinaryRequest;
 import com.couchbase.client.core.message.binary.BinaryRequest;
 import com.couchbase.client.core.message.binary.GetBucketConfigRequest;
 import com.couchbase.client.core.message.binary.GetBucketConfigResponse;
@@ -38,7 +37,6 @@ import com.couchbase.client.core.message.binary.ReplaceRequest;
 import com.couchbase.client.core.message.binary.ReplaceResponse;
 import com.couchbase.client.core.message.binary.UpsertRequest;
 import com.couchbase.client.core.message.binary.UpsertResponse;
-import com.couchbase.client.core.message.document.CoreDocument;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
@@ -61,7 +59,6 @@ import java.util.Queue;
  * Codec that handles encoding of binary memcache requests and decoding of binary memcache responses.
  *
  * @author Michael Nitschinger
- * @author David Sondermann
  * @since 1.0
  */
 public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheResponse, BinaryRequest> {
@@ -103,50 +100,54 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
     }
 
     @Override
-    protected void encode(final ChannelHandlerContext ctx, final BinaryRequest msg, final List<Object> out) throws Exception {
+    protected void encode(final ChannelHandlerContext ctx, final BinaryRequest msg, final List<Object> out)
+        throws Exception {
         if (bucket == null) {
             bucket = msg.bucket();
         }
 
+        BinaryMemcacheRequest request;
         if (msg instanceof GetBucketConfigRequest) {
-            out.add(handleGetBucketConfigRequest());
+            request = handleGetBucketConfigRequest();
         } else if (msg instanceof GetRequest) {
-            out.add(handleGetRequest((GetRequest) msg));
+            request = handleGetRequest((GetRequest) msg);
         } else if (msg instanceof UpsertRequest) {
-            out.add(handleUpsertRequest((UpsertRequest) msg, ctx));
+            request = handleUpsertRequest((UpsertRequest) msg, ctx);
         } else if (msg instanceof InsertRequest) {
-            out.add(handleInsertRequest((InsertRequest) msg, ctx));
+            request = handleInsertRequest((InsertRequest) msg, ctx);
         } else if (msg instanceof ReplaceRequest) {
-            out.add(handleReplaceRequest((ReplaceRequest) msg, ctx));
+            request = handleReplaceRequest((ReplaceRequest) msg, ctx);
         } else if (msg instanceof RemoveRequest) {
-            out.add(handleRemoveRequest((RemoveRequest) msg));
+            request = handleRemoveRequest((RemoveRequest) msg);
         } else {
-            throw new IllegalArgumentException("Unknown message to encode: " + msg);
+            throw new IllegalArgumentException("Unknown Messgae to encode: " + msg);
         }
 
+        out.add(request);
         queue.offer(msg);
     }
 
     @Override
-    protected void decode(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg, final List<Object> in) throws Exception {
-        final BinaryRequest current = queue.poll();
-        final ResponseStatus status = convertStatus(msg.getStatus());
-        final long cas = msg.getCAS();
+    protected void decode(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg,
+        final List<Object> in) throws Exception {
+        BinaryRequest current = queue.poll();
 
+        ResponseStatus status = convertStatus(msg.getStatus());
         CouchbaseRequest currentRequest = null;
         if (status == ResponseStatus.RETRY) {
             currentRequest = current;
         }
 
-        if (current instanceof GetBucketConfigRequest) {
-            final InetSocketAddress address = (InetSocketAddress) ctx.channel().remoteAddress();
+        long cas = msg.getCAS();
+        if(current instanceof GetBucketConfigRequest) {
+            InetSocketAddress addr = (InetSocketAddress) ctx.channel().remoteAddress();
             in.add(
-                    new GetBucketConfigResponse(
-                            convertStatus(msg.getStatus()),
-                            bucket,
-                            msg.content().copy(),
-                            InetAddress.getByName(address.getHostName())
-                    )
+                new GetBucketConfigResponse(
+                    convertStatus(msg.getStatus()),
+                    bucket,
+                    msg.content().copy(),
+                    InetAddress.getByName(addr.getHostName())
+                )
             );
         } else if (current instanceof GetRequest) {
             ByteBuf content = msg.content().copy();
@@ -157,20 +158,15 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
                 content = compressed;
             }
             int flags = 0;
-            int expiration = 0;
-            if (msg.getExtrasLength() > 0) {
-                // TODO get rid of superfluous allocation (at the moment msg.getExtras() is released before)
+            if (msg.getExtrasLength() > 0)
+            {
                 final ByteBuf extrasReleased = msg.getExtras();
                 final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
                 extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
                 flags = extras.getInt(0);
-                if (msg.getExtrasLength() > 4) {
-                    expiration = extras.getInt(1);
-                }
                 extras.release();
             }
-            final CoreDocument document = new CoreDocument(content, flags, expiration, cas, false);
-            in.add(new GetResponse(status, document, bucket, currentRequest));
+            in.add(new GetResponse(status, cas, flags, bucket, content, currentRequest));
         } else if (current instanceof InsertRequest) {
             in.add(new InsertResponse(status, cas, bucket, msg.content().copy(), currentRequest));
         } else if (current instanceof UpsertRequest) {
@@ -185,7 +181,7 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
     }
 
     @Override
-    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof SupportedDatatypes) {
             datatypes = (SupportedDatatypes) evt;
             return;
@@ -194,12 +190,12 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
     }
 
     /**
-     * Convert the binary protocol status in a type safe enum that can be acted upon later.
+     * Convert the binary protocol status in a typesafe enum that can be acted upon later.
      *
      * @param status the status to convert.
      * @return the converted response status.
      */
-    private ResponseStatus convertStatus(final short status) {
+    private ResponseStatus convertStatus(short status) {
         switch (status) {
             case BinaryMemcacheResponseStatus.SUCCESS:
                 return ResponseStatus.SUCCESS;
@@ -221,14 +217,12 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
      * @return the built protocol request.
      */
     private BinaryMemcacheRequest handleGetRequest(final GetRequest request) {
-        final short keyLength = (short) request.key().length();
-
-        final BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest(request.key());
+        int length = request.key().length();
+        BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest(request.key());
         msg.setOpcode(BinaryMemcacheOpcodes.GET);
-        msg.setKeyLength(keyLength);
-        msg.setTotalBodyLength(keyLength);
+        msg.setKeyLength((short) length);
+        msg.setTotalBodyLength((short) length);
         msg.setReserved(request.partition());
-
         return msg;
     }
 
@@ -236,43 +230,134 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
      * Creates the actual protocol level request for an incoming upsert request.
      *
      * @param request the incoming upsert request.
-     * @param ctx     the channel handler context for buffer allocations.
+     * @param ctx the channel handler context for buffer allocations.
      * @return the built protocol request.
      */
     private BinaryMemcacheRequest handleUpsertRequest(final UpsertRequest request, final ChannelHandlerContext ctx) {
-        return createFullBinaryMemcacheRequest(BinaryMemcacheOpcodes.SET, request, ctx);
+        ByteBuf extras = ctx.alloc().buffer(8);
+        extras.writeInt(request.flags());
+        extras.writeInt(request.expiration());
+
+        ByteBuf content = request.content();
+        boolean compress = datatypes.compression() && env.compressionEnabled()
+            && content.readableBytes() >= env.compressionLowerLimit();
+        if (compress) {
+            ByteBuf compressed = ctx.alloc().buffer();
+            snappy.encode(content, compressed, content.readableBytes());
+            content.release();
+            content = compressed;
+        }
+
+        FullBinaryMemcacheRequest msg = new DefaultFullBinaryMemcacheRequest(request.key(), extras, content);
+
+        msg.setOpcode(BinaryMemcacheOpcodes.SET);
+        msg.setKeyLength((short) request.key().length());
+        msg.setTotalBodyLength((short) request.key().length() + content.readableBytes() + extras.readableBytes());
+        msg.setReserved(request.partition());
+        msg.setExtrasLength((byte) extras.readableBytes());
+        if (datatypes.json() && request.isJson()) {
+            if (compress) {
+                msg.setDataType((byte) 0x03);
+            } else {
+                msg.setDataType((byte) 0x01);
+            }
+        } else if (compress) {
+            msg.setDataType((byte) 0x02);
+        }
+        return msg;
     }
 
     /**
      * Creates the actual protocol level request for an incoming replacer request.
      *
      * @param request the incoming replace request.
-     * @param ctx     the channel handler context for buffer allocations.
+     * @param ctx the channel handler context for buffer allocations.
      * @return the built protocol request.
      */
     private BinaryMemcacheRequest handleReplaceRequest(final ReplaceRequest request, final ChannelHandlerContext ctx) {
-        return createFullBinaryMemcacheRequest(BinaryMemcacheOpcodes.REPLACE, request, ctx);
+        ByteBuf extras = ctx.alloc().buffer(8);
+        extras.writeInt(request.flags());
+        extras.writeInt(request.expiration());
+
+        ByteBuf content = request.content();
+        boolean compress = datatypes.compression() && env.compressionEnabled()
+            && content.readableBytes() >= env.compressionLowerLimit();
+        if (compress) {
+            ByteBuf compressed = ctx.alloc().buffer();
+            snappy.encode(content, compressed, content.readableBytes());
+            content.release();
+            content = compressed;
+        }
+
+        FullBinaryMemcacheRequest msg = new DefaultFullBinaryMemcacheRequest(request.key(), extras, content);
+
+        msg.setOpcode(BinaryMemcacheOpcodes.REPLACE);
+        msg.setCAS(request.cas());
+        msg.setKeyLength((short) request.key().length());
+        msg.setTotalBodyLength((short) request.key().length() + content.readableBytes() + extras.readableBytes());
+        msg.setReserved(request.partition());
+        msg.setExtrasLength((byte) extras.readableBytes());
+        if (datatypes.json() && request.isJson()) {
+            if (compress) {
+                msg.setDataType((byte) 0x03);
+            } else {
+                msg.setDataType((byte) 0x01);
+            }
+        } else if (compress) {
+            msg.setDataType((byte) 0x02);
+        }
+        return msg;
     }
 
     /**
      * Creates the actual protocol level request for an incoming insert request.
      *
      * @param request the incoming insert request.
-     * @param ctx     the channel handler context for buffer allocations.
+     * @param ctx the channel handler context for buffer allocations.
      * @return the built protocol request.
      */
     private BinaryMemcacheRequest handleInsertRequest(final InsertRequest request, final ChannelHandlerContext ctx) {
-        return createFullBinaryMemcacheRequest(BinaryMemcacheOpcodes.ADD, request, ctx);
+        ByteBuf extras = ctx.alloc().buffer(8);
+        extras.writeInt(request.flags());
+        extras.writeInt(request.expiration());
+
+        ByteBuf content = request.content();
+        boolean compress = datatypes.compression() && env.compressionEnabled()
+            && content.readableBytes() >= env.compressionLowerLimit();
+        if (compress) {
+            ByteBuf compressed = ctx.alloc().buffer();
+            snappy.encode(content, compressed, content.readableBytes());
+            content.release();
+            content = compressed;
+        }
+
+        FullBinaryMemcacheRequest msg = new DefaultFullBinaryMemcacheRequest(request.key(), extras, content);
+
+        msg.setOpcode(BinaryMemcacheOpcodes.ADD);
+        msg.setKeyLength((short) request.key().length());
+        msg.setTotalBodyLength((short) request.key().length() + content.readableBytes() + extras.readableBytes());
+        msg.setReserved(request.partition());
+        msg.setExtrasLength((byte) extras.readableBytes());
+        if (datatypes.json() && request.isJson()) {
+            if (compress) {
+                msg.setDataType((byte) 0x03);
+            } else {
+                msg.setDataType((byte) 0x01);
+            }
+        } else if (compress) {
+            msg.setDataType((byte) 0x02);
+        }
+        return msg;
     }
 
     private BinaryMemcacheRequest handleRemoveRequest(final RemoveRequest request) {
-        final BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest(request.key());
+        BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest(request.key());
+
         msg.setOpcode(BinaryMemcacheOpcodes.DELETE);
         msg.setCAS(request.cas());
         msg.setKeyLength((short) request.key().length());
         msg.setTotalBodyLength((short) request.key().length());
         msg.setReserved(request.partition());
-
         return msg;
     }
 
@@ -282,47 +367,9 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
      * @return the built protocol request.
      */
     private BinaryMemcacheRequest handleGetBucketConfigRequest() {
-        final BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest();
+        BinaryMemcacheRequest msg = new DefaultBinaryMemcacheRequest();
         msg.setOpcode((byte) 0xb5);
-
         return msg;
     }
 
-    private FullBinaryMemcacheRequest createFullBinaryMemcacheRequest(final byte opCode, final AbstractCoreDocumentBinaryRequest request, final ChannelHandlerContext ctx) {
-        final short keyLength = (short) request.key().length();
-        final CoreDocument document = request.document();
-
-        final ByteBuf extras = ctx.alloc().buffer(8);
-        extras.writeInt(document.flags());
-        extras.writeInt(document.expiration());
-
-        ByteBuf content = document.content();
-        boolean compress = datatypes.compression() && env.compressionEnabled()
-                && content.readableBytes() >= env.compressionLowerLimit();
-        if (compress) {
-            final ByteBuf compressed = ctx.alloc().buffer();
-            snappy.encode(content, compressed, content.readableBytes());
-            content.release();
-            content = compressed;
-        }
-
-        final FullBinaryMemcacheRequest msg = new DefaultFullBinaryMemcacheRequest(request.key(), extras, content);
-        msg.setOpcode(opCode);
-        msg.setCAS(document.cas());
-        msg.setKeyLength(keyLength);
-        msg.setTotalBodyLength(keyLength + content.readableBytes() + extras.readableBytes());
-        msg.setReserved(request.partition());
-        msg.setExtrasLength((byte) extras.readableBytes());
-        if (datatypes.json() && document.isJson()) {
-            if (compress) {
-                msg.setDataType((byte) 0x03);
-            } else {
-                msg.setDataType((byte) 0x01);
-            }
-        } else if (compress) {
-            msg.setDataType((byte) 0x02);
-        }
-
-        return msg;
-    }
 }
