@@ -20,7 +20,6 @@ import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.endpoint.query.QueryEndpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.service.strategies.RandomSelectionStrategy;
-import com.couchbase.client.core.service.strategies.RoundRobinSelectionStrategy;
 import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
@@ -35,7 +34,7 @@ public class QueryService extends AbstractPoolingService {
     /**
      * The endpoint selection strategy.
      */
-    private static final SelectionStrategy STRATEGY = new RoundRobinSelectionStrategy();
+    private static final SelectionStrategy STRATEGY = new RandomSelectionStrategy();
 
     /**
      * The endpoint factory.

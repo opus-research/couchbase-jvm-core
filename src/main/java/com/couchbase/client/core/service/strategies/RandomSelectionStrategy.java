@@ -51,8 +51,7 @@ public class RandomSelectionStrategy implements SelectionStrategy {
         }
 
         for (int i = 0; i < MAX_TRIES; i++) {
-            int selected = RANDOM.get().nextInt(endpoints.length);
-            Endpoint endpoint = endpoints[selected];
+            Endpoint endpoint = endpoints[RANDOM.get().nextInt(endpoints.length)];
             if (endpoint.isState(LifecycleState.CONNECTED)) {
                 return endpoint;
             }
