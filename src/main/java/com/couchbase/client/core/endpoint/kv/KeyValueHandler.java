@@ -25,8 +25,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.ServerFeatures;
-import com.couchbase.client.core.endpoint.ServerFeaturesEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -112,8 +110,6 @@ public class KeyValueHandler
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
     public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
-
-    boolean seqOnMutation = false;
 
 
     /**
@@ -621,11 +617,6 @@ public class KeyValueHandler
             LOGGER.debug(logIdent(ctx, endpoint()) + "Identified Idle State, signalling config reload.");
             endpoint().signalConfigReload();
         }
-
-        if (evt instanceof ServerFeaturesEvent) {
-            seqOnMutation = ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
-        }
-
         super.userEventTriggered(ctx, evt);
     }
 

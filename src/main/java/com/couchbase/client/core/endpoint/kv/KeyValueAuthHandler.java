@@ -275,7 +275,6 @@ public class KeyValueAuthHandler
             case SASL_AUTH_SUCCESS:
                 originalPromise.setSuccess();
                 ctx.pipeline().remove(this);
-                ctx.fireChannelActive();
                 break;
             case SASL_AUTH_FAILURE:
                 originalPromise.setFailure(new AuthenticationException("Authentication Failure"));
