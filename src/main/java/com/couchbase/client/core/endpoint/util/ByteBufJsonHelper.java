@@ -94,7 +94,7 @@ public class ByteBufJsonHelper {
      * @return the section closing position or -1 if not found.
      */
     public static int findSectionClosingPosition(ByteBuf buf, char openingChar, char closingChar) {
-        return buf.forEachByte(new ClosingPositionBufProcessor(openingChar, closingChar, true));
+        return buf.forEachByte(new ClosingPositionBufProcessor(openingChar, closingChar));
     }
 
     /**
@@ -117,6 +117,6 @@ public class ByteBufJsonHelper {
         }
 
         return buf.forEachByte(from, length,
-                new ClosingPositionBufProcessor(openingChar, closingChar, true));
+                new ClosingPositionBufProcessor(openingChar, closingChar));
     }
 }
