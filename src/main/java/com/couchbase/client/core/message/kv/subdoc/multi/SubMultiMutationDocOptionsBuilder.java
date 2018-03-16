@@ -29,7 +29,6 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 @InterfaceAudience.Public
 public class SubMultiMutationDocOptionsBuilder {
     private boolean createDocument;
-    private boolean insertDocument;
 
     public static SubMultiMutationDocOptionsBuilder builder() {
         return new SubMultiMutationDocOptionsBuilder();
@@ -44,21 +43,11 @@ public class SubMultiMutationDocOptionsBuilder {
         return this.createDocument;
     }
 
-    public SubMultiMutationDocOptionsBuilder insertDocument(boolean insertDocument) {
-        this.insertDocument = insertDocument;
-        return this;
-    }
-
-    public boolean insertDocument() {
-        return this.insertDocument;
-    }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
         sb.append(" \"createDocument\":" + createDocument);
-        sb.append(", \"insertDocument\": " + insertDocument);
         sb.append("}");
         return sb.toString();
     }
