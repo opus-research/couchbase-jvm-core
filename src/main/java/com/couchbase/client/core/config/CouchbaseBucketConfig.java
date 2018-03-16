@@ -36,7 +36,7 @@ public interface CouchbaseBucketConfig extends BucketConfig {
      *
      * @return list of hostnames.
      */
-    List<NodeInfo> partitionHosts();
+    List<String> partitionHosts();
 
     /**
      * All partitions, sorted by their partition index.

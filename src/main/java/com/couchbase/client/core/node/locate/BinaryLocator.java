@@ -121,10 +121,9 @@ public class BinaryLocator implements Locator {
         if (nodeId == -1) {
             return new Node[] { };
         }
-
-        NodeInfo nodeInfo = config.partitionHosts().get(nodeId);
+        String hostname = config.partitionHosts().get(nodeId);
         for (Node node : nodes) {
-            if (node.hostname().equals(nodeInfo.hostname())) {
+            if (node.hostname().getHostName().equals(hostname)) {
                 return new Node[] { node };
             }
         }
