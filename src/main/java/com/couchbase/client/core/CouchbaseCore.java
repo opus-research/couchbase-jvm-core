@@ -208,8 +208,7 @@ public class CouchbaseCore implements ClusterFacade {
                 request.observable().onError(BACKPRESSURE_EXCEPTION);
             }
         }
-
-        return (Observable<R>) request.observable().observeOn(environment.scheduler());
+        return (Observable<R>) request.observable();
     }
 
     /**
