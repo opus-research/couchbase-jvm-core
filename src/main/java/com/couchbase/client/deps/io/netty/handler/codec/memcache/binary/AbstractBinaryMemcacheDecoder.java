@@ -22,8 +22,6 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.LastMemcacheCon
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.MemcacheContent;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
 
@@ -232,7 +230,7 @@ public abstract class AbstractBinaryMemcacheDecoder<M extends BinaryMemcacheMess
      * @param in the incoming buffer.
      * @return the decoded header.
      */
-    protected abstract M decodeHeader(ByteBuf in) throws Exception;
+    protected abstract M decodeHeader(ByteBuf in);
 
     /**
      * Helper method to create a upstream message when the incoming parsing did fail.
