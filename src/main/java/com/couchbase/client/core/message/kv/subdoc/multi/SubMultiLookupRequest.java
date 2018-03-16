@@ -37,7 +37,7 @@ import static com.couchbase.client.core.endpoint.kv.KeyValueHandler.SUBDOC_FLAG_
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubMultiLookupRequest extends AbstractKeyValueRequest implements BinarySubdocMultiLookupRequest {
     private final List<LookupCommand> commands;

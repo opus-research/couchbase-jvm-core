@@ -22,12 +22,12 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 import io.netty.buffer.ByteBuf;
 
 /**
- * A sub-document dictionary upsert operation.
+ * A sub-document dictionnary upsert operation.
  *
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubDictUpsertRequest extends AbstractSubdocMutationRequest {
 
