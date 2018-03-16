@@ -19,48 +19,26 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
+
+package com.couchbase.client.core.node.locate;
+
+import com.couchbase.client.core.config.ClusterConfig;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.node.Node;
+
+import java.util.Set;
 
 /**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
- *
- * @author Michael Nitschinger
- * @since 1.0
+ * @author Sergey Avseyev
+ * @since 1.0.2
  */
-public enum ServiceType {
-
-    /**
-     * Views and Design Documents.
-     */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * Key/Value type operations.
-     */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
-    }
-
-    public BucketServiceMapping mapping() {
-        return mapping;
+public class DCPLocator implements Locator {
+    @Override
+    public Node[] locate(CouchbaseRequest request, Set<Node> nodes, ClusterConfig config) {
+        if (nodes.isEmpty()) {
+            return new Node[] {};
+        } else {
+            return new Node[]{nodes.iterator().next()};
+        }
     }
 }
