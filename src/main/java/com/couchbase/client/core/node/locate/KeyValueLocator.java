@@ -28,8 +28,6 @@ import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.config.MemcachedBucketConfig;
 import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.config.Partition;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
@@ -53,8 +51,6 @@ import java.util.zip.CRC32;
  * broadcast-type operations, it will return all suitable nodes without hashing by key.
  */
 public class KeyValueLocator implements Locator {
-
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(KeyValueLocator.class);
 
     @Override
     public Node[] locate(final CouchbaseRequest request, final Set<Node> nodes, final ClusterConfig cluster) {
@@ -128,15 +124,6 @@ public class KeyValueLocator implements Locator {
         }
 
         NodeInfo nodeInfo = config.partitionHosts().get(nodeId);
-
-        if (config.partitionHosts().size() != nodes.size()) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Node list and configuration's partition hosts sizes : {} <> {}, rescheduling",
-                        nodes.size(), config.partitionHosts().size());
-            }
-            return new Node[] { };
-        }
-
         for (Node node : nodes) {
             if (node.hostname().equals(nodeInfo.hostname())) {
                 return new Node[] { node };
