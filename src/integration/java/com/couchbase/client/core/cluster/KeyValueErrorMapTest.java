@@ -28,17 +28,16 @@ import static org.junit.Assert.assertNotNull;
  * Basic error map test
  *
  * @author Subhashni Balakrishnan
- * @since 1.4.5
  */
 public class KeyValueErrorMapTest extends ClusterDependentTest {
 
     @BeforeClass
-    public static void setup() throws Exception {
-        connect(true);
+    public static void checkExtendedAttributeAvailable() throws Exception {
+        assumeMinimumVersionCompatible(5, 0);
     }
 
     @Test
-    public void checkIfTheErrorMapIsRead() throws Exception {
+    public void shouldCheckIfTheErrorMapIsRead() throws Exception {
         ErrorMap errMap = ResponseStatusConverter.getBinaryErrorMap();
         assertNotNull(errMap);
     }

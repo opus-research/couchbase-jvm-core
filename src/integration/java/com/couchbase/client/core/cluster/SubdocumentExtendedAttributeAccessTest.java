@@ -38,7 +38,6 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
     @BeforeClass
     public static void checkExtendedAttributeAvailable() throws Exception {
-        connect(false);
         assumeMinimumVersionCompatible(5, 0);
     }
 

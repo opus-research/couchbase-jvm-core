@@ -31,7 +31,6 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.Assume;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -48,12 +47,6 @@ import static org.junit.Assert.assertTrue;
  * @since 1.1.2
  */
 public class ObserveTest extends ClusterDependentTest {
-
-
-    @BeforeClass
-    public static void setup() throws Exception {
-        connect(false);
-    }
 
     private CouchbaseBucketConfig config = null;
     private int numberOfReplicas;

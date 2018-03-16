@@ -26,7 +26,6 @@ import com.couchbase.client.core.util.ClusterDependentTest;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import rx.Observable;
 import rx.functions.Action1;
@@ -44,11 +43,6 @@ import static org.junit.Assert.assertEquals;
  * @since 1.0
  */
 public class FlushTest extends ClusterDependentTest {
-
-    @BeforeClass
-    public static void setup() throws Exception {
-        connect(false);
-    }
 
     @Test
     public void shouldFlush() {
@@ -71,7 +65,7 @@ public class FlushTest extends ClusterDependentTest {
                 .toBlocking()
                 .last();
 
-        FlushResponse response = cluster().<FlushResponse>send(new FlushRequest(bucket(), username(), password())).toBlocking().single();
+        FlushResponse response = cluster().<FlushResponse>send(new FlushRequest(bucket(), password())).toBlocking().single();
         assertEquals(ResponseStatus.SUCCESS, response.status());
         ReferenceCountUtil.releaseLater(response.content());
 
