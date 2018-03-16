@@ -332,7 +332,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      */
     private int initializeUniqueStream(final String bucket) {
         int streamId = nextStreamId++;
-        DCPStream stream = new DCPStream(streamId, bucket, env().dcpStreamSize());
+        DCPStream stream = new DCPStream(streamId, bucket);
         streams.put(streamId, stream);
         return streamId;
     }
