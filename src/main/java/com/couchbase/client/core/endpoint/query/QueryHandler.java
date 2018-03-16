@@ -24,7 +24,6 @@ package com.couchbase.client.core.endpoint.query;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
-import com.couchbase.client.core.endpoint.util.ClosingPositionBufProcessor;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -34,6 +33,7 @@ import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufProcessor;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -216,7 +216,33 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @return
      */
     private static int findSectionClosingPosition(ByteBuf buf, char openingChar, char closingChar) {
-        return buf.forEachByte(new ClosingPositionBufProcessor(openingChar, closingChar));
+        ClosingPositionBufProcessor processor = new ClosingPositionBufProcessor(openingChar, closingChar);
+        return buf.forEachByte(processor);
+    }
+
+    private static class ClosingPositionBufProcessor implements ByteBufProcessor {
+        private int openCount = 0;
+        private final char openingChar;
+        private final char closingChar;
+
+        public ClosingPositionBufProcessor(char openingChar, char closingChar) {
+            this.openingChar = openingChar;
+            this.closingChar = closingChar;
+        }
+
+        @Override
+        public boolean process(byte current) throws Exception {
+            if (current == openingChar) {
+                openCount++;
+            } else if (current == closingChar && openCount > 0) {
+                openCount--;
+                if (openCount == 0) {
+                    //This will make the ByteBuf.forEachByte return current byte's index
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     /**
@@ -346,17 +372,17 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         int endNextToken = bytesBeforeInResponse(':');
         ByteBuf peekSlice = responseContent.readSlice(endNextToken + 1);
         String peek = peekSlice.toString(CHARSET);
-        if (peek.contains("\"signature\"")) {
+        if (peek.contains("\"signature\":")) {
             return QUERY_STATE_SIGNATURE;
-        } else if (peek.contains("\"results\"")) {
+        } else if (peek.endsWith("\"results\":")) {
             return QUERY_STATE_ROWS;
-        } else if (peek.contains("\"status\"")) {
+        } else if (peek.endsWith("\"status\":")) {
             return QUERY_STATE_STATUS;
-        } else if (peek.contains("\"errors\"")) {
+        } else if (peek.endsWith("\"errors\":")) {
             return QUERY_STATE_ERROR;
-        } else if (peek.contains("\"warnings\"")) {
+        } else if (peek.endsWith("\"warnings\":")) {
             return QUERY_STATE_WARNING;
-        } else if (peek.contains("\"metrics\"")) {
+        } else if (peek.endsWith("\"metrics\":")) {
             return QUERY_STATE_INFO;
         } else {
             IllegalStateException e = new IllegalStateException("Error parsing query response (in TRANSITION) at " + peek);
@@ -371,13 +397,16 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * For now skip the signature.
      */
     private void skipQuerySignature() {
-        //TODO ultimately send the signature back to the client
+        int nextColon = bytesBeforeInResponse(':');
         int openPos = bytesBeforeInResponse('{');
-        int closePos = findSectionClosingPosition(responseContent, '{', '}');
-        if (closePos > 0) {
-            int length = closePos - openPos - responseContent.readerIndex() + 1;
-            responseContent.skipBytes(openPos);
-            ByteBuf signature = responseContent.readSlice(length);
+        if (openPos < nextColon) { //checks for empty signature
+            int closePos = findSectionClosingPosition(responseContent, '{', '}');
+            if (closePos > 0) {
+                int length = closePos - openPos - responseContent.readerIndex() + 1;
+                responseContent.skipBytes(openPos);
+                //TODO ultimately send the signature back to the client
+                ByteBuf signature = responseContent.readSlice(length);
+            }
         }
         queryParsingState = transitionToNextToken();
     }
@@ -467,7 +496,21 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
         while (true) {
             int openBracketPos = bytesBeforeInResponse('{');
-            int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
+            int closeBracketPos = -1;
+            int openBrackets = 0;
+            for (int i = responseContent.readerIndex(); i <= responseContent.writerIndex(); i++) {
+                byte current = responseContent.getByte(i);
+                if (current == '{') {
+                    openBrackets++;
+                } else if (current == '}' && openBrackets > 0) {
+                    openBrackets--;
+                    if (openBrackets == 0) {
+                        closeBracketPos = i;
+                        break;
+                    }
+                }
+            }
+
             if (closeBracketPos == -1) {
                 break;
             }
