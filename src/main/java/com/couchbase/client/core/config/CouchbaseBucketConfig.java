@@ -15,6 +15,7 @@
  */
 package com.couchbase.client.core.config;
 
+import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import java.net.InetAddress;
 
@@ -71,7 +72,7 @@ public interface CouchbaseBucketConfig extends BucketConfig {
      * @param hostname the hostname of the node to check against.
      * @return true if it has, false otherwise.
      */
-    boolean hasPrimaryPartitionsOnNode(InetAddress hostname);
+    boolean hasPrimaryPartitionsOnNode(NetworkAddress hostname);
 
     /**
      * If this couchbase bucket is ephemeral.

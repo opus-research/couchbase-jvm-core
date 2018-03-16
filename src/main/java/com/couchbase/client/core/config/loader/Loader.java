@@ -18,6 +18,7 @@ package com.couchbase.client.core.config.loader;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.LoaderType;
 import com.couchbase.client.core.lang.Tuple2;
+import com.couchbase.client.core.utils.NetworkAddress;
 import rx.Observable;
 
 import java.net.InetAddress;
@@ -25,9 +26,9 @@ import java.net.InetAddress;
 public interface Loader {
 
      @Deprecated
-     Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final InetAddress seedNode,
+     Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final NetworkAddress seedNode,
                                                              final String bucket, final String password);
 
-     Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final InetAddress seedNode,
+     Observable<Tuple2<LoaderType, BucketConfig>> loadConfig(final NetworkAddress seedNode,
         final String bucket, final String username, final String password);
 }

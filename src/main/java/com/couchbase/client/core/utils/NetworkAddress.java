@@ -25,11 +25,13 @@ import java.net.InetAddress;
  */
 public class NetworkAddress {
 
+    public static final String REVERSE_DNS_PROPERTY = "com.couchbase.allowReverseDns";
+
     /**
      * Flag which controls the usage of reverse dns
      */
     private static final boolean ALLOW_REVERSE_DNS = Boolean.parseBoolean(
-        System.getProperty("com.couchbase.allowReverseDns", "true")
+        System.getProperty(REVERSE_DNS_PROPERTY, "true")
     );
 
     private final InetAddress inner;
@@ -122,5 +124,20 @@ public class NetworkAddress {
                 ", fromHostname=" + createdFromHostname +
                 ", reverseDns=" + allowReverseDns +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        NetworkAddress that = (NetworkAddress) o;
+
+        return inner.equals(that.inner);
+    }
+
+    @Override
+    public int hashCode() {
+        return inner.hashCode();
     }
 }

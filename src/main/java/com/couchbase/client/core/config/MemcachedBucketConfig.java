@@ -15,6 +15,7 @@
  */
 package com.couchbase.client.core.config;
 
+import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import java.net.InetAddress;
@@ -34,6 +35,6 @@ public interface MemcachedBucketConfig extends BucketConfig {
      * @param id the id for the document.
      * @return the node address for the given document id.
      */
-    InetAddress nodeForId(final byte[] id);
+    NetworkAddress nodeForId(final byte[] id);
 
 }

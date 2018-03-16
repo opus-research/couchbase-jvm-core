@@ -16,6 +16,7 @@
 package com.couchbase.client.core.config;
 
 import com.couchbase.client.core.service.ServiceType;
+import com.couchbase.client.core.utils.NetworkAddress;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -31,7 +32,7 @@ public interface NodeInfo {
      *
      * @return the host address.
      */
-    InetAddress hostname();
+    NetworkAddress hostname();
 
     /**
      * The exposed non-ssl services.
