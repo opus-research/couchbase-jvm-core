@@ -36,9 +36,7 @@ import java.util.List;
 public interface ServiceRegistry {
 
     Service addService(Service service, String bucket);
-
     Service removeService(Service service, String bucket);
-
     Service serviceBy(ServiceType type, String bucket);
 
     Service locate(CouchbaseRequest request);

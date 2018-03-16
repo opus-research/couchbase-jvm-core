@@ -27,11 +27,13 @@ import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.config.BucketConfigRequest;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.SignalFlush;
+import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
@@ -76,22 +78,16 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     /**
      * The node locator for the binary service.
      */
-    private final Locator binaryLocator = new KeyValueLocator();
+    private final Locator BINARY_LOCATOR = new KeyValueLocator();
 
     /**
-     * The node locator for the view service.
+     * The node locator for the view service;
      */
-    private final Locator viewLocator = new ViewLocator();
+    private final Locator VIEW_LOCATOR = new ViewLocator();
 
-    /**
-     * The node locator for the query service.
-     */
-    private final Locator queryLocator = new QueryLocator();
+    private final Locator QUERY_LOCATOR = new QueryLocator();
 
-    /**
-     * The node locator for the config service.
-     */
-    private final Locator configLocator = new ConfigLocator();
+    private final Locator CONFIG_LOCATOR = new ConfigLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -118,8 +114,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(Collections.newSetFromMap(new ConcurrentHashMap<Node, Boolean>(INITIAL_NODE_SIZE)), environment,
-            configObservable, responseBuffer);
+        this(Collections.newSetFromMap(new ConcurrentHashMap<Node, Boolean>(INITIAL_NODE_SIZE)), environment, configObservable, responseBuffer);
     }
 
     /**
@@ -141,7 +136,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                 try {
                     configuration.set(config);
                     reconfigure(config).subscribe();
-                } catch (Exception ex) {
+                } catch(Exception ex) {
                     ex.printStackTrace();
                 }
 
@@ -176,7 +171,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         for (int i = 0; i < found.length; i++) {
             try {
                 found[i].send(request);
-            } catch (Exception ex) {
+            } catch(Exception ex) {
                 request.observable().onError(ex);
             } finally {
                 event.setRequest(null);
@@ -204,26 +199,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     }
 
     /**
-     * Adds a {@link Node} to the cluster.
-     *
-     * The code first initiates a asynchronous connect and then eventually adds it to the node list once it has been
-     * connected successfully.
-     */
-    Observable<LifecycleState> addNode(final Node node) {
-        if (nodes.contains(node)) {
-            return Observable.just(node.state());
-        }
-
-        return node.connect().map(new Func1<LifecycleState, LifecycleState>() {
-            @Override
-            public LifecycleState call(LifecycleState lifecycleState) {
-                nodes.add(node);
-                return lifecycleState;
-            }
-        });
-    }
-
-    /**
      * Remove a {@link Node} identified by its hostname.
      *
      * @param hostname the hostname of the node.
@@ -231,17 +206,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public Observable<LifecycleState> removeNode(final InetAddress hostname) {
         return removeNode(nodeBy(hostname));
-    }
-
-    /**
-     * Removes a {@link Node} from the cluster.
-     *
-     * The node first gets removed from the list and then is disconnected afterwards, so that outstanding
-     * operations can be handled gracefully.
-     */
-    Observable<LifecycleState> removeNode(final Node node) {
-        nodes.remove(node);
-        return node.disconnect();
     }
 
     /**
@@ -262,6 +226,37 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public Observable<Service> removeService(final RemoveServiceRequest request) {
         return nodeBy(request.hostname()).removeService(request);
+    }
+
+    /**
+     * Adds a {@link Node} to the cluster.
+     *
+     * The code first initiates a asynchronous connect and then eventually adds it to the node list once it has been
+     * connected successfully.
+     */
+    Observable<LifecycleState> addNode(final Node node) {
+        if (nodes.contains(node)) {
+            return Observable.just(node.state());
+        }
+
+        return node.connect().map(new Func1<LifecycleState, LifecycleState>() {
+            @Override
+            public LifecycleState call(LifecycleState lifecycleState) {
+                nodes.add(node);
+                return lifecycleState;
+            }
+        });
+    }
+
+    /**
+     * Removes a {@link Node} from the cluster.
+     *
+     * The node first gets removed from the list and then is disconnected afterwards, so that outstanding
+     * operations can be handled gracefully.
+     */
+    Observable<LifecycleState> removeNode(final Node node) {
+        nodes.remove(node);
+        return node.disconnect();
     }
 
     /**
@@ -290,13 +285,13 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     protected Locator locator(final CouchbaseRequest request) {
         if (request instanceof BinaryRequest) {
-            return binaryLocator;
+            return BINARY_LOCATOR;
         } else if (request instanceof ViewRequest) {
-            return viewLocator;
+            return VIEW_LOCATOR;
         } else if (request instanceof QueryRequest) {
-            return queryLocator;
+            return QUERY_LOCATOR;
         } else if (request instanceof ConfigRequest) {
-            return configLocator;
+            return CONFIG_LOCATOR;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
