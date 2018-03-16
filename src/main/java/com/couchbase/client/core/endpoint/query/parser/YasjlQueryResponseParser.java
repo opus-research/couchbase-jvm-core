@@ -80,11 +80,6 @@ public class YasjlQueryResponseParser {
     protected UnicastAutoReleaseSubject<ByteBuf> queryInfoObservable;
 
     /**
-     * Represents an observable containing profile info on a terminated query.
-     */
-    protected UnicastAutoReleaseSubject<ByteBuf> queryProfileInfoObservable;
-
-    /**
      * Represents the current request
      */
     protected CouchbaseRequest currentRequest;
@@ -142,9 +137,6 @@ public class YasjlQueryResponseParser {
                         }
                         if (querySignatureObservable != null) {
                             querySignatureObservable.withTraceIdentifier("querySignature." + requestID);
-                        }
-                        if (queryProfileInfoObservable != null) {
-                            queryProfileInfoObservable.withTraceIdentifier("queryProfileInfo." + requestID);
                         }
                     }
                 }),
@@ -223,13 +215,6 @@ public class YasjlQueryResponseParser {
                         }
                     }
                 }),
-                new JsonPointer("/profile", new JsonPointerCB1() {
-                    public void call(ByteBuf buf) {
-                        if (queryProfileInfoObservable != null) {
-                            queryProfileInfoObservable.onNext(buf);
-                        }
-                    }
-                }),
         };
         this.parser = new ByteBufJsonParser(jsonPointers);
     }
@@ -251,13 +236,11 @@ public class YasjlQueryResponseParser {
         queryStatusObservable = AsyncSubject.create();
         queryInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         querySignatureObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        queryProfileInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         queryErrorObservable.onBackpressureBuffer();
         queryRowObservable.onBackpressureBuffer();
         querySignatureObservable.onBackpressureBuffer();
         queryStatusObservable.onBackpressureBuffer();
         queryInfoObservable.onBackpressureBuffer();
-        queryProfileInfoObservable.onBackpressureBuffer();
 
         if (!this.callbacksOnIoPool) {
             queryErrorObservable.observeOn(scheduler);
@@ -265,7 +248,6 @@ public class YasjlQueryResponseParser {
             querySignatureObservable.observeOn(scheduler);
             queryStatusObservable.observeOn(scheduler);
             queryInfoObservable.observeOn(scheduler);
-            queryProfileInfoObservable.observeOn(scheduler);
         }
 
         parser.initialize(responseContent);
@@ -280,7 +262,6 @@ public class YasjlQueryResponseParser {
                 querySignatureObservable,
                 queryStatusObservable,
                 queryInfoObservable,
-                queryProfileInfoObservable,
                 currentRequest,
                 status, requestID, clientContextID);
     }
@@ -321,15 +302,11 @@ public class YasjlQueryResponseParser {
         if (querySignatureObservable != null) {
             querySignatureObservable.onCompleted();
         }
-        if (queryProfileInfoObservable != null) {
-            queryProfileInfoObservable.onCompleted();
-        }
         queryInfoObservable = null;
         queryRowObservable = null;
         queryErrorObservable = null;
         queryStatusObservable = null;
         querySignatureObservable = null;
-        queryProfileInfoObservable = null;
         this.initialized = false;
     }
 }

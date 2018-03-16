@@ -71,7 +71,6 @@ import java.util.concurrent.TimeUnit;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
-@Deprecated
 public class DCPConnection {
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(DCPConnection.class);
 

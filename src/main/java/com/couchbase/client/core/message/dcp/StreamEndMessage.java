@@ -19,7 +19,6 @@ package com.couchbase.client.core.message.dcp;
 /**
  * @author Sergey Avseyev
  */
-@Deprecated
 public class StreamEndMessage extends AbstractDCPMessage {
     private final Reason reason;
 
