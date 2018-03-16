@@ -131,13 +131,6 @@ public interface CoreEnvironment {
     Delay observeIntervalDelay();
 
     /**
-     * Returns the {@link Delay} for node reconnects.
-     *
-     * @return the node reconnect delay.
-     */
-    Delay reconnectDelay();
-
-    /**
      * Returns the size of the request ringbuffer.
      *
      * @return the size of the ringbuffer.
