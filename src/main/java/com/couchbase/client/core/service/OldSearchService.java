@@ -48,24 +48,8 @@ public class OldSearchService extends AbstractPoolingService {
      * @param responseBuffer the shared response buffer.
      */
     public OldSearchService(final String hostname, final String bucket, final String password, final int port,
-                            final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    /**
-     * Creates a new {@link ViewService}.
-     *
-     * @param hostname       the hostname of the service.
-     * @param bucket         the name of the bucket.
-     * @param username       the user authorized for bucket access.
-     * @param password       the password of the bucket.
-     * @param port           the port of the service.
-     * @param env            the shared environment.
-     * @param responseBuffer the shared response buffer.
-     */
-    public OldSearchService(final String hostname, final String bucket, final String username, final String password, final int port,
                          final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.searchEndpoints(), env.searchEndpoints(), STRATEGY,
+        super(hostname, bucket, password, port, env, env.searchEndpoints(), env.searchEndpoints(), STRATEGY,
                 responseBuffer, FACTORY);
     }
 
@@ -79,9 +63,9 @@ public class OldSearchService extends AbstractPoolingService {
      */
     static class SearchEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
                                final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new SearchEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new SearchEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 
