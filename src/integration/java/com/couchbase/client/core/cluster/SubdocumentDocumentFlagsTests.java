@@ -19,8 +19,14 @@ package com.couchbase.client.core.cluster;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.RemoveRequest;
 import com.couchbase.client.core.message.kv.RemoveResponse;
+import com.couchbase.client.core.message.kv.subdoc.multi.Lookup;
+import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommandBuilder;
+import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
+import com.couchbase.client.core.message.kv.subdoc.multi.SubMultiLookupDocOptionsBuilder;
+import com.couchbase.client.core.message.kv.subdoc.multi.SubMultiLookupRequest;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
 import com.couchbase.client.core.message.kv.subdoc.simple.SubDictAddRequest;
+import com.couchbase.client.core.message.kv.subdoc.simple.SubGetRequest;
 import com.couchbase.client.core.util.ClusterDependentTest;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -29,6 +35,8 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -77,7 +85,7 @@ public class SubdocumentDocumentFlagsTests extends ClusterDependentTest {
         ReferenceCountUtil.releaseLater(insertResponse.content());
         assertTrue(insertResponse.status().isSuccess());
         RemoveResponse response = cluster().<RemoveResponse>send(new RemoveRequest("shouldCreateDocumentIfSetWithExpiryAndPathFlags", bucket())).toBlocking().single();
-        assert(response.status() == ResponseStatus.SUCCESS);
+        assertEquals(response.status(), ResponseStatus.SUCCESS);
     }
 
     @Test
@@ -88,7 +96,68 @@ public class SubdocumentDocumentFlagsTests extends ClusterDependentTest {
         SubDictAddRequest insertRequest = new SubDictAddRequest("shouldFailIfCreateDocumentIsNotSetWhenDocumentDoesNotExist", subPath, fragment, bucket());
         SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
         ReferenceCountUtil.releaseLater(insertResponse.content());
-        assert(insertResponse.status() == ResponseStatus.NOT_EXISTS);
+        assertEquals(insertResponse.status(), ResponseStatus.NOT_EXISTS);
+    }
+
+    @Test
+    public void shouldAddDocumentIfSet() {
+        String subPath = "hello";
+        ByteBuf fragment = Unpooled.copiedBuffer("\"world\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(fragment);
+
+        SubDictAddRequest insertRequest = new SubDictAddRequest("shouldAddDocumentIfSet", subPath, fragment, bucket());
+        insertRequest.createDocument(true);
+        SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(insertResponse.content());
+        assertTrue(insertResponse.status().isSuccess());
+        RemoveResponse response = cluster().<RemoveResponse>send(new RemoveRequest("shouldAddDocumentIfSet", bucket())).toBlocking().single();
+        assertEquals(response.status(), ResponseStatus.SUCCESS);
+    }
+
+    @Test
+    public void shouldAccessDeletedDocumentIfSet() {
+        String subPath = "xattr.hello";
+        ByteBuf fragment = Unpooled.copiedBuffer("\"world\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(fragment);
+
+        SubDictAddRequest insertRequest = new SubDictAddRequest("shouldAccessDeletedDocumentIfSet", subPath, fragment, bucket());
+        insertRequest.createDocument(true);
+        insertRequest.xattr(true);
+        SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(insertResponse.content());
+        assertTrue(insertResponse.status().isSuccess());
+        RemoveResponse response = cluster().<RemoveResponse>send(new RemoveRequest("shouldAccessDeletedDocumentIfSet", bucket())).toBlocking().single();
+        assert(response.status() == ResponseStatus.SUCCESS);
+
+        SubGetRequest getRequest = new SubGetRequest("shouldAccessDeletedDocumentIfSet", subPath, bucket());
+        getRequest.xattr(true);
+        getRequest.accessDeleted(true);
+        SimpleSubdocResponse getResponse = cluster().<SimpleSubdocResponse>send(getRequest).toBlocking().single();
+
+        assertEquals(getResponse.status(), ResponseStatus.SUCCESS);
+    }
+
+    @Test
+    public void shouldAccessDeletedDocumentIfSetInMultiPath() {
+        String subPath = "spring.class";
+        ByteBuf fragment = Unpooled.copiedBuffer("\"test\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(fragment);
+
+        SubDictAddRequest insertRequest = new SubDictAddRequest("shouldAccessDeletedDocumentIfSetInMultiPath", subPath, fragment, bucket());
+        insertRequest.addDocument(true);
+        insertRequest.xattr(true);
+        SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(insertResponse.content());
+        assertTrue(insertResponse.status().isSuccess());
+        RemoveResponse response = cluster().<RemoveResponse>send(new RemoveRequest("shouldAccessDeletedDocumentIfSetInMultiPath", bucket())).toBlocking().single();
+        assertEquals(response.status(), ResponseStatus.SUCCESS);
+
+        SubMultiLookupRequest lookupRequest = new SubMultiLookupRequest("shouldAccessDeletedDocumentIfSetInMultiPath", bucket(),
+                SubMultiLookupDocOptionsBuilder.builder().accessDeleted(true),
+                new LookupCommandBuilder(Lookup.GET, "spring.class")
+                        .xattr(true).build());
+        MultiLookupResponse lookupResponse = cluster().<MultiLookupResponse>send(lookupRequest).toBlocking().single();
+        assertTrue(lookupResponse.status().isSuccess());
     }
 
 }
