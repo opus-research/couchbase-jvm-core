@@ -41,10 +41,6 @@ public class RetryHelper {
      */
     public static void retryOrCancel(final CoreEnvironment environment, final CouchbaseRequest request,
         final EventSink<ResponseEvent> responseBuffer) {
-        if (!request.isActive()) {
-            return;
-        }
-
         if (environment.retryStrategy().shouldRetry(request, environment)) {
             retry(request, responseBuffer);
         } else {
