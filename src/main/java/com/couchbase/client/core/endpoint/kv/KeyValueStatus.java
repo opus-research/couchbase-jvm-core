@@ -127,7 +127,7 @@ public enum KeyValueStatus {
      * @param code the status code to check.
      * @return the matched code, or unknown if none is found.
      */
-    public static KeyValueStatus valueOf(final long code) {
+    public static KeyValueStatus valueOf(final short code) {
         if (code == SUCCESS.code) {
             return SUCCESS;
         } else if (code == ERR_NOT_FOUND.code) {
