@@ -70,6 +70,8 @@ import java.util.concurrent.ThreadFactory;
  * @author Michael Nitschinger
  * @since 1.0
  */
+
+
 public class CouchbaseCore implements ClusterFacade {
 
     /**
