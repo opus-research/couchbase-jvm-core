@@ -1,23 +1,17 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
- * IN THE SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.couchbase.client.core.env;
 
@@ -29,9 +23,13 @@ import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
+import com.lmax.disruptor.WaitStrategy;
 import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
+
+import java.security.KeyStore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link CoreEnvironment} provides all the core building blocks like environment settings and thread pools so
@@ -46,15 +44,31 @@ import rx.Scheduler;
 public interface CoreEnvironment {
 
     /**
-     * Shutdown the {@link CoreEnvironment}.
+     * Shutdown the {@link CoreEnvironment} with the default timeout.
      *
-     * @deprecated This method will be changed in 2.3.0 into a synchronous version. Please migrate
-     * to {@link #shutdownAsync()} right now to avoid breaking your code.
+     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
+     * The async version can still be found at {@link #shutdownAsync()}.
      *
-     * @return an {@link Observable} eventually returning a boolean, indicating the success of the shutdown.
+     * @return returning a boolean, indicating the success of the shutdown.
      */
-    @Deprecated
-    Observable<Boolean> shutdown();
+    boolean shutdown();
+
+    /**
+     * Shutdown the {@link CoreEnvironment} with a custom timeout.
+     *
+     * This method has been converted (after a deprecation phase) from an async method into a synchronous one.
+     * The async version can still be found at {@link #shutdownAsync()}.
+     *
+     * @return returning a boolean, indicating the success of the shutdown.
+     */
+    boolean shutdown(long timeout, TimeUnit timeUnit);
+
+    /**
+     * The default timeout for disconnect operations, set to {@link DefaultCoreEnvironment#DISCONNECT_TIMEOUT}.
+     *
+     * @return the default disconnect timeout.
+     */
+    long disconnectTimeout();
 
     /**
      * Shutdown the {@link CoreEnvironment} in an asynchronous fashion.
@@ -110,26 +124,11 @@ public interface CoreEnvironment {
     String sslKeystorePassword();
 
     /**
-     * True if N1QL querying should be enabled manually, deprecated.
+     * Allows to directly configure a {@link KeyStore}.
      *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return true if manual N1QL querying is enabled.
-     * @deprecated
+     * @return the keystore to use.
      */
-    @Deprecated
-    boolean queryEnabled();
-
-    /**
-     * If manual querying enabled, this defines the N1QL port to use, deprecated.
-     *
-     * With Couchbase Server 4.0 and onward, it will be automatically detected.
-     *
-     * @return the query port.
-     * @deprecated
-     */
-    @Deprecated
-    int queryPort();
+    KeyStore sslKeystore();
 
     /**
      * If bootstrapping through HTTP is enabled.
@@ -405,4 +404,11 @@ public interface CoreEnvironment {
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     String dcpConnectionName();
+
+    /**
+     * Waiting strategy used by request {@link com.lmax.disruptor.EventProcessor}s to wait for data from {@link com.lmax.disruptor.RingBuffer}
+     *
+     * @return waiting strategy
+     */
+    WaitStrategy requestBufferWaitStrategy();
 }
