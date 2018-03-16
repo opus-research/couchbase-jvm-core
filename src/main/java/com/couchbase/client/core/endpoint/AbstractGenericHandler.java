@@ -44,11 +44,9 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
-import io.netty.util.concurrent.ScheduledFuture;
 import rx.Scheduler;
 import rx.Subscriber;
 import rx.functions.Action0;
-import rx.functions.Action1;
 import rx.subjects.Subject;
 
 import javax.net.ssl.SSLHandshakeException;
@@ -62,7 +60,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static com.couchbase.client.core.utils.Observables.failSafe;
 
@@ -162,14 +159,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private final boolean pipeline;
 
     private volatile long keepAliveThreshold;
-
-    /**
-     * If continuous keepalive is enabled, holds the future for continuous execution.
-     *
-     * This is important since it needs to be cancelled once the channel goes out
-     * of scope/inactive.
-     */
-    private volatile ScheduledFuture<?> continuousKeepAliveFuture;
 
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
@@ -283,9 +272,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 publishResponse(response, currentRequest.observable());
                 if (currentDecodingState == DecodingState.FINISHED) {
                     writeMetrics(response);
-                    if (currentRequest instanceof KeepAlive) {
-                        endpoint.setLastKeepAliveLatency(currentOpTime);
-                    }
                 }
             }
         } catch (CouchbaseException e) {
@@ -501,7 +487,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private void channelActiveSideEffects(final ChannelHandlerContext ctx) {
         long interval = env().keepAliveInterval();
         if (env().continuousKeepAliveEnabled()) {
-            continuousKeepAliveFuture = ctx.executor().scheduleAtFixedRate(new Runnable() {
+            ctx.executor().scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
                     if (shouldSendKeepAlive()) {
@@ -538,12 +524,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        if (continuousKeepAliveFuture != null) {
-            // cancel the continuous execution and interrupt a job.
-            LOGGER.trace("Stopping continuous keepalive execution");
-            continuousKeepAliveFuture.cancel(true);
-            continuousKeepAliveFuture = null;
-        }
         handleOutstandingOperations(ctx);
     }
 
@@ -682,6 +662,16 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     }
 
     /**
+     * Sets current request.
+     *
+     * FIXME this is temporary solution for {@link com.couchbase.client.core.endpoint.dcp.DCPHandler}
+     * @param request request to become the current one
+     */
+    protected void currentRequest(REQUEST request) {
+        currentRequest = request;
+    }
+
+    /**
      * @return stringified version of the remote node's hostname
      */
     protected String remoteHostname() {
@@ -728,9 +718,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         public void onError(Throwable e) {
             if (ctx.channel() == null || !ctx.channel().isActive()) {
                 return;
-            }
-            if (e instanceof TimeoutException) {
-                endpoint.setLastKeepAliveLatency(TimeUnit.MILLISECONDS.toMicros(env().keepAliveTimeout()));
             }
             LOGGER.warn(logIdent(ctx, endpoint) + "Got error while consuming KeepAliveResponse.", e);
             keepAliveThreshold++;

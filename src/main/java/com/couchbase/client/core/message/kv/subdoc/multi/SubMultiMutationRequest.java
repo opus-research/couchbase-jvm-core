@@ -37,7 +37,7 @@ import java.util.List;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class SubMultiMutationRequest extends AbstractKeyValueRequest implements BinarySubdocMultiMutationRequest {
 
@@ -67,11 +67,8 @@ public class SubMultiMutationRequest extends AbstractKeyValueRequest implements 
 
         this.expiration = expiration;
         this.cas = cas;
-        if (docOptionsBuilder.upsertDocument()) {
-            this.docFlags |= SUBDOC_DOCFLAG_MKDOC;
-        }
-        if (docOptionsBuilder.insertDocument()) {
-            this.docFlags |= SUBDOC_DOCFLAG_INSERT;
+        if (docOptionsBuilder.createDocument()) {
+            this.docFlags |= SUBDOC_FLAG_MKDOC;
         }
     }
 

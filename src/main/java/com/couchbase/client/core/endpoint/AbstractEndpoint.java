@@ -23,10 +23,8 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.internal.EndpointHealth;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.internal.SignalFlush;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.AbstractStateMachine;
 import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.state.NotConnectedException;
@@ -66,7 +64,6 @@ import rx.subjects.Subject;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLHandshakeException;
 import java.net.ConnectException;
-import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
@@ -148,8 +145,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
 
     private final boolean pipeline;
 
-    private final String hostname;
-
     /**
      * Factory which handles {@link SSLEngine} creation.
      */
@@ -181,8 +176,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private volatile boolean free;
 
     private volatile long lastResponse;
-
-    private volatile long lastKeepAliveLatency;
 
     /**
      * Preset the stack trace for the static exceptions.
@@ -219,7 +212,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.ioPool = env.ioPool();
         this.lastResponse = 0;
         this.free = true;
-        this.hostname = "127.0.0.1"; // let's consider its localhost for testing, use other constructor if not.
     }
 
     /**
@@ -246,7 +238,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.ioPool = ioPool;
         this.pipeline = pipeline;
         this.free = true;
-        this.hostname = hostname;
         this.connectCallbackGracePeriod = Integer.parseInt(
             System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
         );
@@ -338,21 +329,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 bootstrap.connect().addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture cf) throws Exception {
-                        if (ss.isUnsubscribed()) {
-                            if (cf.isSuccess() && cf.channel() != null) {
-                                cf.channel().close().addListener(new ChannelFutureListener() {
-                                    @Override
-                                    public void operationComplete(ChannelFuture future) throws Exception {
-                                        if (!future.isSuccess()) {
-                                            LOGGER.debug("Got exception while disconnecting " +
-                                                "stray connect attempt.", future.cause());
-                                        }
-                                    }
-                                });
-                            }
-                        } else {
-                            ss.onSuccess(cf);
-                        }
+                        ss.onSuccess(cf);
                     }
                 });
             }
@@ -377,7 +354,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         .subscribe(new SingleSubscriber<ChannelFuture>() {
             @Override
             public void onSuccess(ChannelFuture future) {
-                if (disconnected) {
+                if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
                     transitionState(LifecycleState.DISCONNECTED);
@@ -531,7 +508,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     if (!pipeline) {
                         free = false;
                     }
-                    request.dispatchHostname(hostname);
                     channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
@@ -559,10 +535,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * endpoint is in a connected or connecting state).
      */
     public void notifyChannelInactive() {
-        // if this socket is transient OR we already received an explicit call to disconnect this endpoint,
-        // there is no point in either reconnecting or signalling a config reload, since we are expecting
-        // that this method will be called.
-        if (isTransient || disconnected) {
+        if (isTransient) {
             return;
         }
         LOGGER.info(logIdent(channel, this) + "Got notified from Channel as inactive, " +
@@ -572,7 +545,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             signalConfigReload();
         }
 
-        if (state() == LifecycleState.CONNECTED) {
+        if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
             transitionState(LifecycleState.DISCONNECTED);
             connect(false).subscribe(new Subscriber<LifecycleState>() {
                 @Override
@@ -601,13 +574,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         }
     }
 
-    /**
-     * Called by the underlying channel when a keepalive is returned to record how long it took.
-     */
-    public void setLastKeepAliveLatency(long latency) {
-        lastKeepAliveLatency = latency;
-    }
-
     @Override
     public long lastResponse() {
         return lastResponse;
@@ -627,20 +593,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         } else {
             return free;
         }
-    }
-
-    @Override
-    public Single<EndpointHealth> healthCheck(ServiceType type) {
-        LifecycleState currentState = state();
-        SocketAddress remoteAddr = null;
-        SocketAddress localAddr = null;
-        if(channel != null) {
-            remoteAddr = channel.remoteAddress();
-            localAddr = channel.localAddress();
-        }
-        long lastActivity = TimeUnit.NANOSECONDS.toMicros(lastResponse > 0 ? System.nanoTime() - lastResponse : 0);
-        long pingLatency = TimeUnit.NANOSECONDS.toMicros(lastKeepAliveLatency);
-        return Single.just(new EndpointHealth(type, currentState, localAddr, remoteAddr, lastActivity, pingLatency));
     }
 
     /**
