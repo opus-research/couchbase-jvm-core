@@ -23,8 +23,6 @@ package com.couchbase.client.core.retry;
 
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.kv.ObserveResponse;
-import rx.Observable;
 
 /**
  * A {@link RetryStrategy} that will never retry and cancel right away.
@@ -45,11 +43,6 @@ public class FailFastRetryStrategy implements RetryStrategy {
     @Override
     public boolean shouldRetry(CouchbaseRequest request, final CoreEnvironment env) {
         return false;
-    }
-
-    @Override
-    public Observable<ObserveResponse> retryOnObserve(Observable<ObserveResponse> response) {
-        return response;
     }
 
     @Override
