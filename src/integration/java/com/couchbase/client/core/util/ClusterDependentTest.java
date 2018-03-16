@@ -111,7 +111,7 @@ public class ClusterDependentTest {
      * Helper (hacked together) method to grab a config from a bucket without having to initialize the
      * client first - this helps with pre-bootstrap decisions like credentials for RBAC.
      */
-    public static int[] minClusterVersion() throws Exception {
+    private static int[] minClusterVersion() throws Exception {
         URIBuilder builder = new URIBuilder();
         builder.setScheme("http").setHost(seedNode).setPort(8091).setPath("/pools/default/buckets/" + bucket)
             .setParameter("bucket", bucket);

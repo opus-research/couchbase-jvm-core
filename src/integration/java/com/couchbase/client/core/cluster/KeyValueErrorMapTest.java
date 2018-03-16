@@ -21,14 +21,12 @@ import com.couchbase.client.core.endpoint.kv.ErrorMap;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
-import com.couchbase.client.core.util.MockDependentTest;
 import com.couchbase.mock.JsonUtils;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -44,11 +42,11 @@ import static org.junit.Assume.assumeTrue;
  * @author Subhashni Balakrishnan
  * @since 1.4.5
  */
-public class KeyValueErrorMapTest extends MockDependentTest {
+public class KeyValueErrorMapTest extends ClusterDependentTest {
 
     @BeforeClass
     public static void setup() throws Exception {
-        connect();
+        connect(true);
     }
 
     @Before
@@ -106,7 +104,6 @@ public class KeyValueErrorMapTest extends MockDependentTest {
     }
 
     @Test
-    @Ignore
     public void verifyConstantRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF0", 16),  -1);
         startRetryVerifyRequest();
@@ -123,7 +120,6 @@ public class KeyValueErrorMapTest extends MockDependentTest {
     }
 
     @Test
-    @Ignore
     public void verifyLinearRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF1", 16), -1);
         startRetryVerifyRequest();
@@ -140,7 +136,6 @@ public class KeyValueErrorMapTest extends MockDependentTest {
     }
 
     @Test
-    @Ignore
     public void verifyExponentialRetry() throws Exception {
         opFailRequest(Long.parseLong("7FF2", 16), -1);
         startRetryVerifyRequest();
