@@ -38,7 +38,6 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
@@ -651,10 +650,5 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         protected KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
             super(status, request);
         }
-    }
-
-    @Override
-    protected ServiceType serviceType() {
-        return ServiceType.QUERY;
     }
 }
