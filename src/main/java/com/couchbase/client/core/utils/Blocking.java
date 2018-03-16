@@ -36,12 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Contains various utility methods related to blocking operations.
  *
- * Note that this class has been moved over from "java-client" into "core-io" in the
- * 1.3.0 timeframe. On earlier versions, it's counterpart can be found in the "java-client"
- * library which depends on "core-io".
- *
  * @author Michael Nitschinger
- * @since 1.3.0
+ * @since 2.0.2
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
@@ -104,7 +100,7 @@ public class Blocking {
      * plain volatiles instead (since it just needs get/set semantics) and
      * reduce allocations a little bit.
      *
-     * @since 1.3.0
+     * @since 2.2.0
      */
     private final static class TrackingSubscriber<T> extends Subscriber<T> {
 
