@@ -28,14 +28,12 @@ public class CounterResponse extends AbstractKeyValueResponse {
 
     private final long value;
     private final long cas;
-    private final MutationDescriptor mutationDescriptor;
 
     public CounterResponse(ResponseStatus status, short serverStatusCode, String bucket, long value, long cas,
-        MutationDescriptor mutationDescriptor, CouchbaseRequest request) {
+                           CouchbaseRequest request) {
         super(status, serverStatusCode, bucket, null, request);
         this.value = value;
         this.cas = cas;
-        this.mutationDescriptor = mutationDescriptor;
     }
 
     public long value() {
@@ -45,9 +43,4 @@ public class CounterResponse extends AbstractKeyValueResponse {
     public long cas() {
         return cas;
     }
-
-    public MutationDescriptor mutationDescriptor() {
-        return mutationDescriptor;
-    }
-
 }
