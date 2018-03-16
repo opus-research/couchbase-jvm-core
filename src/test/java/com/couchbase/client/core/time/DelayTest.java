@@ -19,37 +19,34 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.state;
+package com.couchbase.client.core.time;
 
-import rx.Observable;
+import org.junit.Test;
+import java.util.concurrent.TimeUnit;
 
-/**
- * A stateful component that changes its state and notifies subscribed parties.
- *
- * @author Michael Nitschinger
- * @since 1.0
- */
-public interface Stateful<S extends Enum> {
+import static org.junit.Assert.assertEquals;
 
-    /**
-     * Returns a infinite observable which gets updated when the state of the component changes.
-     *
-     * @return a {@link Observable} updated with state transitions.
-     */
-    Observable<S> states();
+public class DelayTest {
 
-    /**
-     * Returns the current state.
-     *
-     * @return the current state.
-     */
-    S state();
+    @Test
+    public void shouldBuildFixedDelay() {
+        Delay delay = Delay.fixed(5, TimeUnit.MICROSECONDS);
+        assertEquals(TimeUnit.MICROSECONDS, delay.unit());
+        assertEquals(5, delay.calculate(10));
+    }
 
-    /**
-     * Check if the given state is the same as the current one.
-     *
-     * @param state the stats to check against.
-     * @return true if it is the same, false otherwise.
-     */
-    boolean isState(S state);
+    @Test
+    public void shouldBuildLinearDelay() {
+        Delay delay = Delay.linear(TimeUnit.HOURS);
+        assertEquals(TimeUnit.HOURS, delay.unit());
+        assertEquals(10, delay.calculate(10));
+    }
+
+    @Test
+    public void shouldBuildExponentialDelay() {
+        Delay delay = Delay.exponential(TimeUnit.SECONDS);
+        assertEquals(TimeUnit.SECONDS, delay.unit());
+        assertEquals(512, delay.calculate(10));
+    }
+
 }

@@ -19,37 +19,38 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.state;
+package com.couchbase.client.core.time;
 
-import rx.Observable;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A stateful component that changes its state and notifies subscribed parties.
+ * Delay which increases exponentially on every attempt.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.1.0
  */
-public interface Stateful<S extends Enum> {
+public class ExponentialDelay extends Delay {
 
-    /**
-     * Returns a infinite observable which gets updated when the state of the component changes.
-     *
-     * @return a {@link Observable} updated with state transitions.
-     */
-    Observable<S> states();
+    private final long lower;
+    private final long upper;
+    private final double growBy;
 
-    /**
-     * Returns the current state.
-     *
-     * @return the current state.
-     */
-    S state();
+    ExponentialDelay(TimeUnit unit, long upper, long lower, double growBy) {
+        super(unit);
+        this.lower = lower;
+        this.upper = upper;
+        this.growBy = growBy;
+    }
 
-    /**
-     * Check if the given state is the same as the current one.
-     *
-     * @param state the stats to check against.
-     * @return true if it is the same, false otherwise.
-     */
-    boolean isState(S state);
+    @Override
+    public long calculate(long attempt) {
+        long calc = Math.round((1 << (attempt - 1)) * growBy);
+        if (calc < lower) {
+            return lower;
+        }
+        if (calc > upper) {
+            return upper;
+        }
+        return calc;
+    }
 }

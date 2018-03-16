@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015 Couchbase, Inc.
+ * Copyright (C) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,35 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.state;
+package com.couchbase.client.core.time;
+
+import java.util.concurrent.TimeUnit;
 
 /**
- * Describes a generic {@link StateZipper}.
- *
- * See the actual implementation for the {@link AbstractStateZipper} for more details and usage information.
+ * Delay which is fixed for every attempt.
  *
  * @author Michael Nitschinger
  * @since 1.1.0
  */
-public interface StateZipper<T, S extends Enum> extends Stateful<S> {
+public class FixedDelay extends Delay {
 
-    /**
-     * Register the given stream to be zipped into the state computation.
-     *
-     * @param identifier the identifier used to uniquely identify the stream.
-     * @param stateful the stateful compontent to be registered.
-     */
-    void register(T identifier, Stateful<S> stateful);
+    private final long delay;
 
-    /**
-     * Deregisters a stream identified by the identifier from the state computation.
-     *
-     * @param identifier the identifier used to uniquely identify the stream.
-     */
-    void deregister(T identifier);
+    FixedDelay(long delay, TimeUnit unit) {
+        super(unit);
+        this.delay = delay;
+    }
 
-    /**
-     * Terminate the zipper and deregister all registered streams.
-     */
-    void terminate();
+    @Override
+    public long calculate(long attempt) {
+        return delay;
+    }
+
 }

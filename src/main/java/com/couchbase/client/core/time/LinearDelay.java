@@ -19,37 +19,39 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.state;
+package com.couchbase.client.core.time;
 
-import rx.Observable;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A stateful component that changes its state and notifies subscribed parties.
+ * Delay which increases linearly for every attempt.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.1.0
  */
-public interface Stateful<S extends Enum> {
+public class LinearDelay extends Delay {
 
-    /**
-     * Returns a infinite observable which gets updated when the state of the component changes.
-     *
-     * @return a {@link Observable} updated with state transitions.
-     */
-    Observable<S> states();
+    private final double growBy;
+    private final long lower;
+    private final long upper;
 
-    /**
-     * Returns the current state.
-     *
-     * @return the current state.
-     */
-    S state();
+    LinearDelay(TimeUnit unit, long upper, long lower, double growBy) {
+        super(unit);
 
-    /**
-     * Check if the given state is the same as the current one.
-     *
-     * @param state the stats to check against.
-     * @return true if it is the same, false otherwise.
-     */
-    boolean isState(S state);
+        this.growBy = growBy;
+        this.lower = lower;
+        this.upper = upper;
+    }
+
+    @Override
+    public long calculate(long attempt) {
+        long calc = Math.round(attempt * growBy);
+        if (calc < lower) {
+            return lower;
+        }
+        if (calc > upper) {
+            return upper;
+        }
+        return calc;
+    }
 }
