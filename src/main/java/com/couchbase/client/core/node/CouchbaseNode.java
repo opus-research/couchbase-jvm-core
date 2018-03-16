@@ -273,11 +273,4 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         }
     }
 
-    @Override
-    public String toString() {
-        return "CouchbaseNode{" +
-            "hostname=" + hostname +
-            ", services=" + serviceRegistry +
-            '}';
-    }
 }

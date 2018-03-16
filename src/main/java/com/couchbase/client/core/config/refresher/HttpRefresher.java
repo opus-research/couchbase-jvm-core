@@ -22,8 +22,6 @@
 package com.couchbase.client.core.config.refresher;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.config.BucketConfig;
-import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import rx.Observable;
@@ -47,61 +45,45 @@ public class HttpRefresher extends AbstractRefresher {
 
     @Override
     public Observable<Boolean> registerBucket(final String name, final String password) {
-        return super.registerBucket(name, password).flatMap(new Func1<Boolean, Observable<BucketStreamingResponse>>() {
-            @Override
-            public Observable<BucketStreamingResponse> call(Boolean aBoolean) {
-                return cluster().send(new BucketStreamingRequest(TERSE_PATH, name, password));
-            }
-        }).onErrorResumeNext(new Func1<Throwable, Observable<BucketStreamingResponse>>() {
-                                                                                    @Override
-                                                                                    public Observable<BucketStreamingResponse> call(Throwable throwable) {
-                                                                                        return cluster().send(new BucketStreamingRequest(VERBOSE_PATH, name, password));
-                                                                                    }
-                                                                                }
-        )
-        .map(new Func1<BucketStreamingResponse, Boolean>() {
-            @Override
-            public Boolean call(final BucketStreamingResponse response) {
-                response
-                    .configs()
-                    .map(new Func1<String, String>() {
-                        @Override
-                        public String call(String s) {
-                            return s.replace("$HOST", response.host());
-                        }
-                    })
-                    .subscribe(new Action1<String>() {
-                        @Override
-                        public void call(final String rawConfig) {
-                            pushConfig(rawConfig);
-                        }
-                    });
-                return true;
-            }
-        });
+        return cluster()
+            .<BucketStreamingResponse>send(new BucketStreamingRequest(TERSE_PATH, name, password))
+            .onErrorResumeNext(new Func1<Throwable, Observable<BucketStreamingResponse>>() {
+                   @Override
+                   public Observable<BucketStreamingResponse> call(Throwable throwable) {
+                       return cluster().send(new BucketStreamingRequest(VERBOSE_PATH, name, password));
+                   }
+               }
+            )
+            .map(new Func1<BucketStreamingResponse, Boolean>() {
+                @Override
+                public Boolean call(final BucketStreamingResponse response) {
+                    response
+                        .configs()
+                        .map(new Func1<String, String>() {
+                            @Override
+                            public String call(String s) {
+                                return s.replace("$HOST", response.host());
+                            }
+                        })
+                        .subscribe(new Action1<String>() {
+                            @Override
+                            public void call(final String rawConfig) {
+                                pushConfig(rawConfig);
+                            }
+                        });
+                    return true;
+                }
+            });
     }
 
     @Override
     public Observable<Boolean> deregisterBucket(final String name) {
-        return super.deregisterBucket(name);
+        // 1) close streaming (close endpoint)
+        return null;
     }
 
     @Override
     public Observable<Boolean> shutdown() {
         return null;
-    }
-
-    @Override
-    public void markTainted(BucketConfig config) {
-
-    }
-
-    @Override
-    public void markUntainted(BucketConfig config) {
-
-    }
-
-    @Override
-    public void refresh(ClusterConfig config) {
     }
 }
