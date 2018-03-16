@@ -255,6 +255,7 @@ public class QueryHandlerTest {
         } else {
             assertEquals(0, signatureList.size());
         }
+        assertEquals(0, inbound.profileInfo().timeout(1, TimeUnit.SECONDS).toList().toBlocking().single().size());
     }
 
     private static Map<String, Object> expectedMetricsCounts(int expectedErrors, int expectedResults) {
@@ -1529,7 +1530,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = null;
         try {
             inbound = (GenericQueryResponse) obs.timeout(1, TimeUnit.SECONDS).toBlocking().last();
-            inbound.info().timeout(1, TimeUnit.SECONDS).toBlocking().last();
+            ReferenceCountUtil.release(inbound.info().timeout(1, TimeUnit.SECONDS).toBlocking().last());
         } catch (Exception e) {
             error = e;
         }
