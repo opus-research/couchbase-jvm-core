@@ -23,8 +23,6 @@ import com.lmax.disruptor.RingBuffer;
 
 public class ServiceFactory {
 
-    public static final ServiceFactory INSTANCE = new ServiceFactory();
-
     /**
      * The logger used.
      */
@@ -44,9 +42,11 @@ public class ServiceFactory {
         }
     }
 
-    private ServiceFactory() { }
+    private ServiceFactory() {
 
-    public Service create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
+    }
+
+    public static Service create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
         ServiceType type, final RingBuffer<ResponseEvent> responseBuffer) {
 
         if (FORCE_OLD_SERVICES) {
