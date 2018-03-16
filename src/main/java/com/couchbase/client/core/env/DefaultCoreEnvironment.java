@@ -22,6 +22,8 @@
 package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.event.DefaultEventBus;
+import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
@@ -149,6 +151,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
+    private final EventBus eventBus;
     private volatile boolean shutdown;
 
     protected DefaultCoreEnvironment(final Builder builder) {
@@ -187,6 +190,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
         this.coreScheduler = builder.scheduler() == null
             ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
+        this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
         this.shutdown = false;
     }
 
@@ -399,6 +403,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return maxRequestLifetime;
     }
 
+    @Override
+    public EventBus eventBus() {
+        return eventBus;
+    }
+
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -428,6 +437,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private RetryStrategy retryStrategy = RETRY_STRATEGY;
         private EventLoopGroup ioPool;
         private Scheduler scheduler;
+        private EventBus eventBus;
         private long maxRequestLifetime = MAX_REQUEST_LIFETIME;
 
         protected Builder() {
@@ -718,6 +728,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public EventBus eventBus() {
+            return eventBus;
+        }
+
+        public Builder eventBus(final EventBus eventBus) {
+            this.eventBus = eventBus;
+            return this;
+        }
+
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -746,6 +766,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         sb.append(", coreScheduler=").append(coreScheduler.getClass().getSimpleName());
+        sb.append(", eventBus=").append(eventBus.getClass().getSimpleName());
         sb.append(", packageNameAndVersion=").append(packageNameAndVersion);
         sb.append(", dcpEnabled=").append(dcpEnabled);
         sb.append(", retryStrategy=").append(retryStrategy);
