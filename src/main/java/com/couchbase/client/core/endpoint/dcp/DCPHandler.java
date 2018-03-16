@@ -1,16 +1,16 @@
 /**
  * Copyright (C) 2014 Couchbase, Inc.
- * <p/>
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * <p/>
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * <p/>
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,7 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.dcp.AbstractDCPRequest;
-import com.couchbase.client.core.message.dcp.ControlParameter;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.dcp.DCPResponse;
 import com.couchbase.client.core.message.dcp.FailoverLogEntry;
@@ -45,12 +44,9 @@ import com.couchbase.client.core.message.dcp.StreamRequestResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
-import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
 import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.CharsetUtil;
 import rx.functions.Action1;
@@ -68,17 +64,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheResponse, BinaryMemcacheRequest, DCPRequest> {
 
+    /**
+     * The Logger used in this handler.
+     */
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(DCPHandler.class);
+
     public static final byte OP_OPEN_CONNECTION = 0x50;
     public static final byte OP_STREAM_REQUEST = 0x53;
     public static final byte OP_SNAPSHOT_MARKER = 0x56;
     public static final byte OP_MUTATION = 0x57;
     public static final byte OP_REMOVE = 0x58;
-    public static final byte OP_CONTROL = 0x5e;
-    public static final byte OP_BUFFER_ACK = 0x5d;
-    /**
-     * The Logger used in this handler.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(DCPHandler.class);
+
     private final Map<String, DCPConnection> connections;
 
     /**
@@ -134,9 +130,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         if (msg.getOpcode() == OP_OPEN_CONNECTION && request instanceof OpenConnectionRequest) {
             final DCPConnection connection = connections.get(((OpenConnectionRequest) request).connectionName());
             response = new OpenConnectionResponse(ResponseStatusConverter.fromBinary(msg.getStatus()), connection, request);
-            if (env().dcpConnectionBufferSize() > 0) {
-                ctx.writeAndFlush(controlRequest(ctx, ControlParameter.CONNECTION_BUFFER_SIZE, env().dcpConnectionBufferSize()));
-            }
         } else if (msg.getOpcode() == OP_STREAM_REQUEST && request instanceof StreamRequestRequest) {
             ByteBuf content = msg.content();
             List<FailoverLogEntry> failoverLog = null;
@@ -160,12 +153,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             final DCPConnection connection = connections.get(DCPConnection.connectionName(msg.getOpaque()));
             response = new StreamRequestResponse(ResponseStatusConverter.fromBinary(msg.getStatus()),
                     failoverLog, rollbackToSequenceNumber, request, connection);
-        } else if (msg.getOpcode() == OP_CONTROL || msg.getOpcode() == OP_BUFFER_ACK) {
-            KeyValueStatus status = KeyValueStatus.valueOf(msg.getStatus());
-            if (status != KeyValueStatus.SUCCESS) {
-                LOGGER.warn("Unexpected status of service response (opcode={}): {} (0x{}, {})",
-                        Integer.toHexString(msg.getOpcode()), status, Integer.toHexString(status.code()), status.description());
-            }
         } else {
             /**
              * FIXME
@@ -262,46 +249,6 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         if (request != null) {
             connection.subject().onNext(request);
         }
-        updateConnectionStats(ctx, connection, msg);
-    }
-
-    private void updateConnectionStats(final ChannelHandlerContext ctx, final DCPConnection connection, final FullBinaryMemcacheResponse msg) {
-        connection.inc(msg.getTotalBodyLength());
-        if (connection.totalReceivedBytes() >= env().dcpConnectionBufferSize() * env().dcpConnectionBufferAckThreshold()) {
-            ctx.writeAndFlush(bufferAckRequest(ctx, connection.totalReceivedBytes()));
-            connection.reset();
-        }
-    }
-
-    private BinaryMemcacheRequest bufferAckRequest(ChannelHandlerContext ctx, int size) {
-        ByteBuf extras = ctx.alloc().buffer(4).writeInt(size);
-        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest("", extras);
-        request.setOpcode(OP_BUFFER_ACK);
-        request.setExtrasLength((byte) extras.readableBytes());
-        request.setTotalBodyLength(extras.readableBytes());
-        return request;
-    }
-
-    private FullBinaryMemcacheRequest controlRequest(ChannelHandlerContext ctx, ControlParameter parameter, boolean value) {
-        return controlRequest(ctx, parameter, Boolean.toString(value));
-    }
-
-    private FullBinaryMemcacheRequest controlRequest(ChannelHandlerContext ctx, ControlParameter parameter, int value) {
-        return controlRequest(ctx, parameter, Integer.toString(value));
-    }
-
-    private FullBinaryMemcacheRequest controlRequest(ChannelHandlerContext ctx, ControlParameter parameter, String value) {
-        String key = parameter.value();
-        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
-        byte[] val = value.getBytes(CharsetUtil.UTF_8);
-        ByteBuf body = ctx.alloc().buffer(val.length);
-        body.writeBytes(val);
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, body);
-        request.setOpcode(OP_CONTROL);
-        request.setKeyLength(keyLength);
-        request.setTotalBodyLength(keyLength + body.readableBytes());
-        return request;
     }
 
     /**
@@ -333,7 +280,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
 
     /**
      * Creates a DCP Stream Request.
-     * <p/>
+     *
      * See the [Protocol Description](https://github.com/couchbaselabs/dcp-documentation/blob/master/documentation/
      * commands/stream-request.md) for more details.
      *
