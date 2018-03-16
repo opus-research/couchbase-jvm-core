@@ -509,7 +509,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     public void userEventTriggered(final ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent e = (IdleStateEvent) evt;
-            if (e.state() == IdleState.READER_IDLE) {
+            if (e.state() == IdleState.ALL_IDLE) {
                 CouchbaseRequest keepAlive = createKeepAliveRequest();
                 if (keepAlive != null) {
                     keepAlive.observable().subscribe(new KeepAliveResponseAction(ctx));
