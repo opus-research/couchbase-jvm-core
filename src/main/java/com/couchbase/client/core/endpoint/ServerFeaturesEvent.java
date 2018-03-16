@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,17 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+package com.couchbase.client.core.endpoint;
 
-package com.couchbase.client.core;
+import com.couchbase.client.core.endpoint.kv.KeyValueFeatureHandler;
 
-import com.couchbase.client.core.message.CouchbaseRequest;
-import rx.functions.Func0;
+import java.util.List;
 
 /**
- * Marker interface which is used to denote a factory implementation that creates new requests on each call..
+ * An event sent by the {@link KeyValueFeatureHandler} to list all the negotiated features.
  *
  * @author Michael Nitschinger
  * @since 1.2.0
  */
-public interface RequestFactory extends Func0<CouchbaseRequest> {
+public class ServerFeaturesEvent {
+
+    private final List<ServerFeatures> supportedFeatures;
+
+    public ServerFeaturesEvent(List<ServerFeatures> supportedFeatures) {
+        this.supportedFeatures = supportedFeatures;
+    }
+
+    public List<ServerFeatures> supportedFeatures() {
+        return supportedFeatures;
+    }
+
 }

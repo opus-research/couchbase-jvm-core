@@ -34,15 +34,20 @@ import io.netty.buffer.ByteBuf;
 public class RemoveResponse extends AbstractKeyValueResponse {
 
     private final long cas;
+    private final MutationToken mutationToken;
 
     public RemoveResponse(final ResponseStatus status, final short serverStatusCode, final long cas, final String bucket,
-                          final ByteBuf content, final CouchbaseRequest request) {
+        final ByteBuf content, final MutationToken mutationToken, final CouchbaseRequest request) {
         super(status, serverStatusCode, bucket, content, request);
         this.cas = cas;
+        this.mutationToken = mutationToken;
     }
 
     public long cas() {
         return cas;
     }
 
+    public MutationToken mutationToken() {
+        return mutationToken;
+    }
 }
