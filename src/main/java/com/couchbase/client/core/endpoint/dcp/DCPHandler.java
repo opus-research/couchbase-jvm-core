@@ -248,7 +248,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     expiration = extras.readInt();
                     lockTime = extras.readInt();
                 }
-                request = new MutationMessage(msg.getStatus(), msg.getKey(), msg.content().retain(), expiration,
+                request = new MutationMessage(msg.getStatus(), new String(msg.getKey(), CHARSET), msg.content().retain(), expiration,
                         bySeqno, revSeqno, flags, lockTime, msg.getCAS(), connection.bucket());
                 updateConnectionStats(ctx, connection, msg);
                 break;
@@ -259,7 +259,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     bySeqno = extras.readLong();
                     revSeqno = extras.readLong();
                 }
-                request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), bySeqno, revSeqno, connection.bucket());
+                request = new RemoveMessage(msg.getStatus(), new String(msg.getKey(), CHARSET), msg.getCAS(), bySeqno, revSeqno, connection.bucket());
                 updateConnectionStats(ctx, connection, msg);
                 break;
 
@@ -301,7 +301,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
 
     private BinaryMemcacheRequest bufferAckRequest(ChannelHandlerContext ctx, int size) {
         ByteBuf extras = ctx.alloc().buffer(4).writeInt(size);
-        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest("", extras);
+        BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(null, extras);
         request.setOpcode(OP_BUFFER_ACK);
         request.setExtrasLength((byte) extras.readableBytes());
         request.setTotalBodyLength(extras.readableBytes());
@@ -317,8 +317,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     }
 
     private FullBinaryMemcacheRequest controlRequest(ChannelHandlerContext ctx, ControlParameter parameter, String value) {
-        String key = parameter.value();
-        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
+        byte[] key = parameter.value().getBytes(CharsetUtil.UTF_8);
+        short keyLength = (short) key.length;
         byte[] val = value.getBytes(CharsetUtil.UTF_8);
         ByteBuf body = ctx.alloc().buffer(val.length);
         body.writeBytes(val);
@@ -344,9 +344,9 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                 .writeInt(msg.sequenceNumber())
                 .writeInt(msg.type().flags());
 
-        String key = msg.connectionName();
+        byte[] key = msg.connectionName().getBytes(CharsetUtil.UTF_8);
         byte extrasLength = (byte) extras.readableBytes();
-        short keyLength = (short) key.getBytes(CharsetUtil.UTF_8).length;
+        short keyLength = (short) key.length;
 
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key, extras);
         request.setOpcode(OP_OPEN_CONNECTION);
