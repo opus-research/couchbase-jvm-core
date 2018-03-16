@@ -53,6 +53,11 @@ import java.util.concurrent.TimeUnit;
 public class CarrierRefresher extends AbstractRefresher {
 
     /**
+     * Don't poll more often than 50ms.
+     */
+    static final long POLL_FLOOR_NS = TimeUnit.MILLISECONDS.toNanos(50);
+
+    /**
      * The logger used.
      */
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(CarrierRefresher.class);
@@ -74,11 +79,6 @@ public class CarrierRefresher extends AbstractRefresher {
     private final Map<String, Long> lastPollTimestamps;
 
     /**
-     * The minimum poll interval in nanoseconds.
-     */
-    private final long pollFloorNs;
-
-    /**
      * Creates a new {@link CarrierRefresher}.
      *
      * @param environment the environment to use.
@@ -90,7 +90,6 @@ public class CarrierRefresher extends AbstractRefresher {
         this.environment = environment;
         this.lastPollTimestamps = new ConcurrentHashMap<String, Long>();
         this.nodeOffset = 0;
-        this.pollFloorNs = TimeUnit.MILLISECONDS.toNanos(environment.configPollFloorInterval());
 
         long pollInterval = environment.configPollInterval();
         if (pollInterval > 0) {
@@ -310,7 +309,7 @@ public class CarrierRefresher extends AbstractRefresher {
      */
     private boolean allowedToPoll(final String bucket) {
         Long bucketLastPollTimestamp = lastPollTimestamps.get(bucket);
-        return bucketLastPollTimestamp == null || ((System.nanoTime() - bucketLastPollTimestamp) >= pollFloorNs);
+        return bucketLastPollTimestamp == null || ((System.nanoTime() - bucketLastPollTimestamp) >= POLL_FLOOR_NS);
     }
 
     /**
