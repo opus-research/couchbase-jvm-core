@@ -57,14 +57,13 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
 
     private final List<ServerFeatures> features;
     private final String userAgent;
-    private final String bucket;
 
     /**
      * The connect promise issued by the connect process.
      */
     private ChannelPromise originalPromise;
 
-    public KeyValueFeatureHandler(CoreEnvironment environment, String bucket) {
+    public KeyValueFeatureHandler(CoreEnvironment environment) {
         userAgent = environment.userAgent();
         boolean tcpNodelay = environment.tcpNodelayEnabled();
 
@@ -74,8 +73,6 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
         }
         features.add(tcpNodelay ? ServerFeatures.TCPNODELAY : ServerFeatures.TCPDELAY);
         features.add(ServerFeatures.XATTR);
-        features.add(ServerFeatures.SELECT_BUCKET);
-        this.bucket = bucket;
     }
 
     @Override
@@ -92,9 +89,6 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
         }
 
         LOGGER.debug("Negotiated supported features: {}", supported);
-        if (supported.contains(ServerFeatures.SELECT_BUCKET)) {
-            LOGGER.debug("Adding select bucket handler");
-        }
         ctx.fireUserEventTriggered(new ServerFeaturesEvent(supported));
         originalPromise.setSuccess();
         ctx.pipeline().remove(this);
