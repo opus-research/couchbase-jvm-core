@@ -42,8 +42,6 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
 
     private boolean xattr;
 
-    private boolean createDocument;
-
     private long cas;
 
     /**
@@ -120,9 +118,4 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
     public long cas() {
         return this.cas;
     }
-
-    @Override
-    public boolean createDocument() { return this.createDocument; }
-
-    public void createDocument(boolean createDocument) { this.createDocument = createDocument; }
 }

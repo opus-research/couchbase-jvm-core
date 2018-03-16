@@ -20,7 +20,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.DecodingState;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseMessage;
@@ -784,12 +783,6 @@ public class QueryHandlerTest {
             @Override
             protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
                 assertEquals(2, keepAliveEventCounter.incrementAndGet());
-            }
-
-            @Override
-            protected CoreEnvironment env() {
-                return DefaultCoreEnvironment.builder()
-                        .continuousKeepAliveEnabled(false).build();
             }
         };
         EmbeddedChannel channel = new EmbeddedChannel(testHandler);
@@ -1560,7 +1553,6 @@ public class QueryHandlerTest {
         when(requestMock1.username()).thenReturn("foo");
         when(requestMock1.password()).thenReturn("");
         when(requestMock1.observable()).thenReturn(obs1);
-        when(requestMock1.isActive()).thenReturn(true);
 
         Subject<CouchbaseResponse,CouchbaseResponse> obs2 = AsyncSubject.create();
         RawQueryRequest requestMock2 = mock(RawQueryRequest.class);
@@ -1569,7 +1561,7 @@ public class QueryHandlerTest {
         when(requestMock2.username()).thenReturn("foo");
         when(requestMock2.password()).thenReturn("");
         when(requestMock2.observable()).thenReturn(obs2);
-        when(requestMock2.isActive()).thenReturn(true);
+
 
         TestSubscriber<CouchbaseResponse> t1 = TestSubscriber.create();
         TestSubscriber<CouchbaseResponse> t2 = TestSubscriber.create();

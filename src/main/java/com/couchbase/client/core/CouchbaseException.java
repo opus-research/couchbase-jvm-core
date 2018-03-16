@@ -15,10 +15,6 @@
  */
 package com.couchbase.client.core;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.message.ResponseStatusDetails;
-
 /**
  * Common parent exception to build a proper exception hierachy inside the driver.
  *
@@ -26,8 +22,6 @@ import com.couchbase.client.core.message.ResponseStatusDetails;
  * @since 1.0
  */
 public class CouchbaseException extends RuntimeException {
-
-    private volatile ResponseStatusDetails responseStatusDetails;
 
     public CouchbaseException() {
 	super();
@@ -45,26 +39,4 @@ public class CouchbaseException extends RuntimeException {
         super(cause);
     }
 
-    @InterfaceAudience.Public
-    @InterfaceStability.Experimental
-    public ResponseStatusDetails details() {
-        return responseStatusDetails;
-    }
-
-    @InterfaceAudience.Private
-    @InterfaceStability.Experimental
-    public void details(final ResponseStatusDetails responseStatusDetails) {
-        this.responseStatusDetails = responseStatusDetails;
-    }
-
-    @Override
-    public String getMessage() {
-        String message = super.getMessage();
-
-        if (responseStatusDetails != null) {
-            message +=  " (Context: " + responseStatusDetails.context() + ", Reference: "
-                    + responseStatusDetails.reference() + ")";
-        }
-        return message;
-    }
 }

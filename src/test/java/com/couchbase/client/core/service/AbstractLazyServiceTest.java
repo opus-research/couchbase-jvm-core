@@ -112,7 +112,7 @@ public class AbstractLazyServiceTest {
 
         @Override
         public ServiceType type() {
-            return ServiceType.QUERY;
+            return ServiceType.DCP;
         }
 
     }

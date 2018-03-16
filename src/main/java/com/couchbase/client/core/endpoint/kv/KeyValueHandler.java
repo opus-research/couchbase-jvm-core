@@ -27,7 +27,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.ResponseStatusDetails;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -78,7 +77,6 @@ import com.couchbase.client.core.message.kv.subdoc.multi.Mutation;
 import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommand;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
 import com.couchbase.client.core.message.kv.subdoc.simple.SubExistRequest;
-import com.couchbase.client.core.message.kv.subdoc.simple.SubGetCountRequest;
 import com.couchbase.client.core.message.kv.subdoc.simple.SubGetRequest;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.time.Delay;
@@ -106,7 +104,6 @@ import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.AUTH
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.AUTO_RETRY;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.CONN_STATE_INVALIDATED;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.FETCH_CONFIG;
-import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.ITEM_LOCKED;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.RETRY_LATER;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.RETRY_NOW;
 import static com.couchbase.client.core.endpoint.kv.ErrorMap.ErrorAttribute.SUBDOC;
@@ -167,7 +164,6 @@ public class KeyValueHandler
     public static final byte OP_SUB_COUNTER = (byte) 0xcf;
     public static final byte OP_SUB_MULTI_LOOKUP = (byte) 0xd0;
     public static final byte OP_SUB_MULTI_MUTATION = (byte) 0xd1;
-    public static final byte OP_SUB_GET_COUNT = (byte) 0xd2;
 
     /**
      * The bitmask for sub-document extras "command" section (third byte of the extras) that activates the
@@ -595,7 +591,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        ByteBuf extras = ctx.alloc().buffer(3, 8); //extras can be 8 bytes if there is an expiry
+        ByteBuf extras = ctx.alloc().buffer(3, 7); //extras can be 7 bytes if there is an expiry
         byte extrasLength = 3; //by default 2 bytes for pathLength + 1 byte for "command" flags
         extras.writeShort(msg.pathLength());
 
@@ -617,16 +613,6 @@ public class KeyValueHandler
                 extras.writeInt(mut.expiration());
             }
 
-            byte docFlags = 0;
-            if (mut.createDocument()) {
-                docFlags |= SUBDOC_FLAG_MKDOC;
-            }
-
-            if (docFlags != 0) {
-                extrasLength += 1;
-                extras.writeByte(docFlags);
-            }
-
             cas = mut.cas();
         } else if (msg instanceof SubGetRequest) {
             SubGetRequest req =  (SubGetRequest)msg;
@@ -636,14 +622,7 @@ public class KeyValueHandler
                 extras.writeByte(0);
             }
         } else if (msg instanceof SubExistRequest) {
-            SubExistRequest req = (SubExistRequest) msg;
-            if (req.xattr()) {
-                extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
-            } else {
-                extras.writeByte(0);
-            }
-        } else if (msg instanceof SubGetCountRequest) {
-            SubGetCountRequest req = (SubGetCountRequest) msg;
+            SubExistRequest req =  (SubExistRequest)msg;
             if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
@@ -723,13 +702,7 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
-        ResponseStatusDetails statusDetails = ResponseStatusConverter.detailsFromBinary(
-            msg.getDataType(),
-            msg.content()
-        );
-
-        // Only consult the error map if we don't know what the code is!
-        ErrorMap.ErrorCode errorCode = status == ResponseStatus.FAILURE ? ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus()) : null;
+        ErrorMap.ErrorCode errorCode = ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus());
 
         if (errorCode != null) {
             LOGGER.debug("ResponseStatus with Extended Error Code {}", errorCode.toString());
@@ -757,15 +730,6 @@ public class KeyValueHandler
                 LOGGER.debug(logIdent(ctx, endpoint()) +
                         "Authentication failure using error code translation");
                 status = ResponseStatus.ACCESS_ERROR;
-            }
-
-            // For LOCKED we need to make sure we are not retrying to preserve
-            // backwards compatible behavior (that is, not retry...)!
-            if (errorCode.attributes().contains(ITEM_LOCKED)) {
-                errorCode.attributes().remove(RETRY_NOW);
-                errorCode.attributes().remove(RETRY_LATER);
-                errorCode.attributes().remove(AUTO_RETRY);
-                status = ResponseStatus.LOCKED;
             }
 
             if (errorCode.attributes().contains(AUTO_RETRY) ||
@@ -832,11 +796,6 @@ public class KeyValueHandler
         } else {
             finishedDecoding();
         }
-
-        if (statusDetails != null) {
-            response.statusDetails(statusDetails);
-        }
-
         return response;
     }
 

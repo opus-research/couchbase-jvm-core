@@ -320,11 +320,6 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
 
         Endpoint endpoint = endpoints.size() > 0 ? selectionStrategy.select(request, endpoints) : null;
 
-        //don't send timed out requests to server
-        if(!request.isActive()) {
-            return;
-        }
-
         if (endpoint == null) {
             if (fixedEndpoints || ((endpoints.size() + pendingRequests) >= maxEndpoints)) {
                 RetryHelper.retryOrCancel(env, request, responseBuffer);
@@ -411,7 +406,9 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
      * @param signalFlush the flush signal to propagate.
      */
     private void sendFlush(final SignalFlush signalFlush) {
-        for (Endpoint endpoint : endpoints) {
+        int length = endpoints.size();
+        for (int i = 0; i < length; i++) {
+            Endpoint endpoint = endpoints.get(i);
             if (endpoint != null) {
                 endpoint.send(signalFlush);
             }
