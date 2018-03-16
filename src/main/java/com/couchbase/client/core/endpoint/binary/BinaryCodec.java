@@ -157,16 +157,7 @@ public class BinaryCodec extends MessageToMessageCodec<FullBinaryMemcacheRespons
                 content.release();
                 content = compressed;
             }
-            int flags = 0;
-            if (msg.getExtrasLength() > 0)
-            {
-                final ByteBuf extrasReleased = msg.getExtras();
-                final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
-                extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-                flags = extras.getInt(0);
-                extras.release();
-            }
-            in.add(new GetResponse(status, cas, flags, bucket, content, currentRequest));
+            in.add(new GetResponse(status, cas, bucket, content, currentRequest));
         } else if (current instanceof InsertRequest) {
             in.add(new InsertResponse(status, cas, bucket, msg.content().copy(), currentRequest));
         } else if (current instanceof UpsertRequest) {
