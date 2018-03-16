@@ -484,9 +484,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     private void decideBetweenRawAndObjects(boolean lastChunk) {
-        //close out the error observable as we got the results!!
-        queryErrorObservable.onCompleted();
-
         responseContent.markReaderIndex();
         int openArrayPos = findNextChar(responseContent, '[');
         if (openArrayPos > -1) {
