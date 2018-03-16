@@ -25,6 +25,8 @@ import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
+import com.couchbase.client.core.event.EventBus;
+import com.couchbase.client.core.event.system.ConfigUpdatedEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
@@ -78,11 +80,6 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(RequestHandler.class);
 
     /**
-     * The initial number of nodes, will expand automatically if more are needed.
-     */
-    private static final int INITIAL_NODE_SIZE = 128;
-
-    /**
      * The node locator for the binary service.
      */
     private final Locator binaryLocator = new KeyValueLocator();
@@ -128,6 +125,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     private final RingBuffer<ResponseEvent> responseBuffer;
 
     /**
+     * The event bus to publish events onto.
+     */
+    private final EventBus eventBus;
+
+    /**
      * Create a new {@link RequestHandler}.
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
@@ -146,6 +148,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
         this.nodes = nodes;
         this.environment = environment;
         this.responseBuffer = responseBuffer;
+        this.eventBus = environment.eventBus();
         configuration = new AtomicReference<ClusterConfig>();
 
         configObservable.subscribe(new Action1<ClusterConfig>() {
@@ -155,10 +158,12 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     LOGGER.debug("Got notified of a new configuration arriving.");
                     configuration.set(config);
                     reconfigure(config).subscribe();
+                    if (eventBus != null) {
+                        eventBus.publish(new ConfigUpdatedEvent(config));
+                    }
                 } catch (Exception ex) {
-                    ex.printStackTrace();
+                    LOGGER.error("Error while subscribing to bucket config stream.", ex);
                 }
-
             }
         });
     }

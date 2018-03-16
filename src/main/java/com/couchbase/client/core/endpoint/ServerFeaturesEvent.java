@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Couchbase, Inc.
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,24 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.config;
+package com.couchbase.client.core.endpoint;
+
+import com.couchbase.client.core.endpoint.kv.KeyValueFeatureHandler;
+
+import java.util.List;
 
 /**
- * Represents the node locator used for the specific bucket type.
+ * An event sent by the {@link KeyValueFeatureHandler} to list all the negotiated features.
  *
  * @author Michael Nitschinger
- * @since 1.0.0
+ * @since 1.2.0
  */
-public enum BucketNodeLocator {
+public class ServerFeaturesEvent {
 
-    /**
-     * The partition based node locator.
-     */
-    VBUCKET,
+    private final List<ServerFeatures> supportedFeatures;
 
-    /**
-     * The node locator based on the ketama location algorithm.
-     */
-    KETAMA
+    public ServerFeaturesEvent(List<ServerFeatures> supportedFeatures) {
+        this.supportedFeatures = supportedFeatures;
+    }
+
+    public List<ServerFeatures> supportedFeatures() {
+        return supportedFeatures;
+    }
 
 }
