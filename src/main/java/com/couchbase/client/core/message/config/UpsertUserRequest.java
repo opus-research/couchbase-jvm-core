@@ -20,6 +20,7 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 /**
  * @author Subhashni Balakrishnan
+ * @since 1.4.4
  */
 public class UpsertUserRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 

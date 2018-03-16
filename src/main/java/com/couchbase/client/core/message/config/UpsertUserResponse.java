@@ -21,6 +21,7 @@ import com.couchbase.client.core.message.ResponseStatus;
 
 /**
  * @author Subhashni Balakrishnan
+ * @since 1.4.4
  */
 public class UpsertUserResponse extends AbstractCouchbaseResponse {
     private final String msg;

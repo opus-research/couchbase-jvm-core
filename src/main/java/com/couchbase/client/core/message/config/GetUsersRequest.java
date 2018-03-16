@@ -20,6 +20,7 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 
 /**
  * @author Subhashni Balakrishnan
+ * @since 1.4.4
  */
 public class GetUsersRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
@@ -31,4 +32,3 @@ public class GetUsersRequest extends AbstractCouchbaseRequest implements ConfigR
         return "/settings/rbac/users";
     }
 }
-

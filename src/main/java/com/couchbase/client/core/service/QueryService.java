@@ -52,9 +52,9 @@ public class QueryService extends PooledService {
      * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public QueryService(final String hostname, final String bucket, final String username, final String password, final int port,
+    public QueryService(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.queryServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+        super(hostname, bucket, password, port, env, env.queryServiceConfig(), responseBuffer, FACTORY, STRATEGY);
     }
 
 
@@ -68,9 +68,9 @@ public class QueryService extends PooledService {
      */
     static class QueryEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
             final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new QueryEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new QueryEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 }
