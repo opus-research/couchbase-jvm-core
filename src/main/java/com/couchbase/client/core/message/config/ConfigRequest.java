@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.message.config;
 
-import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 
 /**
@@ -30,7 +29,7 @@ import com.couchbase.client.core.message.CouchbaseRequest;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public interface ConfigRequest extends CouchbaseRequest, BootstrapMessage {
+public interface ConfigRequest extends CouchbaseRequest {
 
     String path();
 
