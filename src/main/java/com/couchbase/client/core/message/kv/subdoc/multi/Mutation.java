@@ -26,7 +26,7 @@ import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
  * @author Simon Baslé
  * @since 1.2
  */
-@InterfaceStability.Committed
+@InterfaceStability.Experimental
 @InterfaceAudience.Public
 public enum Mutation {
 

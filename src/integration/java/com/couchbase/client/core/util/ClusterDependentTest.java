@@ -66,6 +66,7 @@ public class ClusterDependentTest {
 
     static {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+        System.setProperty("com.couchbase.xerrorEnabled", "false");
     }
 
     private static final String seedNode = TestProperties.seedNode();
@@ -75,7 +76,6 @@ public class ClusterDependentTest {
     private static final String adminUser = TestProperties.adminUser();
     private static final String adminPassword = TestProperties.adminPassword();
     private static final CouchbaseMock couchbaseMock = TestProperties.couchbaseMock();
-    private static final Boolean useMock = TestProperties.useMock();
     private static CoreEnvironment env;
 
     protected static final int KEEPALIVE_INTERVAL = 1000;
@@ -112,7 +112,7 @@ public class ClusterDependentTest {
      * Helper (hacked together) method to grab a config from a bucket without having to initialize the
      * client first - this helps with pre-bootstrap decisions like credentials for RBAC.
      */
-    public static int[] minClusterVersion() throws Exception {
+    private static int[] minClusterVersion() throws Exception {
         URIBuilder builder = new URIBuilder();
         builder.setScheme("http").setHost(seedNode).setPort(8091).setPath("/pools/default/buckets/" + bucket)
             .setParameter("bucket", bucket);
@@ -130,7 +130,7 @@ public class ClusterDependentTest {
     }
 
 
-    public static void connect() throws Exception {
+    public static void connect(boolean useMock) throws Exception {
 
         /*
          * If we are running under RBAC, set the user and password to the admin
@@ -160,7 +160,9 @@ public class ClusterDependentTest {
             }
 
         }
-        env = envBuilder
+        env = envBuilder.dcpEnabled(true)
+                .dcpConnectionBufferSize(1024)          // 1 kilobyte
+                .dcpConnectionBufferAckThreshold(0.5)   // should trigger BUFFER_ACK after 512 bytes
                 .mutationTokensEnabled(true)
                 .keepAliveInterval(KEEPALIVE_INTERVAL)
                 .build();
@@ -203,6 +205,15 @@ public class ClusterDependentTest {
     }
 
     public static CouchbaseMock mock() { return couchbaseMock; }
+
+    /**
+     * Checks based on the cluster node versions if DCP is available.
+     *
+     * @return true if all nodes in the cluster are version 3 or later.
+     */
+    public static boolean isDCPEnabled() throws Exception {
+        return minNodeVersion()[0] >= 3;
+    }
 
     public static boolean isMutationMetadataEnabled() throws Exception {
         return minNodeVersion()[0] >= 4;

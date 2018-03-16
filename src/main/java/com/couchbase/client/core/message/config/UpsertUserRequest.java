@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.couchbase.client.core.message.config;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
@@ -23,20 +24,18 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
  */
 public class UpsertUserRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
-    private final String userId;
-    private final String domain;
+    private final String userid;
     private final String payload;
 
-    public UpsertUserRequest(String username, String password, String domain, String userId, String payload) {
+    public UpsertUserRequest(String userid, String payload, String username, String password) {
         super(username, password);
-        this.userId = userId;
-        this.domain = domain;
+        this.userid = userid;
         this.payload = payload;
     }
 
     @Override
     public String path() {
-        return "/settings/rbac/users/" + domain + "/" + userId;
+        return "/settings/rbac/users/local/" + userid;
     }
 
     public String payload() {
