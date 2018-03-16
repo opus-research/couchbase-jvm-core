@@ -564,14 +564,12 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             int splitPos = findSplitPosition(responseContent, ',');
             int arrayEndPos = findSplitPosition(responseContent, ']');
 
-            boolean doSectionDone = false;
-
             if (splitPos == -1 && arrayEndPos == -1) {
                 //need more data
                 break;
             } else if (arrayEndPos > 0 && (arrayEndPos < splitPos || splitPos == -1)) {
                 splitPos = arrayEndPos;
-                doSectionDone = true;
+                sectionDone();
             }
 
             int length = splitPos - responseContent.readerIndex();
@@ -580,8 +578,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             responseContent.skipBytes(1);
             responseContent.discardReadBytes();
 
-            if (doSectionDone) {
-                sectionDone();
+            if (sectionDone) {
                 queryParsingState = transitionToNextToken(lastChunk);
                 break;
             }

@@ -17,12 +17,12 @@ package com.couchbase.client.core.endpoint.util;
 
 /**
  * Base class for {@link io.netty.buffer.ByteBufProcessor} that need to take JSON string escaping
- * into account, through the {@link #isEscaped(byte)} method.
+ * into account.
  *
  * @author Simon Baslé
  * @since 1.3
  */
-public abstract class AbstractStringAwareBufProcessor {
+public class AbstractStringAwareBufProcessor {
 
     /** previous bytes (current - 1) inspected by string detection (useful to detect escaped quotes) */
     private byte lastByte = 0;
