@@ -71,6 +71,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final String SSL_KEYSTORE_PASSWORD = null;
     public static final boolean QUERY_ENABLED = false;
     public static final int QUERY_PORT = 8093;
+    private static final boolean SEARCH_ENABLED = false;
+    private static final int SEARCH_PORT = 8095;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -86,6 +88,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int KEYVALUE_ENDPOINTS = 1;
     public static final int VIEW_ENDPOINTS = 1;
     public static final int QUERY_ENDPOINTS = 1;
+    public static final int SEARCH_ENDPOINTS = 1;
     public static final Delay OBSERVE_INTERVAL_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 10);
     public static final Delay RECONNECT_DELAY = Delay.exponential(TimeUnit.MILLISECONDS, 4096, 32);
     public static final Delay RETRY_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 100);
@@ -159,6 +162,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final String sslKeystorePassword;
     private final boolean queryEnabled;
     private final int queryPort;
+    private final boolean searchEnabled;
+    private final int searchPort;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -174,6 +179,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
+    private final int searchServiceEndpoints;
     private final Delay observeIntervalDelay;
     private final Delay reconnectDelay;
     private final Delay retryDelay;
@@ -214,6 +220,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
         queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled);
         queryPort = intPropertyOr("queryPort", builder.queryPort);
+        searchEnabled = booleanPropertyOr("searchEnabled", builder.searchEnabled);
+        searchPort = intPropertyOr("searchPort", builder.searchPort);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -229,6 +237,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
+        searchServiceEndpoints = intPropertyOr("searchEndpoints", builder.searchEndpoints);
         packageNameAndVersion = stringPropertyOr("packageNameAndVersion", builder.packageNameAndVersion);
         userAgent = stringPropertyOr("userAgent", builder.userAgent);
         observeIntervalDelay = builder.observeIntervalDelay;
@@ -484,6 +493,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
+    public boolean searchEnabled() {
+        return searchEnabled;
+    }
+
+    @Override
+    public int searchPort() {
+        return searchPort;
+    }
+
+    @Override
     public boolean bootstrapHttpEnabled() {
         return bootstrapHttpEnabled;
     }
@@ -555,6 +574,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public int queryEndpoints() {
         return queryServiceEndpoints;
+    }
+
+    @Override
+    public int searchEndpoints() {
+        return searchServiceEndpoints;
     }
 
     @Override
@@ -647,6 +671,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean queryEnabled = QUERY_ENABLED;
         private int queryPort = QUERY_PORT;
+        public boolean searchEnabled = SEARCH_ENABLED;
+        public int searchPort = SEARCH_PORT;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
         private boolean bootstrapCarrierEnabled = BOOTSTRAP_CARRIER_ENABLED;
         private int bootstrapHttpDirectPort = BOOTSTRAP_HTTP_DIRECT_PORT;
@@ -662,6 +688,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
+        private int searchEndpoints = SEARCH_ENDPOINTS;
         private Delay observeIntervalDelay = OBSERVE_INTERVAL_DELAY;
         private Delay reconnectDelay = RECONNECT_DELAY;
         private Delay retryDelay = RETRY_DELAY;
@@ -739,6 +766,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder queryPort(final int queryPort) {
             this.queryPort = queryPort;
+            return this;
+        }
+
+        public Builder searchEnabled(final boolean searchEnabled) {
+            this.searchEnabled = searchEnabled;
+            return this;
+        }
+
+        public Builder searchPort(final int searchPort) {
+            this.searchPort = searchPort;
             return this;
         }
 
@@ -886,6 +923,17 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder queryEndpoints(final int queryEndpoints) {
             this.queryEndpoints = queryEndpoints;
+            return this;
+        }
+
+        /**
+         * Sets the number of Search (CBFT) endpoints to open per node in the cluster
+         * (default value {@value #SEARCH_ENDPOINTS}).
+         *
+         * Setting this to a higher number is advised in heavy query workloads.
+         */
+        public Builder searchEndpoints(final int searchEndpoints) {
+            this.searchEndpoints = searchEndpoints;
             return this;
         }
 
@@ -1130,6 +1178,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
         sb.append(", queryEnabled=").append(queryEnabled);
         sb.append(", queryPort=").append(queryPort);
+        sb.append(", searchEnabled=").append(searchEnabled);
+        sb.append(", searchPort=").append(searchPort);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
@@ -1143,6 +1193,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", kvServiceEndpoints=").append(kvServiceEndpoints);
         sb.append(", viewServiceEndpoints=").append(viewServiceEndpoints);
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
+        sb.append(", searchServiceEndpoints=").append(searchServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");
