@@ -30,6 +30,8 @@ import com.couchbase.client.core.message.config.BucketConfigRequest;
 import com.couchbase.client.core.message.config.BucketConfigResponse;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
+import com.couchbase.client.core.message.config.BucketsConfigRequest;
+import com.couchbase.client.core.message.config.BucketsConfigResponse;
 import com.couchbase.client.core.message.config.ClusterConfigRequest;
 import com.couchbase.client.core.message.config.ClusterConfigResponse;
 import com.couchbase.client.core.message.config.ConfigRequest;
@@ -37,11 +39,16 @@ import com.couchbase.client.core.message.config.FlushRequest;
 import com.couchbase.client.core.message.config.FlushResponse;
 import com.couchbase.client.core.message.config.GetDesignDocumentsRequest;
 import com.couchbase.client.core.message.config.GetDesignDocumentsResponse;
+import com.couchbase.client.core.message.config.InsertBucketRequest;
+import com.couchbase.client.core.message.config.RemoveBucketRequest;
+import com.couchbase.client.core.message.config.RemoveBucketResponse;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -50,6 +57,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.CharsetUtil;
 import rx.subjects.BehaviorSubject;
 
 import java.net.InetSocketAddress;
@@ -110,24 +118,20 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
     @Override
     protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final ConfigRequest msg) throws Exception {
-        HttpMethod httpMethod;
-
-        if (msg instanceof BucketConfigRequest) {
-            httpMethod = HttpMethod.GET;
-        } else if (msg instanceof ClusterConfigRequest) {
-            httpMethod = HttpMethod.GET;
-        } else if (msg instanceof BucketStreamingRequest) {
-            httpMethod = HttpMethod.GET;
-        } else if(msg instanceof FlushRequest) {
+        HttpMethod httpMethod = HttpMethod.GET;
+        if (msg instanceof FlushRequest || msg instanceof InsertBucketRequest) {
             httpMethod = HttpMethod.POST;
-        } else if (msg instanceof GetDesignDocumentsRequest) {
-            httpMethod = HttpMethod.GET;
-        } else {
-            throw new IllegalArgumentException("Unknown incoming ConfigRequest type "
-                + msg.getClass());
+        } else if (msg instanceof RemoveBucketRequest) {
+            httpMethod = HttpMethod.DELETE;
         }
 
-        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, httpMethod, msg.path());
+        ByteBuf content;
+        if (msg instanceof InsertBucketRequest) {
+            content = Unpooled.copiedBuffer(((InsertBucketRequest) msg).payload(), CharsetUtil.UTF_8);
+        } else {
+            content = Unpooled.EMPTY_BUFFER;
+        }
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, httpMethod, msg.path(), content);
         addAuth(ctx, request, msg.bucket(), msg.password());
 
         return request;
@@ -201,8 +205,12 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
                 response = new BucketConfigResponse(body, status);
             } else if (request instanceof ClusterConfigRequest) {
                 response = new ClusterConfigResponse(body, status);
+            } else if (request instanceof BucketsConfigRequest) {
+                response = new BucketsConfigResponse(body, status);
             } else if (request instanceof GetDesignDocumentsRequest) {
                 response = new GetDesignDocumentsResponse(body, status, request);
+            } else if (request instanceof RemoveBucketRequest) {
+                response = new RemoveBucketResponse(status);
             } else if (request instanceof FlushRequest) {
                 boolean done = responseHeader.getStatus().code() != 201;
                 response = new FlushResponse(done, body, status);
@@ -256,6 +264,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         switch(code) {
             case 200:
             case 201:
+            case 202:
                 status = ResponseStatus.SUCCESS;
                 break;
             case 404:
