@@ -39,10 +39,6 @@ public class DefaultLatencyMetricsCollectorConfig
     private final TimeUnit targetUnit;
     private final Double[] targetPercentiles;
 
-    public static DefaultLatencyMetricsCollectorConfig disabled() {
-        return create(0, TimeUnit.SECONDS);
-    }
-
     public static DefaultLatencyMetricsCollectorConfig create() {
         return new DefaultLatencyMetricsCollectorConfig(builder());
     }

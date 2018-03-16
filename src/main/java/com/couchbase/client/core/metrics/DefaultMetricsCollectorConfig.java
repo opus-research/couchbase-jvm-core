@@ -37,10 +37,6 @@ public class DefaultMetricsCollectorConfig implements MetricsCollectorConfig {
     private final long emitFrequency;
     private final TimeUnit emitFrequencyUnit;
 
-    public static DefaultMetricsCollectorConfig disabled() {
-        return create(0, TimeUnit.SECONDS);
-    }
-
     public static DefaultMetricsCollectorConfig create() {
         return new DefaultMetricsCollectorConfig(builder());
     }
