@@ -29,7 +29,7 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  * A message representing event that removes or expires a document.
  *
  * @author Sergey Avseyev
- * @since 1.2.6
+ * @since 1.1.0
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private

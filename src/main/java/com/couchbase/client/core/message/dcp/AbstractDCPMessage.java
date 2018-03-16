@@ -31,7 +31,7 @@ import rx.subjects.Subject;
  * Default implementation of {@link DCPRequest}.
  *
  * @author Sergey Avseyev
- * @since 1.2.6
+ * @since 1.1.0
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
