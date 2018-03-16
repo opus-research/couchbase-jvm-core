@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2016-2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import io.netty.channel.EventLoopGroup;
 import rx.Observable;
 import rx.Scheduler;
 
-import java.security.KeyStore;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,7 +39,7 @@ import java.util.concurrent.TimeUnit;
  * Note that the {@link CoreEnvironment} is stateful, so be sure to call {@link #shutdown()} or
  * {@link #shutdownAsync()} properly.
  */
-public interface CoreEnvironment {
+public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironment {
 
     /**
      * Shutdown the {@link CoreEnvironment} with the default timeout.
@@ -80,11 +79,40 @@ public interface CoreEnvironment {
     Observable<Boolean> shutdownAsync();
 
     /**
-     * Returns the IO pool for the underlying IO framework.
+     * Returns the IO pool for the underlying IO framework, used as the default pool if not overridden
+     * for the individual services.
      *
-     * @return the IO pool, shared across resources.
+     * @return the default IO pool, shared across resources.
      */
     EventLoopGroup ioPool();
+
+    /**
+     * If set returns the IO Pool for the KV service, if not returns null.
+     *
+     * @return the KV IO pool if set, null otherwise.
+     */
+    EventLoopGroup kvIoPool();
+
+    /**
+     * If set returns the IO Pool for the View service, if not returns null.
+     *
+     * @return the view IO pool if set, null otherwise.
+     */
+    EventLoopGroup viewIoPool();
+
+    /**
+     * If set returns the IO Pool for the query service, if not returns null.
+     *
+     * @return the query IO pool if set, null otherwise.
+     */
+    EventLoopGroup queryIoPool();
+
+    /**
+     * If set returns the IO Pool for the search service, if not returns null.
+     *
+     * @return the search IO pool if set, null otherwise.
+     */
+    EventLoopGroup searchIoPool();
 
     /**
      * Returns the scheduler which should be used for all core actions that need to happen
@@ -100,34 +128,6 @@ public interface CoreEnvironment {
      * @return true if DCP is enabled, false otherwise.
      */
     boolean dcpEnabled();
-
-    /**
-     * Identifies if SSL should be enabled.
-     *
-     * @return true if SSL is enabled, false otherwise.
-     */
-    boolean sslEnabled();
-
-    /**
-     * Identifies the filepath to the ssl keystore.
-     *
-     * @return the path to the keystore file.
-     */
-    String sslKeystoreFile();
-
-    /**
-     * The password which is used to protect the keystore.
-     *
-     * @return the keystore password.
-     */
-    String sslKeystorePassword();
-
-    /**
-     * Allows to directly configure a {@link KeyStore}.
-     *
-     * @return the keystore to use.
-     */
-    KeyStore sslKeystore();
 
     /**
      * If bootstrapping through HTTP is enabled.

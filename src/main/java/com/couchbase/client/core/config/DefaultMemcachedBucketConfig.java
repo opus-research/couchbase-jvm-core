@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2016-2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@
 
 package com.couchbase.client.core.config;
 
+import com.couchbase.client.core.env.ConfigParserEnvironment;
 import com.couchbase.client.core.service.ServiceType;
+import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -34,10 +36,12 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
 
     private final long rev;
     private final TreeMap<Long, NodeInfo> ketamaNodes;
+    private final ConfigParserEnvironment env;
 
     /**
      * Creates a new {@link MemcachedBucketConfig}.
      *
+     * @param env the bootstrap part of environment object.
      * @param rev the revision of the config.
      * @param name the name of the bucket.
      * @param uri the URI for this bucket.
@@ -47,13 +51,15 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
      */
     @JsonCreator
     public DefaultMemcachedBucketConfig(
-        @JsonProperty("rev") long rev,
-        @JsonProperty("name") String name,
-        @JsonProperty("uri") String uri,
-        @JsonProperty("streamingUri") String streamingUri,
-        @JsonProperty("nodes") List<NodeInfo> nodeInfos,
-        @JsonProperty("nodesExt") List<PortInfo> portInfos) {
+            @JacksonInject("env")ConfigParserEnvironment env,
+            @JsonProperty("rev") long rev,
+            @JsonProperty("name") String name,
+            @JsonProperty("uri") String uri,
+            @JsonProperty("streamingUri") String streamingUri,
+            @JsonProperty("nodes") List<NodeInfo> nodeInfos,
+            @JsonProperty("nodesExt") List<PortInfo> portInfos) {
         super(name, BucketNodeLocator.KETAMA, uri, streamingUri, nodeInfos, portInfos);
+        this.env = env;
         this.rev = rev;
         this.ketamaNodes = new TreeMap<Long, NodeInfo>();
         populateKetamaNodes();
@@ -89,7 +95,7 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
                 MessageDigest md5;
                 try {
                     md5 = MessageDigest.getInstance("MD5");
-                    md5.update(keyForNode(node.hostname(), i).getBytes(CharsetUtil.UTF_8));
+                    md5.update(env.memcachedHashingStrategy().hash(node, i).getBytes(CharsetUtil.UTF_8));
                     byte[] digest = md5.digest();
                     for (int j = 0; j < 4; j++) {
                         Long key = ((long) (digest[3 + j * 4] & 0xFF) << 24)
@@ -103,10 +109,6 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
                 }
             }
         }
-    }
-
-    private static String keyForNode(InetAddress hostname, int repetition) {
-        return hostname.getHostName() + "-" + repetition;
     }
 
     @Override

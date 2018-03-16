@@ -13,30 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.node;
 
-package com.couchbase.client.core;
+import com.couchbase.client.core.config.NodeInfo;
 
 /**
- * Exception which states that the service is not available for the bucket.
+ * The default memcache bucket hashing strategy, compatible with 2.x Java SDK.
  *
  * @author Michael Nitschinger
- * @since 2.0.3
+ * @since 2.3.6
  */
-public class ServiceNotAvailableException extends CouchbaseException {
+public class DefaultMemcachedHashingStrategy implements MemcachedHashingStrategy {
 
-    public ServiceNotAvailableException() {
-        super();
+    public static DefaultMemcachedHashingStrategy INSTANCE = new DefaultMemcachedHashingStrategy();
+
+    private DefaultMemcachedHashingStrategy() { }
+
+    @Override
+    public String hash(final NodeInfo info, final int repetition) {
+        return info.hostname().getHostName() + "-" + repetition;
     }
 
-    public ServiceNotAvailableException(String message) {
-        super(message);
-    }
-
-    public ServiceNotAvailableException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public ServiceNotAvailableException(Throwable cause) {
-        super(cause);
-    }
 }

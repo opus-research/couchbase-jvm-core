@@ -35,7 +35,7 @@ public class DCPEndpoint extends AbstractEndpoint {
 
     public DCPEndpoint(String hostname, String bucket, String password, int port,
                        CoreEnvironment environment, RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
+        super(hostname, bucket, password, port, environment, responseBuffer, false, environment.ioPool());
     }
 
     @Override
@@ -45,6 +45,6 @@ public class DCPEndpoint extends AbstractEndpoint {
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
             .addLast(new KeyValueAuthHandler(bucket(), password()))
             .addLast(new DCPConnectionHandler(environment()))
-            .addLast(new DCPHandler(this, responseBuffer(), false));
+            .addLast(new DCPHandler(this, responseBuffer(), false, true));
     }
 }

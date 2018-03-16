@@ -35,7 +35,8 @@ public class QueryEndpoint extends AbstractEndpoint {
 
     public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
         RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, environment, responseBuffer, false);
+        super(hostname, bucket, password, port, environment, responseBuffer, false,
+                environment.queryIoPool() == null ? environment.ioPool() : environment.queryIoPool());
     }
 
     @Override
@@ -45,6 +46,6 @@ public class QueryEndpoint extends AbstractEndpoint {
         }
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer(), false));
+            .addLast(new QueryHandler(this, responseBuffer(), false, false));
     }
 }

@@ -13,15 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.node;
 
-package com.couchbase.client.core.endpoint.kv;
+import com.couchbase.client.core.config.NodeInfo;
 
-public class MalformedMemcacheHeaderException extends Exception {
+/**
+ * This interface defines different hashing strategies used for ketama hashing in memcached buckets.
+ *
+ * @author Michael Nitschinger
+ * @since 2.3.6
+ */
+public interface MemcachedHashingStrategy {
 
-    public MalformedMemcacheHeaderException() {
-    }
+    /**
+     * The hash for each node based on the node information and repetition.
+     *
+     * @param info the node info
+     * @param repetition the repetition
+     * @return the hashed node
+     */
+    String hash(NodeInfo info, int repetition);
 
-    public MalformedMemcacheHeaderException(String message) {
-        super(message);
-    }
 }
