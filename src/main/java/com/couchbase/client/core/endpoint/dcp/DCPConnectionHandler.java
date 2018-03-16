@@ -45,7 +45,6 @@ import java.net.SocketAddress;
  * @author Sergey Avseyev
  * @since 1.2.6
  */
-@Deprecated
 public class DCPConnectionHandler
         extends SimpleChannelInboundHandler<FullBinaryMemcacheResponse>
         implements ChannelOutboundHandler {

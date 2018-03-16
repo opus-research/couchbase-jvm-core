@@ -31,7 +31,6 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public class SnapshotMarkerMessage extends AbstractDCPMessage {
     public static final int MEMORY = 0x01;
     public static final int DISK = 0x02;
