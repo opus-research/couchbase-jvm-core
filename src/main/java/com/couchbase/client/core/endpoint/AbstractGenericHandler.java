@@ -31,6 +31,8 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
+import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -87,7 +89,20 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     private final Queue<REQUEST> sentRequestQueue;
 
+    /**
+     * This queue keeps all timings for each request when it was sent off to the event loop.
+     */
+    private final Queue<Long> sentRequestTimings;
+
+    /**
+     * If this handler is transient (will close after one request).
+     */
     private final boolean isTransient;
+
+    /**
+     * If TRACE level logging has been enabled at startup.
+     */
+    private final boolean traceEnabled;
 
     /**
      * The request which is expected to return next.
@@ -95,6 +110,16 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private REQUEST currentRequest;
 
     private DecodingState currentDecodingState;
+
+    /**
+     * Contains the current round-trip-time for the last completed operation. Used for metrics.
+     */
+    private long currentOpTime = -1;
+
+    /**
+     * Contains the stringified version of the remote node's hostname. Used for metrics.
+     */
+    private String remoteHostname;
 
     /**
      * The future which is used to eventually signal a connected channel.
@@ -125,6 +150,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestQueue = queue;
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
+        this.traceEnabled = LOGGER.isTraceEnabled();
+        this.sentRequestTimings = new ArrayDeque<Long>();
     }
 
     /**
@@ -153,11 +180,19 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected abstract CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, RESPONSE msg) throws Exception;
 
+    /**
+     * Returns the {@link ServiceType} associated with this handler.
+     *
+     * @return the service type.
+     */
+    protected abstract ServiceType serviceType();
+
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
         ENCODED request = encodeRequest(ctx, msg);
         sentRequestQueue.offer(msg);
         out.add(request);
+        sentRequestTimings.offer(System.nanoTime());
     }
 
     @Override
@@ -165,8 +200,17 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
-            if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace(logIdent(ctx, endpoint) + "Started decoding of " + currentRequest);
+            if (currentRequest != null) {
+                Long st = sentRequestTimings.poll();
+                if (st != null) {
+                    currentOpTime = System.nanoTime() - st;
+                } else {
+                    currentOpTime = -1;
+                }
+            }
+
+            if (traceEnabled) {
+                LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
             }
         }
 
@@ -174,6 +218,19 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             CouchbaseResponse response = decodeResponse(ctx, msg);
             if (response != null) {
                 publishResponse(response, currentRequest.observable());
+
+                if (currentDecodingState == DecodingState.FINISHED) {
+                    if (currentRequest != null && currentOpTime >= 0 && env() != null && env().networkLatencyMetricsCollector().isEnabled()) {
+                        NetworkLatencyMetricsIdentifier identifier = new NetworkLatencyMetricsIdentifier(
+                            remoteHostname,
+                            serviceType().toString(),
+                            currentRequest.getClass().getSimpleName(),
+                            response.status().toString()
+                        );
+                        env().networkLatencyMetricsCollector().record(identifier, currentOpTime);
+                    }
+                }
+
             }
         } catch (CouchbaseException e) {
             currentRequest.observable().onError(e);
@@ -182,8 +239,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
-            if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace(logIdent(ctx, endpoint) + "Finished decoding of " + currentRequest);
+            if (traceEnabled) {
+                LOGGER.trace("{}Finished decoding of {}", logIdent(ctx, endpoint), currentRequest);
             }
             currentRequest = null;
             currentDecodingState = DecodingState.INITIAL;
@@ -240,6 +297,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         LOGGER.debug(logIdent(ctx, endpoint) + "Channel Active.");
+        remoteHostname = ctx.channel().remoteAddress().toString();
         ctx.fireChannelActive();
     }
 
@@ -308,6 +366,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
         }
+
+        sentRequestTimings.clear();
     }
 
 
@@ -376,7 +436,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
      */
     protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
-        if (LOGGER.isTraceEnabled()) {
+        if (traceEnabled) {
             LOGGER.trace(logIdent(ctx, endpoint) + "keepAlive was answered, status "
                     + keepAliveResponse.status());
         }
@@ -399,6 +459,13 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected void currentRequest(REQUEST request) {
         currentRequest = request;
+    }
+
+    /**
+     * @return stringified version of the remote node's hostname
+     */
+    protected String remoteHostname() {
+        return remoteHostname;
     }
 
     /**
