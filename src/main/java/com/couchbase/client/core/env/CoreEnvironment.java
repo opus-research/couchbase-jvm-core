@@ -98,6 +98,7 @@ public interface CoreEnvironment {
      * @return true if manual N1QL querying is enabled.
      * @deprecated
      */
+    @Deprecated
     boolean queryEnabled();
 
     /**
@@ -108,6 +109,7 @@ public interface CoreEnvironment {
      * @return the query port.
      * @deprecated
      */
+    @Deprecated
     int queryPort();
 
     /**
@@ -295,7 +297,7 @@ public interface CoreEnvironment {
     boolean tcpNodelayEnabled();
 
     /**
-     * Returns true if extended mutation tokens are enabled.
+     * Returns true if extended mutation metadata is enabled.
      *
      * Note that while this may return true, the server also needs to support it (Couchbase Server
      * 4.0 and above). It will be negotiated during connection setup, but needs to be explicitly
@@ -304,5 +306,5 @@ public interface CoreEnvironment {
      *
      * @return true if enabled on the client side.
      */
-    boolean mutationTokensEnabled();
+    boolean mutationMetadataEnabled();
 }

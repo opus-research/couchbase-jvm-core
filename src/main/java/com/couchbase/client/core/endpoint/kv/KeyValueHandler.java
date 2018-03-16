@@ -46,7 +46,7 @@ import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.message.kv.GetResponse;
 import com.couchbase.client.core.message.kv.InsertRequest;
 import com.couchbase.client.core.message.kv.InsertResponse;
-import com.couchbase.client.core.message.kv.MutationToken;
+import com.couchbase.client.core.message.kv.MutationDescriptor;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveResponse;
 import com.couchbase.client.core.message.kv.PrependRequest;
@@ -489,25 +489,25 @@ public class KeyValueHandler
             response = new GetBucketConfigResponse(status, statusCode, bucket, content,
                     ((GetBucketConfigRequest) request).hostname());
         } else if (request instanceof InsertRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new InsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof UpsertRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new UpsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof ReplaceRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new ReplaceResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof RemoveRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new RemoveResponse(status, statusCode, cas, bucket, content, descr, request);
         }
 
         return response;
     }
 
-    private static MutationToken extractToken(boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
+    private static MutationDescriptor extractDescriptor(boolean seqOnMutation, boolean success, ByteBuf extras) {
         if (success && seqOnMutation) {
-            return new MutationToken(vbid, extras.readLong(), extras.readLong());
+            return new MutationDescriptor(extras.readLong(), extras.readLong());
         }
         return null;
     }
@@ -533,10 +533,10 @@ public class KeyValueHandler
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, statusCode, bucket, content, request);
         } else if (request instanceof AppendRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new AppendResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof PrependRequest) {
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new PrependResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof KeepAliveRequest) {
             releaseContent(content);
@@ -545,7 +545,7 @@ public class KeyValueHandler
             long value = status.isSuccess() ? content.readLong() : 0;
             releaseContent(content);
 
-            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
             response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
@@ -639,7 +639,7 @@ public class KeyValueHandler
         }
 
         if (evt instanceof ServerFeaturesEvent) {
-            seqOnMutation = env().mutationTokensEnabled() &&
+            seqOnMutation = env().mutationMetadataEnabled() &&
                 ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
         }
 
