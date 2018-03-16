@@ -1,26 +1,28 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (C) 2014 Couchbase, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
+ * IN THE SOFTWARE.
  */
 package com.couchbase.client.core;
 
-import com.couchbase.client.core.config.BucketConfig;
-import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -35,17 +37,11 @@ import rx.Scheduler;
 import rx.functions.Action0;
 import rx.subjects.Subject;
 
-import java.util.concurrent.TimeUnit;
-
 public class ResponseHandler implements EventHandler<ResponseEvent> {
-
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(ResponseHandler.class);
 
     private final ClusterFacade cluster;
     private final ConfigurationProvider configurationProvider;
     private final CoreEnvironment environment;
-    private final boolean traceLoggingEnabled;
-    private final int nmvbRetryDelay;
 
     /**
      * Creates a new {@link ResponseHandler}.
@@ -58,8 +54,6 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         this.cluster = cluster;
         this.configurationProvider = provider;
         this.environment = environment;
-        this.nmvbRetryDelay = Integer.parseInt(System.getProperty("com.couchbase.nmvbRetryDelay", "100"));
-        traceLoggingEnabled = LOGGER.isTraceEnabled();
     }
 
     /**
@@ -99,7 +93,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                 final CouchbaseResponse response = (CouchbaseResponse) message;
                 ResponseStatus status = response.status();
                 if (status == ResponseStatus.RETRY) {
-                    retry(event, true);
+                    retry(event);
                 } else {
                     final Scheduler.Worker worker = environment.scheduler().createWorker();
                     final Subject<CouchbaseResponse, CouchbaseResponse> obs = event.getObservable();
@@ -118,7 +112,7 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                     });
                 }
             } else if (message instanceof CouchbaseRequest) {
-                retry(event, false);
+                retry(event);
             } else {
                 throw new IllegalStateException("Got message type I do not understand: " + message);
             }
@@ -128,15 +122,15 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         }
     }
 
-    private void retry(final ResponseEvent event, final boolean isNotMyVbucket) {
+    private void retry(final ResponseEvent event) {
         final CouchbaseMessage message = event.getMessage();
         if (message instanceof CouchbaseRequest) {
-            scheduleForRetry((CouchbaseRequest) message, isNotMyVbucket);
+            scheduleForRetry((CouchbaseRequest) message);
         } else {
 
             CouchbaseRequest request = ((CouchbaseResponse) message).request();
             if (request != null) {
-                scheduleForRetry(request, isNotMyVbucket);
+                scheduleForRetry(request);
             } else {
                 event.getObservable().onError(new CouchbaseException("Operation failed because it does not "
                     + "support cloning."));
@@ -157,29 +151,9 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         }
     }
 
-    /**
-     * Helper method which schedules the given {@link CouchbaseRequest} with a delay for further retry.
-     *
-     * @param request the request to retry.
-     */
-    private void scheduleForRetry(final CouchbaseRequest request, final boolean isNotMyVbucket) {
+    private void scheduleForRetry(final CouchbaseRequest request) {
         CoreEnvironment env = environment;
         Delay delay = env.retryDelay();
-
-        long delayTime;
-        TimeUnit delayUnit;
-        if (isNotMyVbucket) {
-            boolean hasFastForward = bucketHasFastForwardMap(request.bucket(), configurationProvider.config());
-            delayTime = request.incrementRetryCount() == 0 && hasFastForward ? 0 : nmvbRetryDelay;
-            delayUnit = TimeUnit.MILLISECONDS;
-        } else {
-            delayTime = delay.calculate(request.incrementRetryCount());
-            delayUnit = delay.unit();
-        }
-
-        if (traceLoggingEnabled) {
-            LOGGER.trace("Retrying {} with a delay of {} {}", request, delayTime, delayUnit);
-        }
 
         final Scheduler.Worker worker = env.scheduler().createWorker();
         worker.schedule(new Action0() {
@@ -191,21 +165,6 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
                     worker.unsubscribe();
                 }
             }
-        }, delayTime, delayUnit);
-    }
-
-    /**
-     * Helper method to check if the current given bucket contains a fast forward map.
-     *
-     * @param bucketName the name of the bucket.
-     * @param clusterConfig the current cluster configuration.
-     * @return true if it has a ffwd-map, false otherwise.
-     */
-    private static boolean bucketHasFastForwardMap(String bucketName, ClusterConfig clusterConfig) {
-        if (bucketName == null) {
-            return false;
-        }
-        BucketConfig bucketConfig = clusterConfig.bucketConfig(bucketName);
-        return bucketConfig != null && bucketConfig.hasFastForwardMap();
+        }, delay.calculate(request.incrementRetryCount()), delay.unit());
     }
 }
