@@ -92,8 +92,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     private DecodingState currentDecodingState;
 
-    private boolean traceEnabled;
-
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
      *
@@ -118,7 +116,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.sentRequestQueue = queue;
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
-        this.traceEnabled = LOGGER.isTraceEnabled();
     }
 
     /**
@@ -159,8 +156,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
-            if (traceEnabled) {
-                LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Started decoding of " + currentRequest);
             }
         }
 
@@ -176,8 +173,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
-            if (traceEnabled) {
-                LOGGER.trace("{}Finished decoding of {}", logIdent(ctx, endpoint), currentRequest);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(logIdent(ctx, endpoint) + "Finished decoding of " + currentRequest);
             }
             currentRequest = null;
             currentDecodingState = DecodingState.INITIAL;
@@ -354,7 +351,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param keepAliveResponse the keep alive request that was sent when keep alive was triggered
      */
     protected void onKeepAliveResponse(ChannelHandlerContext ctx, CouchbaseResponse keepAliveResponse) {
-        if (traceEnabled) {
+        if (LOGGER.isTraceEnabled()) {
             LOGGER.trace(logIdent(ctx, endpoint) + "keepAlive was answered, status "
                     + keepAliveResponse.status());
         }
