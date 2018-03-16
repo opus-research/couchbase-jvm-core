@@ -25,7 +25,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import rx.Observable;
 import rx.subjects.BehaviorSubject;
-import rx.subjects.Subject;
 
 /**
  * Abstract {@link Stateful} implementation which acts like a simple state machine.
@@ -45,7 +44,7 @@ public class AbstractStateMachine<S extends Enum> implements Stateful<S> {
     /**
      * The observable which emits all the subsequent state changes.
      */
-    private final Subject<S, S> observable;
+    private final BehaviorSubject<S> observable;
 
     /**
      * The current state of the state machine.
@@ -59,7 +58,7 @@ public class AbstractStateMachine<S extends Enum> implements Stateful<S> {
      */
     protected AbstractStateMachine(final S initialState) {
         currentState = initialState;
-        observable = BehaviorSubject.create(currentState).toSerialized();
+        observable = BehaviorSubject.create(currentState);
     }
 
     @Override
