@@ -27,7 +27,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.ResponseStatusDetails;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -180,8 +179,17 @@ public class KeyValueHandler
     /**
      * The bitmask for sub-document create document
      */
-    public static final byte SUBDOC_FLAG_MKDOC = (byte) 0x1;
+    public static final byte SUBDOC_DOCFLAG_MKDOC = (byte) 0x1;
 
+    /**
+     * The bitmask for sub-document add document
+     */
+    public static final byte SUBDOC_DOCFLAG_ADD = (byte) 0x2;
+
+    /**
+     * The bitmask for sub-document access deleted
+     */
+    public static final byte SUBDOC_DOCFLAG_ACCESS_DELETED = (byte) 0x3;
 
     boolean seqOnMutation = false;
 
@@ -616,9 +624,11 @@ public class KeyValueHandler
 
             byte docFlags = 0;
             if (mut.createDocument()) {
-                docFlags |= SUBDOC_FLAG_MKDOC;
+                docFlags |= SUBDOC_DOCFLAG_MKDOC;
             }
-
+            if (mut.addDocument()) {
+                docFlags |= SUBDOC_DOCFLAG_ADD;
+            }
             if (docFlags != 0) {
                 extrasLength += 1;
                 extras.writeByte(docFlags);
@@ -632,12 +642,20 @@ public class KeyValueHandler
             } else {
                 extras.writeByte(0);
             }
+            if (req.accessDeleted()) {
+                extrasLength += 1;
+                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
+            }
         } else if (msg instanceof SubExistRequest) {
             SubExistRequest req =  (SubExistRequest)msg;
             if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
                 extras.writeByte(0);
+            }
+            if (req.accessDeleted()) {
+                extrasLength += 1;
+                extras.writeByte(SUBDOC_DOCFLAG_ACCESS_DELETED);
             }
         } else {
             extras.writeByte(0);
@@ -658,10 +676,20 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
+        byte extrasLength = 0;
+
+        ByteBuf extras = Unpooled.EMPTY_BUFFER;
+
+        if (msg.docFlags() != 0) {
+            extrasLength = 1;
+            extras = ctx.alloc().buffer(extrasLength, extrasLength);
+            extras.writeByte(msg.docFlags());
+        }
+
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
         request.setOpcode(OP_SUB_MULTI_LOOKUP)
                 .setKeyLength(keyLength)
-                .setExtrasLength((byte) 0)
+                .setExtrasLength(extrasLength)
                 .setTotalBodyLength(keyLength + msg.content().readableBytes());
 
         return request;
@@ -713,10 +741,6 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
-        ResponseStatusDetails statusDetails = ResponseStatusConverter.detailsFromBinary(
-            msg.getDataType(),
-            msg.content()
-        );
         ErrorMap.ErrorCode errorCode = ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus());
 
         if (errorCode != null) {
@@ -811,11 +835,6 @@ public class KeyValueHandler
         } else {
             finishedDecoding();
         }
-
-        if (statusDetails != null) {
-            response.statusDetails(statusDetails);
-        }
-
         return response;
     }
 

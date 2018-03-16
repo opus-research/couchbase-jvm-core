@@ -20,41 +20,21 @@ import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 
 /**
- * Document options for {@link SubMultiMutationRequest}
+ * Document options for {@link SubMultiLookupRequest}
  *
  * @author Subhashni Balakrishnan
- * @since 1.4.6
+ * @since 1.4.7
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
-public class SubMultiMutationDocOptionsBuilder {
-    private boolean createDocument;
-    private boolean addDocument;
+public class SubMultiLookupDocOptionsBuilder {
     private boolean accessDeleted;
 
-    public static SubMultiMutationDocOptionsBuilder builder() {
-        return new SubMultiMutationDocOptionsBuilder();
+    public static SubMultiLookupDocOptionsBuilder builder() {
+        return new SubMultiLookupDocOptionsBuilder();
     }
 
-    public SubMultiMutationDocOptionsBuilder createDocument(boolean createDocument) {
-        this.createDocument = createDocument;
-        return this;
-    }
-
-    public boolean createDocument() {
-        return this.createDocument;
-    }
-
-    public SubMultiMutationDocOptionsBuilder addDocument(boolean addDocument) {
-        this.addDocument = addDocument;
-        return this;
-    }
-
-    public boolean addDocument() {
-        return this.addDocument;
-    }
-
-    public SubMultiMutationDocOptionsBuilder accessDeleted(boolean accessDeleted) {
+    public SubMultiLookupDocOptionsBuilder accessDeleted(boolean accessDeleted) {
         this.accessDeleted = accessDeleted;
         return this;
     }
@@ -67,9 +47,7 @@ public class SubMultiMutationDocOptionsBuilder {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
-        sb.append(" \"createDocument\":" + createDocument);
-        sb.append(", \"addDocument\": " + addDocument);
-        sb.append(", \"accessDeleted\": " + accessDeleted);
+        sb.append(" \"accessDeleted\": " + accessDeleted);
         sb.append("}");
         return sb.toString();
     }
