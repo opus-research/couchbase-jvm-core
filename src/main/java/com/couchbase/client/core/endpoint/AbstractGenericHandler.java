@@ -208,11 +208,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         LOGGER.debug(logIdent(ctx, endpoint) + "Cancelling " + sentRequestQueue.size() + " outstanding requests.");
         while(!sentRequestQueue.isEmpty()) {
             REQUEST req = sentRequestQueue.poll();
-            try {
-                req.observable().onError(new RequestCancelledException("Request cancelled in-flight."));
-            } catch (Exception ex) {
-                LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
-            }
+            req.observable().onError(new RequestCancelledException("Request cancelled in-flight."));
         }
     }
 

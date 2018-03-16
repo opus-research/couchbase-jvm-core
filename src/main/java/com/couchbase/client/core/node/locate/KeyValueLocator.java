@@ -34,7 +34,6 @@ import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ReplicaGetRequest;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.state.LifecycleState;
 import io.netty.util.CharsetUtil;
 
 import java.io.UnsupportedEncodingException;
@@ -55,8 +54,9 @@ public class KeyValueLocator implements Locator {
     @Override
     public Node[] locate(final CouchbaseRequest request, final Set<Node> nodes, final ClusterConfig cluster) {
         if (request instanceof GetBucketConfigRequest) {
+            GetBucketConfigRequest req = (GetBucketConfigRequest) request;
             for (Node node : nodes) {
-                if (node.isState(LifecycleState.CONNECTED)) {
+                if (node.hostname().equals(req.hostname())) {
                     return new Node[] { node };
                 }
             }
