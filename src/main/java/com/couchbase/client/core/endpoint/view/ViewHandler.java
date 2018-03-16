@@ -39,7 +39,6 @@ import com.couchbase.client.core.message.view.UpsertDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.message.view.ViewRequest;
-import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufProcessor;
@@ -57,9 +56,9 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import rx.Scheduler;
+import rx.subjects.ReplaySubject;
 
 import java.util.Queue;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The {@link ViewHandler} is responsible for encoding {@link ViewRequest}s into lower level
@@ -90,12 +89,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     /**
      * Represents a observable that sends config chunks if instructed.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> viewRowObservable;
+    private ReplaySubject<ByteBuf> viewRowObservable;
 
     /**
      * Contains info-level data about the view response.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> viewInfoObservable;
+    private ReplaySubject<ByteBuf> viewInfoObservable;
 
     /**
      * Represents the current query parsing state.
@@ -265,9 +264,9 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         String phrase = responseHeader.getStatus().reasonPhrase();
         ResponseStatus status = statusFromCode(responseHeader.getStatus().code());
         Scheduler scheduler = env().scheduler();
-        long ttl = env().autoreleaseAfter();
-        viewRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        viewInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
+
+        viewRowObservable = ReplaySubject.create();
+        viewInfoObservable = ReplaySubject.create();
         return new ViewQueryResponse(
             viewRowObservable.onBackpressureBuffer().observeOn(scheduler),
             viewInfoObservable.onBackpressureBuffer().observeOn(scheduler),
