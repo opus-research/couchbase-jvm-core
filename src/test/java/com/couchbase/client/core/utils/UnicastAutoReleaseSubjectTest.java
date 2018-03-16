@@ -1,19 +1,25 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (c) 2015 Couchbase, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
+ * IN THE SOFTWARE.
  */
-/*
+/**
  * Copyright 2015 Netflix, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,9 +54,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.fail;
-
 public class UnicastAutoReleaseSubjectTest {
 
     @Test(expected = IllegalStateException.class)
@@ -78,37 +81,6 @@ public class UnicastAutoReleaseSubjectTest {
         UnicastAutoReleaseSubject<Object> subject = UnicastAutoReleaseSubject.createWithoutNoSubscriptionTimeout();
         subject.subscribe(Subscribers.empty());
         subject.toBlocking().last();
-    }
-
-    @Test
-    public void testTraceIdAppearsWhenMultiSubscribers() throws Exception {
-        UnicastAutoReleaseSubject<Object> subject = UnicastAutoReleaseSubject.createWithoutNoSubscriptionTimeout();
-        subject.withTraceIdentifier("multiSub");
-
-        subject.subscribe(Subscribers.empty());
-        try {
-            subject.toBlocking().last();
-            fail("Expected IllegalStateException");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageStartingWith("This Observable (multiSub)");
-        }
-    }
-
-    @Test
-    public void testTraceIdAppearsWhenNoSubscription() throws Exception {
-        TestScheduler testScheduler = Schedulers.test();
-        OnUnsubscribeAction onUnsub = new OnUnsubscribeAction();
-        UnicastAutoReleaseSubject<String> subject = UnicastAutoReleaseSubject.create(1, TimeUnit.DAYS, testScheduler,
-                onUnsub);
-        subject.withTraceIdentifier("noSub");
-        subject.onNext("Start the timeout now."); // Since the timeout is scheduled only after content arrival.
-        testScheduler.advanceTimeBy(1, TimeUnit.DAYS);
-        try {
-            subject.toBlocking().last(); // Should immediately throw an error.
-            fail("Expected IllegalStateException");
-        } catch (IllegalStateException e) {
-            assertThat(e).hasMessageStartingWith("The content of this Observable (noSub)");
-        }
     }
 
     @Test

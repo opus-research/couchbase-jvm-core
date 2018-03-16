@@ -1,17 +1,23 @@
-/*
- * Copyright (c) 2016 Couchbase, Inc.
+/**
+ * Copyright (C) 2014 Couchbase, Inc.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
+ * IN THE SOFTWARE.
  */
 package com.couchbase.client.core.endpoint;
 
@@ -24,12 +30,10 @@ import com.couchbase.client.core.state.NotConnectedException;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.Test;
 import rx.Observable;
 import rx.functions.Action1;
-import rx.observers.TestSubscriber;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -67,7 +71,7 @@ public class AbstractEndpointTest {
     public void shouldConnectToItsChannel() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         Observable<LifecycleState> observable = endpoint.connect();
         assertEquals(LifecycleState.CONNECTED, observable.toBlocking().single());
@@ -78,7 +82,7 @@ public class AbstractEndpointTest {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         final ChannelPromise promise = channel.newPromise();
         when(bootstrap.connect()).thenReturn(promise);
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         final CountDownLatch latch = new CountDownLatch(1);
         new Thread(new Runnable() {
@@ -104,7 +108,7 @@ public class AbstractEndpointTest {
     public void shouldSwallowConnectIfConnected() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         Observable<LifecycleState> observable = endpoint.connect();
         assertEquals(LifecycleState.CONNECTED, observable.toBlocking().single());
@@ -117,7 +121,7 @@ public class AbstractEndpointTest {
     public void shouldDisconnectIfInstructed() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         Observable<LifecycleState> observable = endpoint.connect();
         assertEquals(LifecycleState.CONNECTED, observable.toBlocking().single());
@@ -131,7 +135,7 @@ public class AbstractEndpointTest {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         final ChannelPromise promise = channel.newPromise();
         when(bootstrap.connect()).thenReturn(promise);
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         final CountDownLatch latch = new CountDownLatch(1);
         new Thread(new Runnable() {
@@ -156,7 +160,7 @@ public class AbstractEndpointTest {
     public void shouldSendMessageToChannelIfConnected() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         Observable<LifecycleState> observable = endpoint.connect();
         assertEquals(LifecycleState.CONNECTED, observable.toBlocking().single());
@@ -172,7 +176,7 @@ public class AbstractEndpointTest {
     @Test(expected = NotConnectedException.class)
     public void shouldRejectMessageIfNotConnected() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         CouchbaseRequest mockRequest = mock(CouchbaseRequest.class);
         Subject<CouchbaseResponse, CouchbaseResponse> subject = AsyncSubject.create();
@@ -185,7 +189,7 @@ public class AbstractEndpointTest {
     public void shouldStreamLifecycleToObservers() {
         BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
         when(bootstrap.connect()).thenReturn(channel.newSucceededFuture());
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
+        Endpoint endpoint = new DummyEndpoint(bootstrap);
 
         final List<LifecycleState> states = Collections.synchronizedList(new ArrayList<LifecycleState>());
         endpoint.states().subscribe(new Action1<LifecycleState>() {
@@ -208,26 +212,9 @@ public class AbstractEndpointTest {
         assertEquals(LifecycleState.DISCONNECTED, states.get(4));
     }
 
-    @Test
-    public void shouldForceTimeoutOfSocketConnectDoesNotReturn() {
-        BootstrapAdapter bootstrap = mock(BootstrapAdapter.class);
-        when(bootstrap.connect()).thenReturn(channel.newPromise()); // this promise never completes
-        Endpoint endpoint = new DummyEndpoint(bootstrap, environment);
-
-        Observable<LifecycleState> observable = endpoint.connect();
-
-        TestSubscriber<LifecycleState> testSubscriber = new TestSubscriber<LifecycleState>();
-        observable.subscribe(testSubscriber);
-        testSubscriber.awaitTerminalEvent();
-
-        List<Throwable> errors = testSubscriber.getOnErrorEvents();
-        assertEquals(1, errors.size());
-        assertEquals(ConnectTimeoutException.class, errors.get(0).getClass());
-    }
-
     static class DummyEndpoint extends AbstractEndpoint {
-        DummyEndpoint(BootstrapAdapter adapter, CoreEnvironment environment) {
-            super("default", null, adapter, false, environment);
+        DummyEndpoint(BootstrapAdapter adapter) {
+            super("default", null, adapter, false);
         }
 
         DummyEndpoint(String hostname, CoreEnvironment environment) {
