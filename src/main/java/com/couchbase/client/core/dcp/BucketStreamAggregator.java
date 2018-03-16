@@ -36,8 +36,6 @@ import com.couchbase.client.core.message.dcp.StreamRequestResponse;
 import rx.Observable;
 import rx.functions.Func1;
 
-import java.util.List;
-
 /**
  * Provides a higher level abstraction over a DCP stream.
  * <p/>
@@ -49,7 +47,6 @@ import java.util.List;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class BucketStreamAggregator {
-    public static String DEFAULT_CONNECTION_NAME = "jvmCore";
 
     private final ClusterFacade core;
     private final String bucket;
@@ -65,12 +62,7 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed() {
-        final BucketStreamAggregatorState state = new BucketStreamAggregatorState(DEFAULT_CONNECTION_NAME);
-        int numPartitions = partitionSize().toBlocking().first();
-        for (short partition = 0; partition < numPartitions; partition++) {
-            state.put(new BucketStreamState(partition, 0, 0, 0xffffffff, 0, 0xffffffff));
-        }
-        return feed(state);
+        return feed(new BucketStreamAggregatorState("jvmCore"));
     }
 
     /**
@@ -80,19 +72,36 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed(final BucketStreamAggregatorState aggregatorState) {
-        final String connectionName = aggregatorState.name();
+        return open(aggregatorState)
+                .flatMap(new Func1<StreamRequestResponse, Observable<DCPRequest>>() {
+                             @Override
+                             public Observable<DCPRequest> call(StreamRequestResponse response) {
+                                 return response.stream();
+                             }
+                         }
+                );
+    }
+
+    /**
+     * Opens DCP stream for all vBuckets starting with given state.
+     * Use BucketStreamAggregatorState.BLANK to start from very beginning.
+     *
+     * @param aggregatorState state object
+     * @return collection of stream objects
+     */
+    public Observable<StreamRequestResponse> open(final BucketStreamAggregatorState aggregatorState) {
         return core
-                .<OpenConnectionResponse>send(new OpenConnectionRequest(connectionName, bucket))
-                .flatMap(new Func1<OpenConnectionResponse, Observable<DCPRequest>>() {
+                .<OpenConnectionResponse>send(new OpenConnectionRequest(aggregatorState.name(), bucket))
+                .flatMap(new Func1<OpenConnectionResponse, Observable<StreamRequestResponse>>() {
                     @Override
-                    public Observable<DCPRequest> call(final OpenConnectionResponse response) {
+                    public Observable<StreamRequestResponse> call(OpenConnectionResponse reponse) {
                         return Observable
                                 .from(aggregatorState)
                                 .flatMap(new Func1<BucketStreamState, Observable<StreamRequestResponse>>() {
                                     @Override
                                     public Observable<StreamRequestResponse> call(final BucketStreamState feed) {
                                         Observable<StreamRequestResponse> res =
-                                                core.send(new StreamRequestRequest(connectionName,
+                                                core.send(new StreamRequestRequest(
                                                         feed.partition(), feed.vbucketUUID(),
                                                         feed.startSequenceNumber(), feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),
@@ -106,25 +115,18 @@ public class BucketStreamAggregator {
                                                         rollbackSequenceNumber = 0;
                                                         break;
                                                     case ROLLBACK:
-                                                        rollbackSequenceNumber = response.rollbackToSequenceNumber();
+                                                        rollbackSequenceNumber = response.getRollbackToSequenceNumber();
                                                         break;
                                                     default:
                                                         return Observable.just(response);
                                                 }
-                                                return core.send(new StreamRequestRequest(connectionName,
+                                                return core.send(new StreamRequestRequest(
                                                         feed.partition(), feed.vbucketUUID(),
                                                         rollbackSequenceNumber, feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),
                                                         bucket));
                                             }
                                         });
-                                    }
-                                })
-                                .toList()
-                                .flatMap(new Func1<List<StreamRequestResponse>, Observable<DCPRequest>>() {
-                                    @Override
-                                    public Observable<DCPRequest> call(List<StreamRequestResponse> streamRequestResponses) {
-                                        return response.connection().subject();
                                     }
                                 });
                     }

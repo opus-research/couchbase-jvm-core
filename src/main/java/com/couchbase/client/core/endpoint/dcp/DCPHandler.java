@@ -1,16 +1,16 @@
 /**
  * Copyright (C) 2014 Couchbase, Inc.
- * <p/>
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * <p/>
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * <p/>
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -49,14 +49,15 @@ import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.CharsetUtil;
+import rx.Scheduler;
 import rx.functions.Action1;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Sergey Avseyev
@@ -75,7 +76,16 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     public static final byte OP_MUTATION = 0x57;
     public static final byte OP_REMOVE = 0x58;
 
-    private final Map<String, DCPConnection> connections;
+    /**
+     * Maps stream identifiers to {@link DCPStream}. The identifiers put into
+     * opaque fields of each packet of the stream and helps to multiplex streams.
+     */
+    private final Map<Integer, DCPStream> streams;
+
+    /**
+     * Counter for stream identifiers.
+     */
+    private int nextStreamId = 0;
 
     /**
      * Creates a new {@link DCPHandler} with the default queue for requests.
@@ -96,7 +106,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      */
     public DCPHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<DCPRequest> queue, boolean isTransient) {
         super(endpoint, responseBuffer, queue, isTransient);
-        connections = new ConcurrentHashMap<String, DCPConnection>();
+        streams = new HashMap<Integer, DCPStream>();
     }
 
     @Override
@@ -104,10 +114,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         BinaryMemcacheRequest request;
 
         if (msg instanceof OpenConnectionRequest) {
-            OpenConnectionRequest openConnection = (OpenConnectionRequest) msg;
-            request = handleOpenConnectionRequest(ctx, openConnection);
-            DCPConnection connection = new DCPConnection(env(), openConnection.connectionName(), openConnection.bucket());
-            connections.put(connection.name(), connection);
+            request = handleOpenConnectionRequest(ctx, (OpenConnectionRequest) msg);
         } else if (msg instanceof StreamRequestRequest) {
             request = handleStreamRequestRequest(ctx, (StreamRequestRequest) msg);
         } else {
@@ -125,13 +132,15 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     protected CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg)
             throws Exception {
         DCPRequest request = currentRequest();
+
         DCPResponse response = null;
 
         if (msg.getOpcode() == OP_OPEN_CONNECTION && request instanceof OpenConnectionRequest) {
-            final DCPConnection connection = connections.get(((OpenConnectionRequest) request).connectionName());
-            response = new OpenConnectionResponse(ResponseStatusConverter.fromBinary(msg.getStatus()), connection, request);
+            response = new OpenConnectionResponse(ResponseStatusConverter.fromBinary(msg.getStatus()), request);
         } else if (msg.getOpcode() == OP_STREAM_REQUEST && request instanceof StreamRequestRequest) {
             ByteBuf content = msg.content();
+            Scheduler scheduler = env().scheduler();
+            DCPStream stream = streams.get(msg.getOpaque());
             List<FailoverLogEntry> failoverLog = null;
             long rollbackToSequenceNumber = 0;
             KeyValueStatus status = KeyValueStatus.valueOf(msg.getStatus());
@@ -149,10 +158,11 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                 default:
                     LOGGER.warn("Unexpected status of StreamRequestResponse: {} (0x{}, {})",
                             status, Integer.toHexString(status.code()), status.description());
+
             }
-            final DCPConnection connection = connections.get(DCPConnection.connectionName(msg.getOpaque()));
             response = new StreamRequestResponse(ResponseStatusConverter.fromBinary(msg.getStatus()),
-                    failoverLog, rollbackToSequenceNumber, request, connection);
+                    stream.subject().onBackpressureBuffer().observeOn(scheduler), failoverLog, request,
+                    rollbackToSequenceNumber);
         } else {
             /**
              * FIXME
@@ -169,8 +179,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
              *    relevant to 'current request'
              */
             final DCPRequest oldRequest = currentRequest();
-            final DCPConnection connection = connections.get(DCPConnection.connectionName(msg.getOpaque()));
-            final DCPRequest dummy = new AbstractDCPRequest(connection.bucket(), null) {
+            final DCPStream stream = streams.get(msg.getOpaque());
+            final DCPRequest dummy = new AbstractDCPRequest(stream.bucket(), null) {
             };
             dummy.observable().subscribe(new Action1<CouchbaseResponse>() {
                 @Override
@@ -180,12 +190,12 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             }, new Action1<Throwable>() {
                 @Override
                 public void call(Throwable throwable) {
-                    connection.subject().onError(throwable);
+                    stream.subject().onError(throwable);
                 }
             });
             try {
                 currentRequest(dummy);
-                handleDCPRequest(ctx, connection, msg);
+                handleDCPRequest(ctx, msg);
             } finally {
                 currentRequest(oldRequest);
             }
@@ -203,7 +213,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     /**
      * Handles incoming stream of DCP messages.
      */
-    private void handleDCPRequest(final ChannelHandlerContext ctx, final DCPConnection connection, final FullBinaryMemcacheResponse msg) {
+    private void handleDCPRequest(ChannelHandlerContext ctx, FullBinaryMemcacheResponse msg) {
+        final DCPStream stream = streams.get(msg.getOpaque());
         DCPRequest request = null;
         int flags = 0;
 
@@ -220,7 +231,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     flags = extras.readInt();
                     extras.release();
                 }
-                request = new SnapshotMarkerMessage(msg.getStatus(), startSequenceNumber, endSequenceNumber, flags, connection.bucket());
+                request = new SnapshotMarkerMessage(msg.getStatus(), startSequenceNumber, endSequenceNumber,
+                        flags, stream.bucket());
                 break;
 
             case OP_MUTATION:
@@ -237,17 +249,18 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     lockTime = extras.readInt();
                     extras.release();
                 }
-                request = new MutationMessage(msg.getStatus(), msg.getKey(),
-                        msg.content().retain(), expiration, flags, lockTime, msg.getCAS(), connection.bucket());
+                request = new MutationMessage(msg.getStatus(), msg.getKey(), msg.content().retain(),
+                        expiration, flags, lockTime, msg.getCAS(), stream.bucket());
+                // TODO: release message content if nobody consumed it
                 break;
             case OP_REMOVE:
-                request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), connection.bucket());
+                request = new RemoveMessage(msg.getStatus(), msg.getKey(), msg.getCAS(), stream.bucket());
                 break;
             default:
                 LOGGER.info("Unhandled DCP message: {}, {}", msg.getOpcode(), msg);
         }
         if (request != null) {
-            connection.subject().onNext(request);
+            stream.subject().onNext(request);
         }
     }
 
@@ -259,11 +272,11 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      * @return a converted {@link BinaryMemcacheRequest}.
      */
     private BinaryMemcacheRequest handleOpenConnectionRequest(final ChannelHandlerContext ctx,
-                                                              final OpenConnectionRequest msg) {
+        final OpenConnectionRequest msg) {
         ByteBuf extras = ctx.alloc().buffer(8);
         extras
-                .writeInt(msg.sequenceNumber())
-                .writeInt(msg.type().flags());
+            .writeInt(msg.sequenceNumber())
+            .writeInt(msg.type().flags());
 
         String key = msg.connectionName();
         byte extrasLength = (byte) extras.readableBytes();
@@ -289,17 +302,16 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      * @return a converted {@link BinaryMemcacheRequest}.
      */
     private BinaryMemcacheRequest handleStreamRequestRequest(final ChannelHandlerContext ctx,
-                                                             final StreamRequestRequest msg) {
-        DCPConnection connection = connections.get(msg.connectionName());
+        final StreamRequestRequest msg) {
         ByteBuf extras = ctx.alloc().buffer(48);
         extras
-                .writeInt(0) // flags
-                .writeInt(0) // reserved
-                .writeLong(msg.startSequenceNumber()) // start sequence number
-                .writeLong(msg.endSequenceNumber()) // end sequence number
-                .writeLong(msg.vbucketUUID()) // vbucket UUID
-                .writeLong(msg.snapshotStartSequenceNumber()) // snapshot start sequence number
-                .writeLong(msg.snapshotEndSequenceNumber()); // snapshot end sequence number
+            .writeInt(0) // flags
+            .writeInt(0) // reserved
+            .writeLong(msg.startSequenceNumber()) // start sequence number
+            .writeLong(msg.endSequenceNumber()) // end sequence number
+            .writeLong(msg.vbucketUUID()) // vbucket UUID
+            .writeLong(msg.snapshotStartSequenceNumber()) // snapshot start sequence number
+            .writeLong(msg.snapshotEndSequenceNumber()); // snapshot end sequence number
 
         byte extrasLength = (byte) extras.readableBytes();
 
@@ -307,13 +319,27 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         request.setOpcode(OP_STREAM_REQUEST);
         request.setExtrasLength(extrasLength);
         request.setTotalBodyLength(extrasLength);
-        request.setOpaque(connection.addStream(connection.name()));
+        request.setOpaque(initializeUniqueStream(msg.bucket()));
 
         return request;
+    }
+
+    /**
+     * Initializes a unique stream ID and stores it for later reference.
+     *
+     * @param bucket the name of the bucket.
+     * @return the generated stream ID.
+     */
+    private int initializeUniqueStream(final String bucket) {
+        int streamId = nextStreamId++;
+        DCPStream stream = new DCPStream(env(), streamId, bucket);
+        streams.put(streamId, stream);
+        return streamId;
     }
 
     @Override
     protected ServiceType serviceType() {
         return ServiceType.DCP;
     }
+
 }
