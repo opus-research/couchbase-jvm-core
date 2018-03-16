@@ -28,6 +28,7 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.event.EventType;
 import com.couchbase.client.core.event.consumers.LoggingConsumer;
 import com.couchbase.client.core.event.system.TooManyEnvironmentsEvent;
+import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
 import com.couchbase.client.core.logging.CouchbaseLogLevel;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -71,8 +72,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
+    public static final String SSL_TRUSTSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
+    public static final String SSL_TRUSTSTORE_PASSWORD = null;
     public static final KeyStore SSL_KEYSTORE = null;
+    public static final KeyStore SSL_TRUSTSTORE = null;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -105,7 +109,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
-    public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
+    public static final long CONFIG_POLL_INTERVAL = 2500;
+    public static final long CONFIG_POLL_FLOOR_INTERVAL = 50;
     public static final boolean CERT_AUTH_ENABLED = false;
 
     public static String CORE_VERSION;
@@ -179,8 +184,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
+    private final String sslTruststoreFile;
     private final String sslKeystorePassword;
+    private final String sslTruststorePassword;
     private final KeyStore sslKeystore;
+    private final KeyStore sslTruststore;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -216,6 +224,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final WaitStrategyFactory requestBufferWaitStrategy;
     private final MemcachedHashingStrategy memcachedHashingStrategy;
     private final long configPollInterval;
+    private final long configPollFloorInterval;
     private final boolean certAuthEnabled;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
@@ -247,6 +256,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final NetworkLatencyMetricsCollector networkLatencyMetricsCollector;
     private final Subscription metricsCollectorSubscription;
 
+    private final CouchbaseCoreSendHook couchbaseCoreSendHook;
+
     protected DefaultCoreEnvironment(final Builder builder) {
         boolean emitEnvWarnMessage = false;
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
@@ -257,7 +268,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
+        sslTruststoreFile = stringPropertyOr("sslTruststoreFile", builder.sslTruststoreFile);
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
+        sslTruststorePassword = stringPropertyOr("sslTruststorePassword", builder.sslTruststorePassword);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -288,8 +301,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
         sslKeystore = builder.sslKeystore;
+        sslTruststore = builder.sslTruststore;
         memcachedHashingStrategy = builder.memcachedHashingStrategy;
         configPollInterval = longPropertyOr("configPollInterval", builder.configPollInterval);
+        configPollFloorInterval = longPropertyOr("configPollFloorInterval", builder.configPollFloorInterval);
         certAuthEnabled = booleanPropertyOr("certAuthEnabled", builder.certAuthEnabled);
         continuousKeepAliveEnabled = booleanPropertyOr(
             "continuousKeepAliveEnabled",
@@ -451,6 +466,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         if (emitEnvWarnMessage) {
             eventBus.publish(new TooManyEnvironmentsEvent(instanceCounter));
+        }
+
+        this.couchbaseCoreSendHook = builder.couchbaseCoreSendHook;
+
+        if (configPollInterval < configPollFloorInterval) {
+            throw new IllegalArgumentException("The config poll interval (" +
+                configPollInterval + ") is lower than the config " +
+                "poll floor interval (" + configPollFloorInterval +
+                "), which means that some config polling will " +
+                "be skipped. Please adjust both settings in a logical fashion.");
         }
     }
 
@@ -624,6 +649,21 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public KeyStore sslKeystore() {
         return sslKeystore;
+    }
+
+    @Override
+    public String sslTruststoreFile() {
+        return sslTruststoreFile;
+    }
+
+    @Override
+    public KeyStore sslTruststore() {
+        return sslTruststore;
+    }
+
+    @Override
+    public String sslTruststorePassword() {
+        return sslTruststorePassword;
     }
 
     @Override
@@ -850,11 +890,18 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return searchServiceConfig;
     }
 
-    @InterfaceStability.Experimental
+    @InterfaceStability.Committed
     @InterfaceAudience.Public
     @Override
     public long configPollInterval() {
         return configPollInterval;
+    }
+
+    @InterfaceStability.Committed
+    @InterfaceAudience.Public
+    @Override
+    public long configPollFloorInterval() {
+        return configPollFloorInterval;
     }
 
     @Override
@@ -877,12 +924,20 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return keepAliveTimeout;
     }
 
+    @Override
+    public CouchbaseCoreSendHook couchbaseCoreSendHook() {
+        return couchbaseCoreSendHook;
+    }
+
     public static class Builder {
 
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
+        private String sslTruststoreFile = SSL_TRUSTSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
+        private String sslTruststorePassword = SSL_TRUSTSTORE_PASSWORD;
         private KeyStore sslKeystore = SSL_KEYSTORE;
+        private KeyStore sslTruststore = SSL_TRUSTSTORE;
         private String userAgent = USER_AGENT;
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
@@ -931,7 +986,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private WaitStrategyFactory requestBufferWaitStrategy;
         private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
         private long configPollInterval = CONFIG_POLL_INTERVAL;
+        private long configPollFloorInterval = CONFIG_POLL_FLOOR_INTERVAL;
         private boolean certAuthEnabled = CERT_AUTH_ENABLED;
+        private CouchbaseCoreSendHook couchbaseCoreSendHook;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
@@ -958,11 +1015,29 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
          *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
+         * If this method is used without also specifying
+         * {@link #sslTruststoreFile(String)} this keystore will be used to initialize
+         * both the key factory as well as the trust factory with java SSL. This
+         * needs to be the case for backwards compatibility, but if you do not need
+         * X.509 client cert authentication you might as well just use {@link #sslTruststoreFile(String)}
+         * alone.
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
+            return this;
+        }
+
+        /**
+         * Defines the location of the SSL TrustStore keystore file (default value null, none).
+         *
+         * If this method is used without also specifying
+         * {@link #sslKeystoreFile(String)} this keystore will be used to initialize
+         * both the key factory as well as the trust factory with java SSL. Prefer
+         * this method over the {@link #sslKeystoreFile(String)} if you do not need
+         * X.509 client auth and just need server side certificate checking.
+         */
+        public Builder sslTruststoreFile(final String sslTruststoreFile) {
+            this.sslTruststoreFile = sslTruststoreFile;
             return this;
         }
 
@@ -977,15 +1052,45 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
+         * Sets the SSL TrustStore password to be used with the Keystore file (default value null, none).
+         *
+         * @see #sslKeystoreFile(String)
+         */
+        public Builder sslTruststorePassword(final String sslTruststorePassword) {
+            this.sslTruststorePassword = sslTruststorePassword;
+            return this;
+        }
+
+        /**
          * Sets the SSL Keystore directly and not indirectly via filepath.
          *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
+         * If this method is used without also specifying
+         * {@link #sslTruststore(KeyStore)} this keystore will be used to initialize
+         * both the key factory as well as the trust factory with java SSL. This
+         * needs to be the case for backwards compatibility, but if you do not need
+         * X.509 client cert authentication you might as well just use {@link #sslTruststore(KeyStore)}
+         * alone.
          *
          * @param sslKeystore the keystore to use.
          */
         public Builder sslKeystore(final KeyStore sslKeystore) {
             this.sslKeystore = sslKeystore;
+            return this;
+        }
+
+        /**
+         * Sets the SSL Keystore for the TrustStore directly and not indirectly via filepath.
+         *
+         * If this method is used without also specifying
+         * {@link #sslKeystore(KeyStore)} this keystore will be used to initialize
+         * both the key factory as well as the trust factory with java SSL. Prefer
+         * this method over the {@link #sslKeystore(KeyStore)} if you do not need
+         * X.509 client auth and just need server side certificate checking.
+         *
+         * @param sslTruststore the keystore to use.
+         */
+        public Builder sslTruststore(final KeyStore sslTruststore) {
+            this.sslTruststore = sslTruststore;
             return this;
         }
 
@@ -1492,18 +1597,30 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Allows to set the configuration poll interval which polls the server cluster
          * configuration proactively.
          *
-         * Note that the interval cannot be set lower than 50 milliseconds (other than 0
-         * to disable it).
+         * Note that the interval cannot be set lower than the floor interval defined in
+         * {@link #configPollFloorInterval(long)}.
+         *
          * @param configPollInterval the interval in milliseconds, 0 deactivates the polling.
          */
-        @InterfaceStability.Experimental
+        @InterfaceStability.Committed
         @InterfaceAudience.Public
         public Builder configPollInterval(long configPollInterval) {
-            if (configPollInterval < 50 && configPollInterval != 0) {
-                throw new IllegalArgumentException("The poll interval cannot be lower than " +
-                    "50 milliseconds");
-            }
             this.configPollInterval = configPollInterval;
+            return this;
+        }
+
+        /**
+         * Allows to set the minimum config polling interval.
+         *
+         * Note that the {@link #configPollInterval(long)} obviously needs to be equal
+         * or larger than this setting, otherwise intervals will be skipped.
+         *
+         * @param configPollFloorInterval the interval in milliseconds.
+         */
+        @InterfaceStability.Committed
+        @InterfaceAudience.Public
+        public Builder configPollFloorInterval(long configPollFloorInterval) {
+            this.configPollFloorInterval = configPollFloorInterval;
             return this;
         }
 
@@ -1549,6 +1666,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        /**
+         * Allows to configure a custom core send hook, see the javadocs for it for more details.
+         */
+        @InterfaceAudience.Public
+        @InterfaceStability.Experimental
+        public Builder couchbaseCoreSendHook(final CouchbaseCoreSendHook hook) {
+            this.couchbaseCoreSendHook = hook;
+            return this;
+        }
+
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1564,8 +1691,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     protected StringBuilder dumpParameters(StringBuilder sb) {
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
+        sb.append(", sslTruststoreFile='").append(sslTruststoreFile).append('\'');
         sb.append(", sslKeystorePassword=").append(sslKeystorePassword != null && !sslKeystorePassword.isEmpty());
+        sb.append(", sslTruststorePassword=").append(sslTruststorePassword != null && !sslTruststorePassword.isEmpty());
         sb.append(", sslKeystore=").append(sslKeystore);
+        sb.append(", sslTruststore=").append(sslTruststore);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
@@ -1581,6 +1711,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", searchServiceEndpoints=").append(searchServiceEndpoints);
         sb.append(", configPollInterval=").append(configPollInterval);
+        sb.append(", configPollFloorInterval=").append(configPollFloorInterval);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");
@@ -1643,7 +1774,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", disconnectTimeout=").append(disconnectTimeout);
         sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
         sb.append(", certAuthEnabled=").append(certAuthEnabled);
-
+        sb.append(", coreSendHook=").append(couchbaseCoreSendHook == null ? "null" :
+            couchbaseCoreSendHook.getClass().getSimpleName());
         return sb;
     }
 

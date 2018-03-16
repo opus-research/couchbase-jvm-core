@@ -24,7 +24,10 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
+import com.couchbase.client.core.message.internal.EndpointHealth;
+import com.couchbase.client.core.message.internal.HealthCheckResponse;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
+import com.couchbase.client.core.message.internal.ServicesHealth;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
@@ -38,6 +41,7 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -69,6 +73,11 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * The hostname or IP address of the node.
      */
     private final NetworkAddress hostname;
+
+    /**
+     * For performance reasons, cache the string representation as well.
+     */
+    private final String convertedHostname;
 
     /**
      * The environment to use.
@@ -110,6 +119,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         final RingBuffer<ResponseEvent> responseBuffer, ServiceFactory serviceFactory) {
         super(LifecycleState.DISCONNECTED);
         this.hostname = hostname;
+        this.convertedHostname = hostname.nameOrAddress();
         this.serviceRegistry = registry;
         this.environment = environment;
         this.responseBuffer = responseBuffer;
@@ -188,6 +198,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 service.send(request);
             }
         } else {
+            request.dispatchHostname(convertedHostname);
             Service service = serviceRegistry.locate(request);
             if (service == null) {
                 RetryHelper.retryOrCancel(environment, request, responseBuffer);
@@ -288,6 +299,15 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         serviceStates.deregister(service);
         enabledServices &= ~(1 << service.type().ordinal());
         return Observable.just(service);
+    }
+
+    @Override
+    public Observable<EndpointHealth> healthCheck() {
+        List<Observable<EndpointHealth>> healthChecks = new ArrayList<Observable<EndpointHealth>>();
+        for (Service service : serviceRegistry.services()) {
+            healthChecks.add(service.healthCheck());
+        }
+        return Observable.merge(healthChecks);
     }
 
     @Override

@@ -66,7 +66,6 @@ public class ClusterDependentTest {
 
     static {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-        System.setProperty("com.couchbase.xerrorEnabled", "false");
     }
 
     private static final String seedNode = TestProperties.seedNode();
@@ -76,6 +75,7 @@ public class ClusterDependentTest {
     private static final String adminUser = TestProperties.adminUser();
     private static final String adminPassword = TestProperties.adminPassword();
     private static final CouchbaseMock couchbaseMock = TestProperties.couchbaseMock();
+    private static final Boolean useMock = TestProperties.useMock();
     private static CoreEnvironment env;
 
     protected static final int KEEPALIVE_INTERVAL = 1000;
@@ -112,7 +112,7 @@ public class ClusterDependentTest {
      * Helper (hacked together) method to grab a config from a bucket without having to initialize the
      * client first - this helps with pre-bootstrap decisions like credentials for RBAC.
      */
-    private static int[] minClusterVersion() throws Exception {
+    public static int[] minClusterVersion() throws Exception {
         URIBuilder builder = new URIBuilder();
         builder.setScheme("http").setHost(seedNode).setPort(8091).setPath("/pools/default/buckets/" + bucket)
             .setParameter("bucket", bucket);
@@ -130,7 +130,7 @@ public class ClusterDependentTest {
     }
 
 
-    public static void connect(boolean useMock) throws Exception {
+    public static void connect() throws Exception {
 
         /*
          * If we are running under RBAC, set the user and password to the admin

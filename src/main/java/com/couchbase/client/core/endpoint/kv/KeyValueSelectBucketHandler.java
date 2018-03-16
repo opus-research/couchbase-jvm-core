@@ -77,9 +77,25 @@ public class KeyValueSelectBucketHandler extends SimpleChannelInboundHandler<Ful
     private static final byte SUCCESS = (byte)0x00;
 
     /**
+     * The bucket is not found upon selection
+     */
+    private static final byte NOTFOUND_ERROR = (byte)0x01;
+
+    /**
      * Access error response status
      */
     private static final byte ACCESS_ERROR = (byte)0x24;
+
+    /**
+     * Test constructor to enable/disable the feature in the embedded channels.
+     *
+     * @param bucket the name of the user/bucket.
+     * @param selectBucketEnabled if it should be enabled without firing the event.
+     */
+    KeyValueSelectBucketHandler(String bucket, boolean selectBucketEnabled) {
+        this.bucket = bucket;
+        this.selectBucketEnabled = selectBucketEnabled;
+    }
 
     /**
      * Creates a new {@link KeyValueSelectBucketHandler}.
@@ -87,7 +103,7 @@ public class KeyValueSelectBucketHandler extends SimpleChannelInboundHandler<Ful
      * @param bucket the name of the user/bucket.
      */
     public KeyValueSelectBucketHandler(String bucket) {
-        this.bucket = bucket;
+        this(bucket, false);
     }
 
     /**
@@ -133,6 +149,9 @@ public class KeyValueSelectBucketHandler extends SimpleChannelInboundHandler<Ful
                 break;
             case ACCESS_ERROR:
                 originalPromise.setFailure(new AuthenticationException("Authentication failure on Select Bucket command"));
+                break;
+            case NOTFOUND_ERROR:
+                originalPromise.setFailure(new AuthenticationException("Bucket not found on Select Bucket command"));
                 break;
             default:
                 originalPromise.setFailure(new AuthenticationException("Unhandled select bucket status: "

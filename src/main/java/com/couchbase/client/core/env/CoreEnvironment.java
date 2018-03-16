@@ -18,6 +18,7 @@ package com.couchbase.client.core.env;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.event.EventBus;
+import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
@@ -451,9 +452,19 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      *
      * @return the polling interval in milliseconds.
      */
-    @InterfaceStability.Experimental
+    @InterfaceStability.Committed
     @InterfaceAudience.Public
     long configPollInterval();
+
+
+    /**
+     * Returns the minimum polling interval allowed.
+     *
+     * @return the minimum polling interval.
+     */
+    @InterfaceStability.Committed
+    @InterfaceAudience.Public
+    long configPollFloorInterval();
 
     /**
      * True if X.509 client certificate authentication is enabled.
@@ -461,5 +472,12 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceStability.Uncommitted
     @InterfaceAudience.Public
     boolean certAuthEnabled();
+
+    /**
+     * Returns the {@link CouchbaseCoreSendHook} if set, null otherwise.
+     */
+    @InterfaceStability.Experimental
+    @InterfaceAudience.Public
+    CouchbaseCoreSendHook couchbaseCoreSendHook();
 
 }

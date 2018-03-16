@@ -15,13 +15,14 @@
  */
 package com.couchbase.client.core;
 
-
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultConfigurationProvider;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.env.Diagnostics;
+import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
+import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -44,6 +45,7 @@ import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.AddServiceResponse;
 import com.couchbase.client.core.message.internal.GetConfigProviderRequest;
 import com.couchbase.client.core.message.internal.GetConfigProviderResponse;
+import com.couchbase.client.core.message.internal.HealthCheckRequest;
 import com.couchbase.client.core.message.internal.InternalRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeRequest;
 import com.couchbase.client.core.message.internal.RemoveNodeResponse;
@@ -59,6 +61,7 @@ import com.lmax.disruptor.dsl.ProducerType;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
+import rx.subjects.Subject;
 
 import java.util.concurrent.ThreadFactory;
 
@@ -112,6 +115,7 @@ public class CouchbaseCore implements ClusterFacade {
     private final Disruptor<ResponseEvent> responseDisruptor;
 
     private volatile boolean sharedEnvironment = true;
+    private final CouchbaseCoreSendHook coreSendHook;
 
     /**
      * Populate the static exceptions with stack trace elements.
@@ -136,6 +140,7 @@ public class CouchbaseCore implements ClusterFacade {
         LOGGER.debug(Diagnostics.collectAndFormat());
 
         this.environment = environment;
+        this.coreSendHook = environment.couchbaseCoreSendHook();
         configProvider = new DefaultConfigurationProvider(this, environment);
         ThreadFactory disruptorThreadFactory = new DefaultThreadFactory("cb-core", true);
         responseDisruptor = new Disruptor<ResponseEvent>(
@@ -202,11 +207,22 @@ public class CouchbaseCore implements ClusterFacade {
             handleClusterRequest(request);
             return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else {
-            boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
-            if (!published) {
-                request.observable().onError(BACKPRESSURE_EXCEPTION);
+            if (coreSendHook == null) {
+                boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
+                if (!published) {
+                    request.observable().onError(BACKPRESSURE_EXCEPTION);
+                }
+                return (Observable<R>) request.observable();
+            } else {
+                Subject<CouchbaseResponse, CouchbaseResponse> response = request.observable();
+                Tuple2<CouchbaseRequest, Observable<CouchbaseResponse>> hook = coreSendHook
+                        .beforeSend(request, response);
+                boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, hook.value1());
+                if (!published) {
+                    response.onError(BACKPRESSURE_EXCEPTION);
+                }
+                return (Observable<R>) hook.value2();
             }
-            return (Observable<R>) request.observable();
         }
     }
 
@@ -338,14 +354,16 @@ public class CouchbaseCore implements ClusterFacade {
                 .subscribe(request.observable());
         } else if (request instanceof RemoveServiceRequest) {
             requestHandler
-                .removeService((RemoveServiceRequest) request)
-                .map(new Func1<Service, RemoveServiceResponse>() {
-                    @Override
-                    public RemoveServiceResponse call(Service service) {
-                        return new RemoveServiceResponse(ResponseStatus.SUCCESS);
-                    }
-                })
-                .subscribe(request.observable());
+                    .removeService((RemoveServiceRequest) request)
+                    .map(new Func1<Service, RemoveServiceResponse>() {
+                        @Override
+                        public RemoveServiceResponse call(Service service) {
+                            return new RemoveServiceResponse(ResponseStatus.SUCCESS);
+                        }
+                    })
+                    .subscribe(request.observable());
+        } else if (request instanceof HealthCheckRequest) {
+            requestHandler.healthCheck().subscribe(request.observable());
         } else {
             request
                 .observable()
