@@ -97,4 +97,10 @@ public class DefaultCouchbaseBucketConfigTest {
         assertEquals("192.168.1.194", config.nodes().get(1).hostname().address());
         assertEquals(9001, (int)config.nodes().get(1).services().get(ServiceType.CONFIG));
     }
+
+    @Test
+    public void shouldLoadConfigWithMDS() throws Exception {
+        String raw = Resources.read("mds_config_index_out_of_bound_bug.json", getClass());
+        CouchbaseBucketConfig config = JSON_MAPPER.readValue(raw, CouchbaseBucketConfig.class);
+    }
 }
