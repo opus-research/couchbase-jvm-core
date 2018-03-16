@@ -19,29 +19,54 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.metrics;
+package com.couchbase.client.core.event.metrics;
+
+import java.util.Map;
 
 /**
- * A generic metrics collector.
+ * A latency metric value object which contains percentile and other related information.
  *
  * @author Michael Nitschinger
  * @since 1.2.0
  */
-public interface MetricsCollector {
+public class LatencyMetric {
 
-    /**
-     * Its high-level configuration.
-     */
-    MetricsCollectorConfig config();
+    private final long min;
+    private final long max;
+    private final long count;
+    private final Map<Double, Long> percentiles;
 
-    /**
-     * Shuts down the collector (non-reversible) and frees bound resources.
-     */
-    boolean shutdown();
+    public LatencyMetric(long min, long max, long count, Map<Double, Long> percentiles) {
+        this.min = min;
+        this.max = max;
+        this.count = count;
+        this.percentiles = percentiles;
+    }
 
-    /**
-     * True if this collector actually emits something.
-     */
-    boolean isEnabled();
+    public long min() {
+        return min;
+    }
 
+    public long max() {
+        return max;
+    }
+
+    public long count() {
+        return count;
+    }
+
+    public Map<Double, Long> percentiles() {
+        return percentiles;
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("LatencyMetric{");
+        sb.append("min=").append(min);
+        sb.append(", max=").append(max);
+        sb.append(", count=").append(count);
+        sb.append(", percentiles=").append(percentiles);
+        sb.append('}');
+        return sb.toString();
+    }
 }
