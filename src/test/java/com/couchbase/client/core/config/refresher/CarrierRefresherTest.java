@@ -40,8 +40,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import rx.Observable;
 
 import java.net.InetAddress;
@@ -49,7 +47,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
@@ -85,31 +82,22 @@ public class CarrierRefresherTest {
         nodeInfos.add(new DefaultNodeInfo(null, "localhost:8091", ports));
         when(config.nodes()).thenReturn(nodeInfos);
 
-        final AtomicReference<ByteBuf> bufRef = new AtomicReference<ByteBuf>(null);
-        when(cluster.send(any(GetBucketConfigRequest.class)))
-                .thenAnswer(new Answer<Observable<GetBucketConfigResponse>>() {
-                    @Override
-                    public Observable<GetBucketConfigResponse> answer(InvocationOnMock invocation) throws Throwable {
-                        ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
-                        ByteBuf oldContent = bufRef.getAndSet(content);
-                        if (oldContent != null) {
-                            assertEquals(0, oldContent.refCnt());
-                        }
-                        GetBucketConfigResponse response = new GetBucketConfigResponse(
-                                ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
-                                "bucket",
-                                content,
-                                InetAddress.getByName("localhost"));
-                        return Observable.just(response);
-                    }
-                });
+        ByteBuf content = Unpooled.copiedBuffer("{\"config\": true}", CharsetUtil.UTF_8);
+        when(cluster.send(any(GetBucketConfigRequest.class))).thenReturn(Observable.just(
+            (CouchbaseResponse) new GetBucketConfigResponse(
+                ResponseStatus.SUCCESS, KeyValueStatus.SUCCESS.code(),
+                "bucket",
+                content,
+                InetAddress.getByName("localhost")
+            )
+        ));
 
         refresher.markTainted(config);
 
         Thread.sleep(1500);
 
         verify(provider, times(1)).proposeBucketConfig("bucket", "{\"config\": true}");
-        assertEquals(0, bufRef.get().refCnt());
+        assertEquals(0, content.refCnt());
     }
 
     @Test
