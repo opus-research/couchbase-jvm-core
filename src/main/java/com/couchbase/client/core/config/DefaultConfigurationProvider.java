@@ -325,6 +325,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         }
 
         BucketConfig config = BucketConfigParser.parse(rawConfig);
+        config.password(currentConfig.get().bucketConfig(bucket).password());
         upsertBucketConfig(config);
     }
 
@@ -367,14 +368,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             && config.rev() <= cluster.bucketConfig(config.name()).rev()) {
             LOGGER.trace("Not applying new configuration, older rev ID.");
             return;
-        }
-
-        // If the current password of the config is empty and an old config exists
-        // make sure to transfer the password over to the new config. Otherwise it
-        // is possible that authentication errors because of a null password arise.
-        // See JVMCBC-185
-        if (config.password() == null && cluster.bucketConfig(config.name()) != null) {
-            config.password(cluster.bucketConfig(config.name()).password());
         }
 
         cluster.setBucketConfig(config.name(), config);
