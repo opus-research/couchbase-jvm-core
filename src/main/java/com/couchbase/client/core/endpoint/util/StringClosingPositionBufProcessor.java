@@ -41,7 +41,6 @@ public class StringClosingPositionBufProcessor implements ByteBufProcessor {
 
     private boolean inString = false;
     private byte lastByte = 0;
-    private byte beforeLastByte = 0;
 
     @Override
     public boolean process(byte value) throws Exception {
@@ -49,19 +48,13 @@ public class StringClosingPositionBufProcessor implements ByteBufProcessor {
         if (!inString && value == '"') {
             inString = true;
             done = false;
-        } else if (inString && value == '"') {
-            boolean escaped = lastByte == '\\' && beforeLastByte != '\\';
-            if (escaped) {
-                done = false;
-            } else {
-                inString = false;
-                done = true;
-            }
+        } else if (inString && value == '"' && lastByte != '\\') {
+            inString = false;
+            done = true;
         } else {
             done = false;
         }
 
-        beforeLastByte = lastByte;
         lastByte = value;
         return !done;
     }
