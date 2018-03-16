@@ -76,11 +76,6 @@ public class AbstractStateMachine<S extends Enum> implements Stateful<S> {
         return currentState == state;
     }
 
-    @Override
-    public boolean hasSubscribers() {
-        return observable.hasObservers();
-    }
-
     /**
      * Transition into a new state.
      *
