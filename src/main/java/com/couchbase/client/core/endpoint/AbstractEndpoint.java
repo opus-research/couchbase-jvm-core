@@ -78,6 +78,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     public static final int MAX_RECONNECT_DELAY = 4096;
 
     /**
+     * The minimum reconnect delay in milliseconds, so it does not retry immediately.
+     */
+    public static final int MIN_RECONNECT_DELAY = 128;
+
+    /**
      * The logger used.
      */
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(Endpoint.class);
@@ -375,6 +380,9 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private long reconnectDelay() {
         int delay = 1 << (reconnectAttempt++);
+        if (delay <= MIN_RECONNECT_DELAY) {
+            return MIN_RECONNECT_DELAY;
+        }
         return delay >= MAX_RECONNECT_DELAY ? MAX_RECONNECT_DELAY : delay;
     }
 
