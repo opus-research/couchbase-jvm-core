@@ -756,7 +756,7 @@ public class AnalyticsHandler extends AbstractGenericHandler<HttpObject, HttpReq
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements AnalyticsRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null, null);
+            super(null, null);
         }
     }
 

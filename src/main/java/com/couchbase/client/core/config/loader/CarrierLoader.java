@@ -59,15 +59,8 @@ public class CarrierLoader extends AbstractLoader {
         return env().sslEnabled() ? env().bootstrapCarrierSslPort() : env().bootstrapCarrierDirectPort();
     }
 
-
     @Override
     protected Observable<String> discoverConfig(final String bucket, final String password,
-                                                final InetAddress hostname) {
-        return discoverConfig(bucket, bucket, password, hostname);
-    }
-
-    @Override
-    protected Observable<String> discoverConfig(final String bucket, final String username, final String password,
         final InetAddress hostname) {
         if (!env().bootstrapCarrierEnabled()) {
             LOGGER.info("Carrier Bootstrap manually disabled.");

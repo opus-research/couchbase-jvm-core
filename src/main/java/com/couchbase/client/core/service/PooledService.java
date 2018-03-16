@@ -51,7 +51,6 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
 
     private final String hostname;
     private final String bucket;
-    private final String username;
     private final String password;
     private final int port;
     private final CoreEnvironment env;
@@ -81,20 +80,12 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
                   final CoreEnvironment env, final AbstractServiceConfig serviceConfig,
                   final RingBuffer<ResponseEvent> responseBuffer, final EndpointFactory endpointFactory,
                   final SelectionStrategy selectionStrategy) {
-        this(hostname, bucket, bucket, password, port, env, serviceConfig, responseBuffer, endpointFactory, selectionStrategy);
-    }
-
-    PooledService(final String hostname, final String bucket, final String username, final String password, final int port,
-                  final CoreEnvironment env, final AbstractServiceConfig serviceConfig,
-                  final RingBuffer<ResponseEvent> responseBuffer, final EndpointFactory endpointFactory,
-                  final SelectionStrategy selectionStrategy) {
         super(serviceConfig.minEndpoints() == 0 ? LifecycleState.IDLE : LifecycleState.DISCONNECTED);
         preCheckEndpointSettings(serviceConfig);
 
         this.initialState = serviceConfig.minEndpoints() == 0 ? LifecycleState.IDLE : LifecycleState.DISCONNECTED;
         this.hostname = hostname;
         this.bucket = bucket;
-        this.username = username;
         this.password = password;
         this.port = port;
         this.env = env;
@@ -188,7 +179,7 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
 
             synchronized (epMutex) {
                 for (int i = 0; i < belowMin; i++) {
-                    Endpoint endpoint = endpointFactory.create(hostname, bucket, username, password, port, env, responseBuffer);
+                    Endpoint endpoint = endpointFactory.create(hostname, bucket, password, port, env, responseBuffer);
                     endpoints.add(endpoint);
                     endpointStates.register(endpoint, endpoint);
                     endpoint.connect().subscribe(new Subscriber<LifecycleState>() {
@@ -249,7 +240,7 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
                 return Observable.just(state());
             }
             for (int i = 0; i < numToConnect; i++) {
-                Endpoint endpoint = endpointFactory.create(hostname, username, bucket, password, port, env, responseBuffer);
+                Endpoint endpoint = endpointFactory.create(hostname, bucket, password, port, env, responseBuffer);
                 endpoints.add(endpoint);
                 endpointStates.register(endpoint, endpoint);
             }
@@ -348,7 +339,7 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
                 + "Need to open a new Endpoint (size {}), pending requests {}", endpoints.size(), pendingRequests);
 
         final Endpoint endpoint = endpointFactory.create(
-            hostname, bucket, username, password, port, env, responseBuffer
+            hostname, bucket, password, port, env, responseBuffer
         );
 
         final Subscription subscription = whenState(endpoint, LifecycleState.CONNECTED,
