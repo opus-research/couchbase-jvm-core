@@ -35,18 +35,4 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
 public interface DCPResponse extends CouchbaseResponse {
-    /**
-     * The partition (vBucket) to use for this request.
-     *
-     * @return the partition to use.
-     */
-    short partition();
-
-    /**
-     * Set the partition ID.
-     *
-     * @param id the id of the partition.
-     * @return the {@link DCPRequest} for proper chaining.
-     */
-    DCPResponse partition(short id);
 }

@@ -24,6 +24,7 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
      *
      * @param rev the revision of the config.
      * @param name the name of the bucket.
+     * @param locator the locator for this bucket.
      * @param uri the URI for this bucket.
      * @param streamingUri the streaming URI for this bucket.
      * @param nodeInfos related node information.
@@ -33,11 +34,12 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
     public DefaultMemcachedBucketConfig(
         @JsonProperty("rev") long rev,
         @JsonProperty("name") String name,
+        @JsonProperty("nodeLocator") String locator,
         @JsonProperty("uri") String uri,
         @JsonProperty("streamingUri") String streamingUri,
         @JsonProperty("nodes") List<NodeInfo> nodeInfos,
         @JsonProperty("nodesExt") List<PortInfo> portInfos) {
-        super(name, BucketNodeLocator.KETAMA, uri, streamingUri, nodeInfos, portInfos);
+        super(name, BucketNodeLocator.fromConfig(locator), uri, streamingUri, nodeInfos, portInfos);
         this.rev = rev;
         this.ketamaNodes = new TreeMap<Long, NodeInfo>();
         populateKetamaNodes();
@@ -89,45 +91,8 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
         }
     }
 
-    private static String keyForNode(InetAddress hostname, int repetition) {
+    private String keyForNode(InetAddress hostname, int repetition) {
         return hostname.getHostName() + "-" + repetition;
-    }
-
-    @Override
-    public InetAddress nodeForId(final byte[] id) {
-        long hash = calculateKetamaHash(id);
-
-        if (!ketamaNodes.containsKey(hash)) {
-            SortedMap<Long, NodeInfo> tailMap = ketamaNodes.tailMap(hash);
-            if (tailMap.isEmpty()) {
-                hash = ketamaNodes.firstKey();
-            } else {
-                hash = tailMap.firstKey();
-            }
-        }
-
-        return ketamaNodes.get(hash).hostname();
-    }
-
-    /**
-     * Calculates the ketama hash for the given key.
-     *
-     * @param key the key to calculate.
-     * @return the calculated hash.
-     */
-    private static long calculateKetamaHash(final byte[] key) {
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            md5.update(key);
-            byte[] digest = md5.digest();
-            long rv = ((long) (digest[3] & 0xFF) << 24)
-                    | ((long) (digest[2] & 0xFF) << 16)
-                    | ((long) (digest[1] & 0xFF) << 8)
-                    | (digest[0] & 0xFF);
-            return rv & 0xffffffffL;
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Could not encode ketama hash.", e);
-        }
     }
 
     @Override
