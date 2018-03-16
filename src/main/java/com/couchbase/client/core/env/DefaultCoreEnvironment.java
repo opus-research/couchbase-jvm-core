@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.env;
 
+import java.util.Properties;
+
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -33,9 +35,8 @@ import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
 
-import java.util.Properties;
-
 public class DefaultCoreEnvironment implements CoreEnvironment {
+
 
     /**
      * The logger used.
@@ -62,6 +63,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int QUERY_ENDPOINTS = 1;
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
+
 
     private static final String NAMESPACE = "com.couchbase.";
 
@@ -162,8 +164,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         this.ioPool = builder.ioPool() == null
             ? new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true)) : builder.ioPool();
-        this.coreScheduler = builder.scheduler() == null
-            ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
+        this.coreScheduler = builder.scheduler() == null ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
         this.shutdown = false;
     }
 

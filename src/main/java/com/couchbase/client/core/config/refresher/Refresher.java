@@ -68,14 +68,14 @@ public interface Refresher {
     /**
      * Marks the given bucket as tainted.
      *
-     * @param config the config of the bucket that should be marked.
+     * @param config
      */
     void markTainted(BucketConfig config);
 
     /**
      * Mark the given bucket as not tainted.
      *
-     * @param config the config of the bucket that should not be marked anymore.
+     * @param config
      */
     void markUntainted(BucketConfig config);
 

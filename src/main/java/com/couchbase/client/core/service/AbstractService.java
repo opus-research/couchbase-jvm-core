@@ -103,28 +103,26 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
             endpointStates.add(endpoint.states());
         }
 
-        Observable
-            .combineLatest(endpointStates, new FuncN<LifecycleState>() {
-                @Override
-                public LifecycleState call(Object... args) {
-                    LifecycleState[] states = Arrays.copyOf(args, args.length, LifecycleState[].class);
-                    return calculateStateFrom(Arrays.asList(states));
+        Observable.combineLatest(endpointStates, new FuncN<LifecycleState>() {
+            @Override
+            public LifecycleState call(Object... args) {
+                LifecycleState[] states = Arrays.copyOf(args, args.length, LifecycleState[].class);
+                return calculateStateFrom(Arrays.asList(states));
+            }
+        }).subscribe(new Action1<LifecycleState>() {
+            @Override
+            public void call(LifecycleState state) {
+                if (state == state()) {
+                    return;
                 }
-            })
-                .subscribe(new Action1<LifecycleState>() {
-                    @Override
-                    public void call(LifecycleState state) {
-                        if (state == state()) {
-                            return;
-                        }
-                        if (state == LifecycleState.CONNECTED) {
-                            LOGGER.debug(logIdent(hostname, AbstractService.this) + "Connected Service.");
-                        } else if (state == LifecycleState.DISCONNECTED) {
-                            LOGGER.debug(logIdent(hostname, AbstractService.this) + "Disconnected Service.");
-                        }
-                        transitionState(state);
-                    }
-                });
+                if (state == LifecycleState.CONNECTED) {
+                    LOGGER.debug(logIdent(hostname, AbstractService.this) + "Connected Service.");
+                } else if (state == LifecycleState.DISCONNECTED) {
+                    LOGGER.debug(logIdent(hostname, AbstractService.this) + "Disconnected Service.");
+                }
+                transitionState(state);
+            }
+        });
     }
 
     @Override
@@ -227,8 +225,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
                 case DISCONNECTING:
                     disconnecting++;
                     break;
-                default:
-                    // ignore
             }
         }
         if (endpointStates.size() == connected) {
@@ -252,6 +248,6 @@ public abstract class AbstractService extends AbstractStateMachine<LifecycleStat
      * @return a prefix string for logs.
      */
     protected static String logIdent(final String hostname, final Service service) {
-        return "[" + hostname + "][" + service.getClass().getSimpleName() + "]: ";
+        return "["+hostname+"][" + service.getClass().getSimpleName()+"]: ";
     }
 }
