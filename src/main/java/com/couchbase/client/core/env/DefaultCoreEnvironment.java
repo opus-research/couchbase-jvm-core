@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.env;
 
+import java.util.Properties;
+
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -78,9 +80,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                 throw new IllegalStateException("Could not locate ClusterFacade");
             }
 
-            Package pkg = Package.getPackage("com.couchbase.client.core");
-            String version = pkg.getSpecificationVersion();
-            String gitVersion = pkg.getImplementationVersion();
+            Properties versionProp = new Properties();
+            versionProp.load(DefaultCoreEnvironment.class.getClassLoader().getResourceAsStream("couchbase.client.core.properties"));
+            String version = versionProp.getProperty("specificationVersion");
+            String gitVersion = versionProp.getProperty("implementationVersion");
             PACKAGE_NAME_AND_VERSION = String.format("couchbase-jvm-core/%s (git: %s)",
                 version == null ? "unknown" : version, gitVersion == null ? "unknown" : gitVersion);
 
