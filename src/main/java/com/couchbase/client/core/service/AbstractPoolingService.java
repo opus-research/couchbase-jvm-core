@@ -22,10 +22,10 @@
 package com.couchbase.client.core.service;
 
 import com.couchbase.client.core.ResponseEvent;
+import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
@@ -40,7 +40,6 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
     private final int maxEndpoints;
     private final RingBuffer<ResponseEvent> responseBuffer;
     private final SelectionStrategy strategy;
-    private final CoreEnvironment env;
 
     protected AbstractPoolingService(String hostname, String bucket, String password, int port,
         CoreEnvironment env, int minEndpoints, int maxEndpoints, SelectionStrategy strategy,
@@ -49,7 +48,6 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
         this.maxEndpoints = maxEndpoints;
         this.responseBuffer = responseBuffer;
         this.strategy = strategy;
-        this.env = env;
     }
 
     @Override
@@ -57,8 +55,7 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
         if (endpoints().length == maxEndpoints) {
             Endpoint endpoint = strategy.select(request, endpoints());
             if (endpoint == null) {
-                RetryHelper.retryOrCancel(env.retryStrategy(), request, responseBuffer);
-
+                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
             } else {
                 endpoint.send(request);
             }
