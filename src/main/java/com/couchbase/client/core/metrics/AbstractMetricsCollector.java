@@ -42,11 +42,9 @@ public abstract class AbstractMetricsCollector implements MetricsCollector {
 
     private final MetricsCollectorConfig config;
     private final Subscription subscription;
-    private final boolean isEnabled;
 
     protected AbstractMetricsCollector(final EventBus eventBus, Scheduler scheduler, MetricsCollectorConfig config) {
         this.config = config;
-        isEnabled = config.emitFrequency() > 0;
 
         if (config.emitFrequency() > 0) {
             subscription = Observable
@@ -87,10 +85,5 @@ public abstract class AbstractMetricsCollector implements MetricsCollector {
         }
 
         return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return isEnabled;
     }
 }
