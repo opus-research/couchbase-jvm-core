@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@ package com.couchbase.client.core.message.dcp;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import rx.subjects.Subject;
 
@@ -36,52 +36,50 @@ import rx.subjects.Subject;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implements DCPRequest {
-    protected static short DEFAULT_PARTITION = 0;
+public abstract class AbstractDCPMessage extends AbstractDCPRequest implements DCPMessage {
+    private final String key;
+    private final int totalBodyLength;
+    private final DCPConnection connection;
 
     /**
-     * The partition (vBucket) of the document.
-     */
-    private short partition = DEFAULT_PARTITION;
-
-    /**
-     * Creates a new {@link AbstractDCPRequest}.
+     * Creates a new {@link AbstractDCPMessage}.
      *
-     *
+     * @param connection
+     * @param totalBodyLength
+     * @param partition
+     * @param key
      * @param bucket   the bucket of the document.
      * @param password the optional password of the bucket.
      */
-    public AbstractDCPRequest(final String bucket, final String password) {
+    public AbstractDCPMessage(DCPConnection connection, int totalBodyLength, short partition, String key, final String bucket, final String password) {
         super(bucket, password);
+        this.partition(partition);
+        this.key = key;
+        this.totalBodyLength = totalBodyLength;
+        this.connection = connection;
     }
 
-    public AbstractDCPRequest(final String bucket, final String password, final Subject<CouchbaseResponse,
-            CouchbaseResponse> observable) {
+    public AbstractDCPMessage(DCPConnection connection, int totalBodyLength, short partition, String key, final String bucket, final String password,
+                              final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
         super(bucket, password, observable);
+        this.partition(partition);
+        this.key = key;
+        this.totalBodyLength = totalBodyLength;
+        this.connection = connection;
     }
 
     @Override
-    public short partition() {
-        if (partition == -1) {
-            throw new IllegalStateException("Partition requested but not set beforehand");
-        }
-        return partition;
+    public int totalBodyLength() {
+        return totalBodyLength;
     }
 
     @Override
-    public DCPRequest partition(short partition) {
-        if (partition < 0) {
-            throw new IllegalArgumentException("Partition must be larger than or equal to zero");
-        }
-        this.partition = partition;
-        return this;
+    public String key() {
+        return key;
     }
 
-    public String toString() {
-        final StringBuilder sb = new StringBuilder(this.getClass().getSimpleName() + "{");
-        sb.append("observable=").append(observable());
-        sb.append(", bucket='").append(bucket()).append('\'');
-        sb.append(", partition=").append(partition());
-        return sb.append('}').toString();
+    @Override
+    public DCPConnection connection() {
+        return connection;
     }
 }
