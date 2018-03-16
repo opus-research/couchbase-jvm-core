@@ -56,9 +56,7 @@ import rx.Subscription;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
-import com.couchbase.client.core.utils.Blocking;
 
-import java.security.KeyStore;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -73,7 +71,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
-    public static final KeyStore SSL_KEYSTORE = null;
+    public static final boolean QUERY_ENABLED = false;
+    public static final int QUERY_PORT = 8093;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -103,7 +102,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
     public static final boolean CALLBACKS_ON_IO_POOL = false;
-    public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -178,7 +176,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
     private final String sslKeystorePassword;
-    private final KeyStore sslKeystore;
+    private final boolean queryEnabled;
+    private final int queryPort;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -210,7 +209,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
     private final boolean callbacksOnIoPool;
-    private final long disconnectTimeout;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -236,6 +234,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
+        queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled);
+        queryPort = intPropertyOr("queryPort", builder.queryPort);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -267,8 +267,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
-        disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
-        sslKeystore = builder.sslKeystore;
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -393,13 +391,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public boolean shutdown() {
-        return shutdown(disconnectTimeout(), TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public boolean shutdown(long timeout, TimeUnit timeUnit) {
-        return Blocking.blockForSingle(shutdownAsync(), timeout, timeUnit);
+    @Deprecated
+    public Observable<Boolean> shutdown() {
+        return shutdownAsync();
     }
 
     @Override
@@ -505,8 +499,13 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public KeyStore sslKeystore() {
-        return sslKeystore;
+    public boolean queryEnabled() {
+        return queryEnabled;
+    }
+
+    @Override
+    public int queryPort() {
+        return queryPort;
     }
 
     @Override
@@ -690,20 +689,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return callbacksOnIoPool;
     }
 
-    @Override
-    public long disconnectTimeout() {
-        return disconnectTimeout;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
-        private KeyStore sslKeystore = SSL_KEYSTORE;
         private String userAgent = USER_AGENT;
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
+        private boolean queryEnabled = QUERY_ENABLED;
+        private int queryPort = QUERY_PORT;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
         private boolean bootstrapCarrierEnabled = BOOTSTRAP_CARRIER_ENABLED;
         private int bootstrapHttpDirectPort = BOOTSTRAP_HTTP_DIRECT_PORT;
@@ -738,7 +733,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
         private boolean callbacksOnIoPool = CALLBACKS_ON_IO_POOL;
-        private long disconnectTimeout = DISCONNECT_TIMEOUT;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
@@ -766,9 +760,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
-         *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
@@ -777,7 +768,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Sets the SSL Keystore password to be used with the Keystore file (default value null, none).
-         *
          * @see #sslKeystoreFile(String)
          */
         public Builder sslKeystorePassword(final String sslKeystorePassword) {
@@ -786,15 +776,24 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
-         * Sets the SSL Keystore directly and not indirectly via filepath.
+         * Toggles the N1QL Query feature (default value {@value #QUERY_ENABLED}).
+         * This parameter will be deprecated once N1QL is in General Availability and shipped with the server.
          *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
-         *
-         * @param sslKeystore the keystore to use.
+         * If not bundled with the server, the N1QL service must run on all the cluster's nodes.
          */
-        public Builder sslKeystore(final KeyStore sslKeystore) {
-            this.sslKeystore = sslKeystore;
+        public Builder queryEnabled(final boolean queryEnabled) {
+            this.queryEnabled = queryEnabled;
+            return this;
+        }
+
+        /**
+         * Defines the port for N1QL Query (default value {@value #QUERY_PORT}).
+         * This parameter will be deprecated once N1QL is in General Availability and shipped with the server.
+         *
+         * If not bundled with the server, the N1QL service must run on all the cluster's nodes.
+         */
+        public Builder queryPort(final int queryPort) {
+            this.queryPort = queryPort;
             return this;
         }
 
@@ -1204,16 +1203,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Sets a custom disconnect timeout.
-         *
-         * @param disconnectTimeout the disconnect timeout in milliseconds.
-         */
-        public Builder disconnectTimeout(long disconnectTimeout) {
-            this.disconnectTimeout = disconnectTimeout;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1229,8 +1218,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     protected StringBuilder dumpParameters(StringBuilder sb) {
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
-        sb.append(", sslKeystorePassword=").append(sslKeystorePassword != null && !sslKeystorePassword.isEmpty());
-        sb.append(", sslKeystore=").append(sslKeystore);
+        sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
+        sb.append(", queryEnabled=").append(queryEnabled);
+        sb.append(", queryPort=").append(queryPort);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
@@ -1271,7 +1261,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
         sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
-        sb.append(", disconnectTimeout=").append(disconnectTimeout);
 
         return sb;
     }
