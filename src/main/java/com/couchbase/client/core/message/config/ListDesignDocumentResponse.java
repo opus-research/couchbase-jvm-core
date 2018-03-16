@@ -19,53 +19,24 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.util;
+package com.couchbase.client.core.message.config;
 
-/**
- * Helper class to centralize test properties that can be modified through system properties.
- *
- * @author Michael Nitschinger
- * @since 1.0
- */
-public class TestProperties {
+import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
 
-    private static String seedNode;
-    private static String bucket;
-    private static String password;
+public class ListDesignDocumentResponse extends AbstractCouchbaseResponse {
 
-    /**
-     * Initialize static the properties.
-     */
-    static {
-        seedNode = System.getProperty("seedNode", "127.0.0.1");
-        bucket = System.getProperty("bucket", "default");
-        password = System.getProperty("password", "");
+    private final String content;
+
+    public ListDesignDocumentResponse(String content, ResponseStatus status, CouchbaseRequest request) {
+        super(status, request);
+        this.content = content;
     }
 
-    /**
-     * The seed node to bootstrap from.
-     *
-     * @return the seed node.
-     */
-    public static String seedNode() {
-        return seedNode;
+    public String content() {
+        return content;
     }
 
-    /**
-     * The bucket to work against.
-     *
-     * @return the name of the bucket.
-     */
-    public static String bucket() {
-        return bucket;
-    }
-
-    /**
-     * The password of the bucket.
-     *
-     * @return the password of the bucket.
-     */
-    public static String password() {
-        return password;
-    }
 }

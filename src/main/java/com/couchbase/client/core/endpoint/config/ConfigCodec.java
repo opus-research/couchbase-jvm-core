@@ -8,6 +8,8 @@ import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.config.FlushRequest;
 import com.couchbase.client.core.message.config.FlushResponse;
+import com.couchbase.client.core.message.config.ListDesignDocumentResponse;
+import com.couchbase.client.core.message.config.ListDesignDocumentsRequest;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -60,6 +62,8 @@ public class ConfigCodec extends MessageToMessageCodec<HttpObject, ConfigRequest
             request = handleBucketStreamingRequest(ctx, (BucketStreamingRequest) msg);
         } else if(msg instanceof FlushRequest) {
             request = handleFlushRequest(ctx, (FlushRequest) msg);
+        } else if (msg instanceof ListDesignDocumentsRequest) {
+            request = handleListDesignDocumentsRequest(ctx, (ListDesignDocumentsRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown Message to encode: " + msg);
         }
@@ -83,6 +87,10 @@ public class ConfigCodec extends MessageToMessageCodec<HttpObject, ConfigRequest
         return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, msg.path());
     }
 
+    private HttpRequest handleListDesignDocumentsRequest(ChannelHandlerContext ctx, ListDesignDocumentsRequest msg) {
+        return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, msg.path());
+    }
+
     private HttpRequest handleBucketConfigRequest(ChannelHandlerContext ctx, BucketConfigRequest msg) {
         return new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, msg.path());
 
@@ -100,6 +108,8 @@ public class ConfigCodec extends MessageToMessageCodec<HttpObject, ConfigRequest
             handleBucketStreamingResponse(ctx, msg, out);
         } else if (currentRequest instanceof FlushRequest) {
             handleFlushResponse(ctx, msg, out);
+        } else if (currentRequest instanceof ListDesignDocumentsRequest) {
+            handleListDesignDocumentResponse(ctx, msg, out);
         }
     }
 
@@ -111,6 +121,34 @@ public class ConfigCodec extends MessageToMessageCodec<HttpObject, ConfigRequest
             boolean done = code != 201;
             out.add(new FlushResponse(done, status));
             currentRequest = null;
+        }
+    }
+
+    private void handleListDesignDocumentResponse(ChannelHandlerContext ctx, HttpObject msg, List<Object> out) {
+        if (msg instanceof HttpResponse) {
+            HttpResponse res = (HttpResponse) msg;
+            currentStatus = res.getStatus().code();
+        }
+
+        if (msg instanceof HttpContent) {
+            currentConfig.append(((HttpContent) msg).content().toString(CharsetUtil.UTF_8));
+
+            if (msg instanceof LastHttpContent) {
+                switch(currentStatus) {
+                    case 200:
+                        out.add(new ListDesignDocumentResponse(currentConfig.toString(), ResponseStatus.SUCCESS, null));
+                        break;
+                    case 401:
+                        out.add(new ListDesignDocumentResponse("Unauthorized", ResponseStatus.FAILURE, null));
+                        break;
+                    case 404:
+                        out.add(new ListDesignDocumentResponse(currentConfig.toString(), ResponseStatus.NOT_EXISTS, null));
+                        break;
+                }
+
+                currentConfig.setLength(0);
+                currentRequest = null;
+            }
         }
     }
 
