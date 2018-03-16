@@ -5,7 +5,6 @@ import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.config.MemcacheBucketConfig;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.binary.AbstractKeyAwareBinaryRequest;
 import com.couchbase.client.core.message.binary.BinaryRequest;
 import com.couchbase.client.core.message.binary.GetBucketConfigRequest;
 import com.couchbase.client.core.node.Node;
@@ -25,16 +24,16 @@ public class BinaryLocator implements Locator {
     @Override
     public Node[] locate(final CouchbaseRequest request, final Set<Node> nodes, final ClusterConfig cluster) {
         if (request instanceof GetBucketConfigRequest) {
-            final GetBucketConfigRequest req = (GetBucketConfigRequest) request;
-            for (final Node node : nodes) {
+            GetBucketConfigRequest req = (GetBucketConfigRequest) request;
+            for (Node node : nodes) {
                 if (node.hostname().equals(req.hostname())) {
-                    return new Node[]{node};
+                    return new Node[] { node };
                 }
             }
             throw new IllegalStateException("Node not found for request" + request);
         }
 
-        final BucketConfig bucket = cluster.bucketConfig(request.bucket());
+        BucketConfig bucket = cluster.bucketConfig(request.bucket());
         if (bucket instanceof CouchbaseBucketConfig) {
             return locateForCouchbaseBucket((BinaryRequest) request, nodes, (CouchbaseBucketConfig) bucket);
         } else if (bucket instanceof MemcacheBucketConfig) {
@@ -48,50 +47,47 @@ public class BinaryLocator implements Locator {
      * Locates the proper {@link Node}s for a Couchbase bucket.
      *
      * @param request the request.
-     * @param nodes   the managed nodes.
-     * @param config  the bucket configuration.
+     * @param nodes the managed nodes.
+     * @param config the bucket configuration.
      * @return an observable with one or more nodes to send the request to.
      */
     private Node[] locateForCouchbaseBucket(final BinaryRequest request, final Set<Node> nodes,
-                                            final CouchbaseBucketConfig config) {
-        if (!(request instanceof AbstractKeyAwareBinaryRequest))
-        {
-            throw new IllegalStateException("Request ist not key aware: " + request);
-        }
-        final String key = ((AbstractKeyAwareBinaryRequest) request).key();
+        final CouchbaseBucketConfig config) {
+        String key = request.key();
 
-        final CRC32 crc32 = new CRC32();
+        CRC32 crc32 = new CRC32();
         try {
             crc32.update(key.getBytes("UTF-8"));
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-        final long rv = (crc32.getValue() >> 16) & 0x7fff;
-        final int partitionId = (int) rv & config.partitions().size() - 1;
+        long rv = (crc32.getValue() >> 16) & 0x7fff;
+        int partitionId = (int) rv & config.partitions().size() - 1;
         request.partition((short) partitionId);
 
-        final int nodeId = config.partitions().get(partitionId).master();
+        int nodeId = config.partitions().get(partitionId).master();
         if (nodeId < 0) {
-            return new Node[]{};
+            return new Node[] { };
         }
-        final String hostname = config.partitionHosts().get(nodeId);
-        for (final Node node : nodes) {
+        String hostname = config.partitionHosts().get(nodeId);
+        for (Node node : nodes) {
             if (node.hostname().getHostName().equals(hostname)) {
-                return new Node[]{node};
+                return new Node[] { node };
             }
         }
-        throw new IllegalStateException("Node not found for request: " + request);
+        throw new IllegalStateException("Node not found for request" + request);
     }
 
     /**
      * Locates the proper {@link Node}s for a Memcache bucket.
      *
      * @param request the request.
-     * @param nodes   the managed nodes.
-     * @param config  the bucket configuration.
+     * @param nodes the managed nodes.
+     * @param config the bucket configuration.
      * @return an observable with one or more nodes to send the request to.
      */
-    private Node[] locateForMemcacheBucket(final BinaryRequest request, final Set<Node> nodes, final MemcacheBucketConfig config) {
+    private Node[] locateForMemcacheBucket(final BinaryRequest request, final Set<Node> nodes,
+        final MemcacheBucketConfig config) {
         // todo: ketama lookup
         throw new UnsupportedOperationException("implement me");
     }

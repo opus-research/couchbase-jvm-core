@@ -34,23 +34,11 @@ import java.net.InetAddress;
  */
 public class GetBucketConfigResponse extends AbstractBinaryResponse {
 
-    private final ResponseStatus status;
-    private final ByteBuf content;
-    private final InetAddress hostname;
+    private InetAddress hostname;
 
     public GetBucketConfigResponse(final ResponseStatus status, final String bucket, final ByteBuf content, final InetAddress hostname) {
-        super(null, bucket, null);
-        this.status = status;
-        this.content = content;
+        super(status, bucket, content, null);
         this.hostname = hostname;
-    }
-
-    public ResponseStatus status() {
-        return status;
-    }
-
-    public ByteBuf content() {
-        return content;
     }
 
     public InetAddress hostname() {

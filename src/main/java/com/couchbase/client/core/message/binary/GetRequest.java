@@ -27,24 +27,16 @@ package com.couchbase.client.core.message.binary;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class GetRequest extends AbstractKeyAwareBinaryRequest {
-
-    private final String key;
+public class GetRequest extends AbstractBinaryRequest {
 
     /**
      * Create a new {@link GetRequest}.
      *
-     * @param key    the key of the document.
+     * @param key the key of the document.
      * @param bucket the bucket of the document.
      */
     public GetRequest(final String key, final String bucket) {
-        super(bucket, null);
-        this.key = key;
-    }
-
-    @Override
-    public String key() {
-        return key;
+        super(key, bucket, null);
     }
 
 }

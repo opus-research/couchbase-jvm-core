@@ -32,6 +32,11 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 public abstract class AbstractBinaryRequest extends AbstractCouchbaseRequest implements BinaryRequest {
 
     /**
+     * The key of the document, should be null if not tied to any.
+     */
+    private final String key;
+
+    /**
      * The partition (vbucket) of the document.
      */
     private short partition = -1;
@@ -39,11 +44,18 @@ public abstract class AbstractBinaryRequest extends AbstractCouchbaseRequest imp
     /**
      * Creates a new {@link AbstractBinaryRequest}.
      *
-     * @param bucket   the bucket of the document.
+     * @param key the key of the document.
+     * @param bucket the bucket of the document.
      * @param password the optional password of the bucket.
      */
-    protected AbstractBinaryRequest(final String bucket, final String password) {
+    protected AbstractBinaryRequest(String key, String bucket, String password) {
         super(bucket, password);
+        this.key = key;
+    }
+
+    @Override
+    public String key() {
+        return key;
     }
 
     @Override
@@ -55,12 +67,11 @@ public abstract class AbstractBinaryRequest extends AbstractCouchbaseRequest imp
     }
 
     @Override
-    public BinaryRequest partition(final short partition) {
+    public BinaryRequest partition(short partition) {
         if (partition < 0) {
             throw new IllegalArgumentException("Partition must be larger than or equal to zero");
         }
         this.partition = partition;
         return this;
     }
-
 }
