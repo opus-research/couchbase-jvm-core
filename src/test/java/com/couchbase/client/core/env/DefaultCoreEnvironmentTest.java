@@ -175,11 +175,11 @@ public class DefaultCoreEnvironmentTest {
         //create an environment with a custom IOPool and Scheduler that are not cleaned up on shutdown
         DefaultCoreEnvironment env = DefaultCoreEnvironment.builder()
                 .ioPool(new LocalEventLoopGroup())
-                .scheduler(Schedulers.newThread()).build();
+                .scheduler(Schedulers.trampoline()).build();
         String dump = env.dumpParameters(new StringBuilder()).toString();
 
         assertTrue(dump, dump.contains("LocalEventLoopGroup!unmanaged"));
-        assertTrue(dump, dump.contains("NewThreadScheduler!unmanaged"));
+        assertTrue(dump, dump.contains("TrampolineScheduler!unmanaged"));
     }
 
     @Test
