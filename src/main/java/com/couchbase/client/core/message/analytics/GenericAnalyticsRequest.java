@@ -37,9 +37,9 @@ public class GenericAnalyticsRequest extends AbstractCouchbaseRequest implements
     private final boolean jsonFormat;
     private final InetAddress targetNode;
 
-    protected GenericAnalyticsRequest(String query, boolean jsonFormat, String bucket, String username, String password,
+    protected GenericAnalyticsRequest(String query, boolean jsonFormat, String bucket, String password,
         InetAddress targetNode) {
-        super(bucket, username, password);
+        super(bucket, password);
         this.query = query;
         this.jsonFormat = jsonFormat;
         this.targetNode = targetNode;
@@ -68,21 +68,7 @@ public class GenericAnalyticsRequest extends AbstractCouchbaseRequest implements
      * @return a {@link GenericAnalyticsRequest} for this simple statement.
      */
     public static GenericAnalyticsRequest simpleStatement(String statement, String bucket, String password) {
-        return new GenericAnalyticsRequest(statement, false, bucket, bucket, password, null);
-    }
-
-    /**
-     * Creates a {@link GenericAnalyticsRequest} and mark it as containing a single simple statement
-     * (e.g. "SELECT * FROM default").
-     *
-     * @param statement the Analytics query statement to perform.
-     * @param bucket the bucket on which to search.
-     * @param username the user authorized for bucket access.
-     * @param password the password for the target bucket.
-     * @return a {@link GenericAnalyticsRequest} for this simple statement.
-     */
-    public static GenericAnalyticsRequest simpleStatement(String statement, String bucket, String username, String password) {
-        return new GenericAnalyticsRequest(statement, false, bucket, username, password, null);
+        return new GenericAnalyticsRequest(statement, false, bucket, password, null);
     }
 
     /**
@@ -97,8 +83,8 @@ public class GenericAnalyticsRequest extends AbstractCouchbaseRequest implements
      * @param password the password for the target bucket.
      * @return a {@link GenericAnalyticsRequest} for this full query.
      */
-    public static GenericAnalyticsRequest jsonQuery(String jsonQuery, String bucket, String username, String password) {
-        return new GenericAnalyticsRequest(jsonQuery, true, bucket, username, password, null);
+    public static GenericAnalyticsRequest jsonQuery(String jsonQuery, String bucket, String password) {
+        return new GenericAnalyticsRequest(jsonQuery, true, bucket, password, null);
     }
 
     /**
@@ -110,12 +96,11 @@ public class GenericAnalyticsRequest extends AbstractCouchbaseRequest implements
      *
      * @param jsonQuery the Analytics query in json form.
      * @param bucket the bucket on which to perform the query.
-     * @param username the username authorized for bucket access.
      * @param password the password for the target bucket.
      * @param targetNode the node on which to execute this request (or null to let the core locate and choose one).
      * @return a {@link GenericAnalyticsRequest} for this full query.
      */
-    public static GenericAnalyticsRequest jsonQuery(String jsonQuery, String bucket, String username, String password, InetAddress targetNode) {
-        return new GenericAnalyticsRequest(jsonQuery, true, bucket, username, password, targetNode);
+    public static GenericAnalyticsRequest jsonQuery(String jsonQuery, String bucket, String password, InetAddress targetNode) {
+        return new GenericAnalyticsRequest(jsonQuery, true, bucket, password, targetNode);
     }
 }

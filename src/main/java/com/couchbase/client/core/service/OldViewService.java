@@ -52,24 +52,8 @@ public class OldViewService extends AbstractPoolingService {
      * @param responseBuffer the shared response buffer.
      */
     public OldViewService(final String hostname, final String bucket, final String password, final int port,
-                          final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    /**
-     * Creates a new {@link ViewService}.
-     *
-     * @param hostname the hostname of the service.
-     * @param bucket the name of the bucket.
-     * @param password the password of the bucket.
-     * @param username the user authorized for bucket access.
-     * @param port the port of the service.
-     * @param env the shared environment.
-     * @param responseBuffer the shared response buffer.
-     */
-    public OldViewService(final String hostname, final String bucket, final String username, final String password, final int port,
                        final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.viewEndpoints(), env.viewEndpoints(), STRATEGY, responseBuffer,
+        super(hostname, bucket, password, port, env, env.viewEndpoints(), env.viewEndpoints(), STRATEGY, responseBuffer,
                 FACTORY);
     }
 
@@ -81,11 +65,11 @@ public class OldViewService extends AbstractPoolingService {
     /**
      * The factory for {@link com.couchbase.client.core.endpoint.view.ViewEndpoint}s.
      */
-    static class ViewEndpointFactory extends AbstractEndpointFactory {
+    static class ViewEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
                                final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new ViewEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new ViewEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 }

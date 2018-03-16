@@ -41,8 +41,8 @@ public class GetBucketConfigRequest extends AbstractKeyValueRequest implements B
      * @param bucket the name of the bucket.
      * @param hostname the hostname of the node.
      */
-    public GetBucketConfigRequest(final String bucket,  final InetAddress hostname) {
-        super(null, bucket);
+    public GetBucketConfigRequest(final String bucket, final InetAddress hostname) {
+        super(null, bucket, null);
         this.hostname = hostname;
     }
 

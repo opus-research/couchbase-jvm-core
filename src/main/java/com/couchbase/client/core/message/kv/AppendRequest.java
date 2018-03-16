@@ -23,7 +23,7 @@ public class AppendRequest extends AbstractKeyValueRequest {
     private final ByteBuf content;
 
     public AppendRequest(String key, long cas, ByteBuf content, String bucket) {
-        super(key, bucket);
+        super(key, bucket, null);
         this.cas = cas;
         this.content = content;
     }
