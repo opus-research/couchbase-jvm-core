@@ -136,6 +136,7 @@ public class QueryHandlerTest {
 
         CoreEnvironment environment = mock(CoreEnvironment.class);
         when(environment.scheduler()).thenReturn(Schedulers.computation());
+        when(environment.queryEnabled()).thenReturn(Boolean.TRUE);
         when(environment.maxRequestLifetime()).thenReturn(10000L);
         when(environment.autoreleaseAfter()).thenReturn(2000L);
         endpoint = mock(AbstractEndpoint.class);
