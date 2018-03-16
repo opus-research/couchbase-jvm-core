@@ -928,14 +928,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
     }
 
-    /**
-     * Dumps the environment parameters known to this implementation into a {@link StringBuilder},
-     * which is returned for method chaining.
-     *
-     * @param sb the StringBuilder in which to dump parameters.
-     * @return the same StringBuilder for method chaining.
-     */
-    protected StringBuilder dumpParameters(StringBuilder sb) {
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("CoreEnvironment: {");
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
         sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
@@ -966,13 +961,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", observeIntervalDelay=").append(observeIntervalDelay);
         sb.append(", keepAliveInterval=").append(keepAliveInterval);
         sb.append(", autoreleaseAfter=").append(autoreleaseAfter);
-        return sb;
-    }
-
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("CoreEnvironment: {");
-        dumpParameters(sb).append('}');
+        sb.append('}');
         return sb.toString();
     }
 
