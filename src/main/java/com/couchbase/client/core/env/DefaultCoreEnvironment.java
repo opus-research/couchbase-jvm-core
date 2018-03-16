@@ -21,8 +21,6 @@
  */
 package com.couchbase.client.core.env;
 
-import java.util.Properties;
-
 import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -67,8 +65,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     private static final String NAMESPACE = "com.couchbase.";
 
-    private static final String VERSION_PROPERTIES = "com.couchbase.client.core.properties";
-
     /**
      * Sets up the package version and user agent.
      *
@@ -82,16 +78,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                 throw new IllegalStateException("Could not locate ClusterFacade");
             }
 
-            String version = null;
-            String gitVersion = null;
-            try {
-                Properties versionProp = new Properties();
-                versionProp.load(DefaultCoreEnvironment.class.getClassLoader().getResourceAsStream(VERSION_PROPERTIES));
-                version = versionProp.getProperty("specificationVersion");
-                gitVersion = versionProp.getProperty("implementationVersion");
-            } catch (Exception e) {
-                LOGGER.info("Could not retrieve version properties, defaulting.", e);
-            }
+            Package pkg = Package.getPackage("com.couchbase.client.core");
+            String version = pkg.getSpecificationVersion();
+            String gitVersion = pkg.getImplementationVersion();
             PACKAGE_NAME_AND_VERSION = String.format("couchbase-jvm-core/%s (git: %s)",
                 version == null ? "unknown" : version, gitVersion == null ? "unknown" : gitVersion);
 
