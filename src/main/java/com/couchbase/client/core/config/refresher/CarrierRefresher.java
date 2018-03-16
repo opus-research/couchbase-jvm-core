@@ -22,7 +22,6 @@
 package com.couchbase.client.core.config.refresher;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.RequestFactory;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationException;
@@ -30,15 +29,15 @@ import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
+import com.couchbase.client.core.utils.Buffers;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action1;
+import rx.functions.Func0;
 import rx.functions.Func1;
-
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -213,41 +212,40 @@ public class CarrierRefresher extends AbstractRefresher {
      * @return a raw configuration or an error.
      */
     private Observable<String> refreshAgainstNode(final String bucketName, final InetAddress hostname) {
-        return cluster()
-            .<GetBucketConfigResponse>send(new RequestFactory() {
-                @Override
-                public CouchbaseRequest call() {
-                    return new GetBucketConfigRequest(bucketName, hostname);
-                }
-            })
-            .doOnNext(new Action1<GetBucketConfigResponse>() {
-                @Override
-                public void call(GetBucketConfigResponse response) {
-                    if (!response.status().isSuccess()) {
-                        if (response.content() != null && response.content().refCnt() > 0) {
-                            response.content().release();
-                        }
-                        throw new ConfigurationException("Could not fetch config from node: " + response);
-                    }
-                }
-            })
-            .map(new Func1<GetBucketConfigResponse, String>() {
-                @Override
-                public String call(GetBucketConfigResponse response) {
-                    String raw = response.content().toString(CharsetUtil.UTF_8).trim();
-                    if (response.content().refCnt() > 0) {
+        return Buffers.wrapColdWithAutoRelease(Observable.defer(new Func0<Observable<GetBucketConfigResponse>>() {
+            @Override
+            public Observable<GetBucketConfigResponse> call() {
+                return cluster().send(new GetBucketConfigRequest(bucketName, hostname));
+            }
+        }))
+        .doOnNext(new Action1<GetBucketConfigResponse>() {
+            @Override
+            public void call(GetBucketConfigResponse response) {
+                if (!response.status().isSuccess()) {
+                    if (response.content() != null && response.content().refCnt() > 0) {
                         response.content().release();
                     }
-                    return raw.replace("$HOST", response.hostname().getHostName());
+                    throw new ConfigurationException("Could not fetch config from node: " + response);
                 }
-            })
-            .doOnError(new Action1<Throwable>() {
-                @Override
-                public void call(Throwable ex) {
-                    LOGGER.debug("Could not fetch config from bucket \"" + bucketName + "\" against \""
-                            + hostname + "\".", ex);
+            }
+        })
+        .map(new Func1<GetBucketConfigResponse, String>() {
+            @Override
+            public String call(GetBucketConfigResponse response) {
+                String raw = response.content().toString(CharsetUtil.UTF_8).trim();
+                if (response.content().refCnt() > 0) {
+                    response.content().release();
                 }
-            });
+                return raw.replace("$HOST", response.hostname().getHostName());
+            }
+        })
+        .doOnError(new Action1<Throwable>() {
+            @Override
+            public void call(Throwable ex) {
+                LOGGER.debug("Could not fetch config from bucket \"" + bucketName + "\" against \""
+                        + hostname + "\".", ex);
+            }
+        });
     }
 
 }

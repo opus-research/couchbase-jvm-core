@@ -22,13 +22,11 @@
 package com.couchbase.client.core.config.refresher;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.RequestFactory;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationException;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.config.BucketStreamingRequest;
 import com.couchbase.client.core.message.config.BucketStreamingResponse;
 import rx.Observable;
@@ -62,12 +60,7 @@ public class HttpRefresher extends AbstractRefresher {
             @Override
             public Observable<BucketStreamingResponse> call(Boolean aBoolean) {
                 return cluster()
-                    .<BucketStreamingResponse>send(new RequestFactory() {
-                        @Override
-                        public CouchbaseRequest call() {
-                            return new BucketStreamingRequest(TERSE_PATH, name, password);
-                        }
-                    })
+                    .<BucketStreamingResponse>send(new BucketStreamingRequest(TERSE_PATH, name, password))
                     .doOnNext(new Action1<BucketStreamingResponse>() {
                         @Override
                         public void call(BucketStreamingResponse response) {
@@ -81,12 +74,7 @@ public class HttpRefresher extends AbstractRefresher {
             @Override
             public Observable<BucketStreamingResponse> call(Throwable throwable) {
                 return cluster()
-                    .<BucketStreamingResponse>send(new RequestFactory() {
-                        @Override
-                        public CouchbaseRequest call() {
-                            return new BucketStreamingRequest(VERBOSE_PATH, name, password);
-                        }
-                    })
+                    .<BucketStreamingResponse>send(new BucketStreamingRequest(VERBOSE_PATH, name, password))
                     .doOnNext(new Action1<BucketStreamingResponse>() {
                         @Override
                         public void call(BucketStreamingResponse response) {
