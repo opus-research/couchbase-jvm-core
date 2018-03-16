@@ -25,6 +25,7 @@ import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
+import java.net.InetAddress;
 import java.util.List;
 
 /**
@@ -119,4 +120,11 @@ public interface BucketConfig {
      */
     boolean serviceEnabled(ServiceType type);
 
+    /**
+     * Check if the service is enabled on the given node.
+     *
+     * @param type the type to check.
+     * @return true if it is, false otherwise.
+     */
+    boolean serviceEnabled(final ServiceType type, final InetAddress node);
 }
