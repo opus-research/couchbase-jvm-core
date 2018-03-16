@@ -38,7 +38,7 @@ public class BuffersTest {
     @Test
     public void shouldReleaseIfUnsubscribed() {
         ReplaySubject<ByteBuf> source = ReplaySubject.create();
-        Observable<ByteBuf> wrapped = Buffers.wrapColdWithAutoRelease(source);
+        Observable<ByteBuf> wrapped = Buffers.liftForAutoRelease(source);
 
         for (int i = 0; i < 5; i++) {
             source.onNext(Unpooled.buffer());

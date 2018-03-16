@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.cluster;
 
+import com.couchbase.client.core.RequestFactory;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.CounterRequest;
 import com.couchbase.client.core.message.kv.CounterResponse;
@@ -62,15 +64,23 @@ public class KeyValueMessageTest extends ClusterDependentTest {
 
     @Test
     public void shouldUpsertAndGetDocument() throws Exception {
-        String key = "upsert-key";
-        String content = "Hello World!";
-        UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
-        UpsertResponse response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
+        final String key = "upsert-key";
+        final String content = "Hello World!";
+        final UpsertResponse response = cluster().<UpsertResponse>send(new RequestFactory() {
+            @Override
+            public CouchbaseRequest call() {
+                return new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
+            }
+        }).toBlocking().single();
         ReferenceCountUtil.releaseLater(response.content());
         assertValidMetadata(response.mutationToken());
 
-        GetRequest request = new GetRequest(key, bucket());
-        GetResponse getResponse = cluster().<GetResponse>send(request).toBlocking().single();
+        GetResponse getResponse = cluster().<GetResponse>send(new RequestFactory() {
+            @Override
+            public CouchbaseRequest call() {
+                return new GetRequest(key, bucket());
+            }
+        }).toBlocking().single();
         assertEquals(content, getResponse.content().toString(CharsetUtil.UTF_8));
         ReferenceCountUtil.releaseLater(getResponse.content());
     }

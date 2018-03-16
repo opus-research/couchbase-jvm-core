@@ -28,22 +28,46 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import rx.Observable;
 
 /**
- * Represents a Couchbase Cluster.
+ * Represents the entry point into the core layer.
  *
  * @author Michael Nitschinger
  * @since 1.0
  */
+@InterfaceStability.Committed
+@InterfaceAudience.Public
 public interface ClusterFacade {
 
     /**
      * Sends a {@link CouchbaseRequest} into the cluster and eventually returns a {@link CouchbaseResponse}.
      *
-     * The {@link CouchbaseResponse} is not returned directly, but is wrapped into a {@link Observable}.
+     * The {@link CouchbaseResponse} is not returned directly, but is wrapped into a cold {@link Observable}.
+     *
+     * Note that this method is deprecated in favor of {@link #send(RequestFactory)}, because while it makes the
+     * Observable cold, it still reuses the same originating hot subject for retry logic, which can result in
+     * correctness issues. Instead, the factory send should be used where on every factory call a fresh new
+     * request is created.
      *
      * @param request the request to send.
-     * @return the {@link CouchbaseResponse} wrapped into a {@link Observable}.
+     * @return the {@link CouchbaseResponse} wrapped into a cold {@link Observable}.
      */
     @InterfaceStability.Committed
     @InterfaceAudience.Public
+    @Deprecated
     <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request);
+
+    /**
+     * Sends a {@link CouchbaseRequest} into the cluster and eventually returns a {@link CouchbaseResponse}.
+     *
+     * The {@link CouchbaseResponse} is not returned directly, but is wrapped into a cold {@link Observable}.
+     *
+     * Note that the factory implementation needs to make sure that on every call, a fresh new request is created,
+     * in other to properly handle retry scenarios. The reason for this is that a hot observable is bound on every
+     * request object, so the only way to handle it is to create a new one.
+     *
+     * @param requestFactory the factory which forges requests on demand.
+     * @return the {@link CouchbaseResponse} wrapped into a cold {@link Observable}.
+     */
+    @InterfaceStability.Committed
+    @InterfaceAudience.Public
+    <R extends CouchbaseResponse> Observable<R> send(final RequestFactory requestFactory);
 }

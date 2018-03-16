@@ -31,13 +31,18 @@ import com.couchbase.client.core.message.config.BucketConfigRequest;
 import com.couchbase.client.core.message.config.BucketConfigResponse;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import rx.Observable;
 
 import java.net.InetAddress;
+import java.util.Arrays;
+import java.util.List;
 
+import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -82,7 +87,7 @@ public class HttpLoaderTest {
         Observable<CouchbaseResponse> response = Observable.just(
             (CouchbaseResponse) new BucketConfigResponse("myconfig", ResponseStatus.SUCCESS)
         );
-        when(cluster.send(isA(BucketConfigRequest.class))).thenReturn(response);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketConfigRequest.class)))).thenReturn(response);
 
         HttpLoader loader = new HttpLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);
@@ -92,14 +97,25 @@ public class HttpLoaderTest {
     @Test
     public void shouldDiscoverConfigFromVerboseAsFallback() {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        Observable<CouchbaseResponse> terseResponse = Observable.just(
-                (CouchbaseResponse) new BucketConfigResponse(null, ResponseStatus.FAILURE)
-        );
-        Observable<CouchbaseResponse> verboseResponse = Observable.just(
-                (CouchbaseResponse) new BucketConfigResponse("verboseConfig", ResponseStatus.SUCCESS)
-        );
-        when(cluster.send(isA(BucketConfigRequest.class))).thenReturn(terseResponse);
-        when(cluster.send(isA(BucketConfigRequest.class))).thenReturn(verboseResponse);
+
+        when(cluster.send(argThat(hasRequestFromFactory(BucketConfigRequest.class)))).thenAnswer(
+                new Answer<Observable<CouchbaseResponse>>() {
+            int count = 0;
+
+            List<Observable<CouchbaseResponse>> responses = Arrays.asList(
+                Observable.just(
+                    (CouchbaseResponse) new BucketConfigResponse(null, ResponseStatus.FAILURE)
+                ),
+                Observable.just(
+                    (CouchbaseResponse) new BucketConfigResponse("verboseConfig", ResponseStatus.SUCCESS)
+                )
+            );
+
+            @Override
+            public Observable<CouchbaseResponse> answer(InvocationOnMock invocation) throws Throwable {
+                return responses.get(count++);
+            }
+        });
 
         HttpLoader loader = new HttpLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);
@@ -109,14 +125,10 @@ public class HttpLoaderTest {
     @Test
     public void shouldThrowExceptionIfTerseAndVerboseCouldNotBeDiscovered() {
         ClusterFacade cluster = mock(ClusterFacade.class);
-        Observable<CouchbaseResponse> terseResponse = Observable.just(
+        Observable<CouchbaseResponse> response = Observable.just(
                 (CouchbaseResponse) new BucketConfigResponse(null, ResponseStatus.FAILURE)
         );
-        Observable<CouchbaseResponse> verboseResponse = Observable.just(
-                (CouchbaseResponse) new BucketConfigResponse(null, ResponseStatus.FAILURE)
-        );
-        when(cluster.send(isA(BucketConfigRequest.class))).thenReturn(terseResponse);
-        when(cluster.send(isA(BucketConfigRequest.class))).thenReturn(verboseResponse);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketConfigRequest.class)))).thenReturn(response);
 
         HttpLoader loader = new HttpLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);
