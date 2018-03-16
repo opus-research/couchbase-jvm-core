@@ -91,7 +91,7 @@ public class CouchbaseCore implements ClusterFacade {
     /**
      * A preconstructed {@link BackpressureException}.
      */
-    public static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
+    private static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
 
     /**
      * The {@link RequestEvent} {@link RingBuffer}.
