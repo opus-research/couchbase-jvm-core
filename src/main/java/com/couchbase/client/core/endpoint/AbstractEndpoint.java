@@ -329,21 +329,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 bootstrap.connect().addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture cf) throws Exception {
-                        if (ss.isUnsubscribed()) {
-                            if (cf.isSuccess() && cf.channel() != null) {
-                                cf.channel().close().addListener(new ChannelFutureListener() {
-                                    @Override
-                                    public void operationComplete(ChannelFuture future) throws Exception {
-                                        if (!future.isSuccess()) {
-                                            LOGGER.debug("Got exception while disconnecting " +
-                                                "stray connect attempt.", future.cause());
-                                        }
-                                    }
-                                });
-                            }
-                        } else {
-                            ss.onSuccess(cf);
-                        }
+                        ss.onSuccess(cf);
                     }
                 });
             }
@@ -368,7 +354,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         .subscribe(new SingleSubscriber<ChannelFuture>() {
             @Override
             public void onSuccess(ChannelFuture future) {
-                if (disconnected) {
+                if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
                     transitionState(LifecycleState.DISCONNECTED);
@@ -559,7 +545,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             signalConfigReload();
         }
 
-        if (state() == LifecycleState.CONNECTED) {
+        if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
             transitionState(LifecycleState.DISCONNECTED);
             connect(false).subscribe(new Subscriber<LifecycleState>() {
                 @Override
