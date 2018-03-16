@@ -86,7 +86,7 @@ public class QueryCodec extends MessageToMessageCodec<FullHttpResponse, QueryReq
         queue.offer(msg.getClass());
     }
 
-    private HttpRequest handleGenericQueryRequest(final ChannelHandlerContext ctx, final GenericQueryRequest msg) {
+    private HttpRequest handleGenericQueryRequest(ChannelHandlerContext ctx, GenericQueryRequest msg) {
         FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/query");
         ByteBuf query = Unpooled.copiedBuffer(msg.query(), CharsetUtil.UTF_8);
         request.headers().add(HttpHeaders.Names.CONTENT_LENGTH, query.readableBytes());

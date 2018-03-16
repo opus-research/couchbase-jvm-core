@@ -27,6 +27,7 @@ import com.couchbase.client.core.env.Environment;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.HttpClientCodec;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 
 /**
  * This endpoint defines the pipeline for query requests and responses (N1QL).
@@ -45,6 +46,7 @@ public class QueryEndpoint extends AbstractEndpoint {
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new QueryHandler(this, responseBuffer()));
+            .addLast(new HttpObjectAggregator(Integer.MAX_VALUE))
+            .addLast(new QueryCodec());
     }
 }
