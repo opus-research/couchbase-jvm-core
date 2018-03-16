@@ -369,20 +369,12 @@ public class AnalyticsHandler extends AbstractGenericHandler<HttpObject, HttpReq
         queryInfoObservable.withTraceIdentifier("queryInfo." + rid);
         querySignatureObservable.withTraceIdentifier("querySignature." + rid);
 
-        if (!env().callbacksOnIoPool()) {
-            queryErrorObservable.observeOn(scheduler);
-            queryRowObservable.observeOn(scheduler);
-            querySignatureObservable.observeOn(scheduler);
-            queryStatusObservable.observeOn(scheduler);
-            queryInfoObservable.observeOn(scheduler);
-        }
-
         return new GenericAnalyticsResponse(
-                queryErrorObservable.onBackpressureBuffer(),
-                queryRowObservable.onBackpressureBuffer(),
-                querySignatureObservable.onBackpressureBuffer(),
-                queryStatusObservable.onBackpressureBuffer(),
-                queryInfoObservable.onBackpressureBuffer(),
+                queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
+                querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryStatusObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryInfoObservable.onBackpressureBuffer().observeOn(scheduler),
                 currentRequest(),
                 status, requestId, clientId
         );
