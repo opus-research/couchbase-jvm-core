@@ -78,7 +78,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long KEEPALIVEINTERVAL = TimeUnit.SECONDS.toMillis(30);
     public static final long AUTORELEASE_AFTER = TimeUnit.SECONDS.toMillis(2);
     public static final boolean BUFFER_POOLING_ENABLED = true;
-    public static final int SOCKET_CONNECT_TIMEOUT = 1000;
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
@@ -164,7 +163,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final long keepAliveInterval;
     private final long autoreleaseAfter;
     private final boolean bufferPoolingEnabled;
-    private final int socketConnectTimeout;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -181,7 +179,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             LOGGER.warn("More than " + MAX_ALLOWED_INSTANCES + " Couchbase Environments found (" + instanceCounter
                 + "), this can have severe impact on performance and stability. Reuse environments!");
         }
-
         dcpEnabled = booleanPropertyOr("dcpEnabled", builder.dcpEnabled());
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled());
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile());
@@ -211,7 +208,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         keepAliveInterval = longPropertyOr("keepAliveInterval", builder.keepAliveInterval());
         autoreleaseAfter = longPropertyOr("autoreleaseAfter", builder.autoreleaseAfter());
         bufferPoolingEnabled = booleanPropertyOr("bufferPoolingEnabled", builder.bufferPoolingEnabled());
-        socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout());
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -463,11 +459,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return bufferPoolingEnabled;
     }
 
-    @Override
-    public int socketConnectTimeout() {
-        return socketConnectTimeout;
-    }
-
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -504,7 +495,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private long keepAliveInterval = KEEPALIVEINTERVAL;
         private long autoreleaseAfter = AUTORELEASE_AFTER;
         private boolean bufferPoolingEnabled = BUFFER_POOLING_ENABLED;
-        private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
 
         protected Builder() {
         }
@@ -1020,21 +1010,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Sets a custom socket connect timeout.
-         *
-         * @param socketConnectTimeout the socket connect timeout in milliseconds.
-         */
-        public Builder socketConnectTimeout(int socketConnectTimeout) {
-            this.socketConnectTimeout = socketConnectTimeout;
-            return this;
-        }
-
-        @Override
-        public int socketConnectTimeout() {
-            return socketConnectTimeout;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1085,7 +1060,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", keepAliveInterval=").append(keepAliveInterval);
         sb.append(", autoreleaseAfter=").append(autoreleaseAfter);
         sb.append(", bufferPoolingEnabled=").append(bufferPoolingEnabled);
-        sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
         return sb;
     }
 
