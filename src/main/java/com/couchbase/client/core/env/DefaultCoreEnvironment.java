@@ -808,11 +808,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return instanceCounter;
     }
 
-    @Override
-    public KeyValueServiceConfig kvServiceConfig() {
-        return null; // TODO: fixme
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;

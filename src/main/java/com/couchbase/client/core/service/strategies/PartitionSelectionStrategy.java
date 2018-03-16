@@ -67,7 +67,7 @@ public class PartitionSelectionStrategy implements SelectionStrategy {
         if (partition >= 0) {
             int numEndpoints = endpoints.length;
             Endpoint endpoint = numEndpoints == 1 ? endpoints[0] : endpoints[partition % numEndpoints];
-            if (endpoint != null && endpoint.isState(LifecycleState.CONNECTED) && endpoint.isFree()) {
+            if (endpoint != null && endpoint.isState(LifecycleState.CONNECTED)) {
                 return endpoint;
             }
             return null;
@@ -84,7 +84,7 @@ public class PartitionSelectionStrategy implements SelectionStrategy {
      */
     private static Endpoint selectFirstConnected(final Endpoint[] endpoints) {
         for (Endpoint endpoint : endpoints) {
-            if (endpoint.isState(LifecycleState.CONNECTED) && endpoint.isFree()) {
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
                 return endpoint;
             }
         }
