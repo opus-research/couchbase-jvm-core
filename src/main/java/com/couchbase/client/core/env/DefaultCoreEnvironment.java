@@ -56,7 +56,6 @@ import rx.Subscription;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
-import com.couchbase.client.core.utils.Blocking;
 
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -103,7 +102,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
     public static final boolean CALLBACKS_ON_IO_POOL = false;
-    public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -211,7 +209,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
     private final boolean callbacksOnIoPool;
-    private final long disconnectTimeout;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -270,7 +267,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
-        disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -395,13 +391,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public boolean shutdown() {
-        return shutdown(disconnectTimeout(), TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public boolean shutdown(long timeout, TimeUnit timeUnit) {
-        return Blocking.blockForSingle(shutdownAsync(), timeout, timeUnit);
+    @Deprecated
+    public Observable<Boolean> shutdown() {
+        return shutdownAsync();
     }
 
     @Override
@@ -697,11 +689,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return callbacksOnIoPool;
     }
 
-    @Override
-    public long disconnectTimeout() {
-        return disconnectTimeout;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -746,7 +733,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
         private boolean callbacksOnIoPool = CALLBACKS_ON_IO_POOL;
-        private long disconnectTimeout = DISCONNECT_TIMEOUT;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
@@ -1217,16 +1203,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        /**
-         * Sets a custom disconnect timeout.
-         *
-         * @param disconnectTimeout the disconnect timeout in milliseconds.
-         */
-        public Builder disconnectTimeout(long disconnectTimeout) {
-            this.disconnectTimeout = disconnectTimeout;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1285,7 +1261,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
         sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
-        sb.append(", disconnectTimeout=").append(disconnectTimeout);
 
         return sb;
     }
