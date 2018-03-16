@@ -138,7 +138,6 @@ public class SearchHandler extends AbstractGenericHandler<HttpObject, HttpReques
             } else if (request instanceof RemoveSearchIndexRequest) {
                 response = new RemoveSearchIndexResponse(body, status);
             } else if (request instanceof SearchQueryRequest) {
-                //TODO if more parsing is implemented, add a RawSearchQueryRequest similar to what was done in JVMCBC-357
                 response = new SearchQueryResponse(body, status);
             }
 
