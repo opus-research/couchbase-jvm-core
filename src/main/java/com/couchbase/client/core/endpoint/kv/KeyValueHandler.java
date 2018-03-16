@@ -27,7 +27,6 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.ResponseStatusDetails;
 import com.couchbase.client.core.message.kv.AbstractKeyValueRequest;
 import com.couchbase.client.core.message.kv.AbstractKeyValueResponse;
 import com.couchbase.client.core.message.kv.AppendRequest;
@@ -592,7 +591,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        ByteBuf extras = ctx.alloc().buffer(3, 7); //extras can be 7 bytes if there is an expiry
+        ByteBuf extras = ctx.alloc().buffer(3, 8); //extras can be 8 bytes if there is an expiry
         byte extrasLength = 3; //by default 2 bytes for pathLength + 1 byte for "command" flags
         extras.writeShort(msg.pathLength());
 
@@ -612,6 +611,16 @@ public class KeyValueHandler
             if (mut.expiration() != 0L) {
                 extrasLength = 7;
                 extras.writeInt(mut.expiration());
+            }
+
+            byte docFlags = 0;
+            if (mut.createDocument()) {
+                docFlags |= SUBDOC_FLAG_MKDOC;
+            }
+
+            if (docFlags != 0) {
+                extrasLength += 1;
+                extras.writeByte(docFlags);
             }
 
             cas = mut.cas();
@@ -703,10 +712,6 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
-        ResponseStatusDetails statusDetails = ResponseStatusConverter.detailsFromBinary(
-            msg.getDataType(),
-            msg.content()
-        );
         ErrorMap.ErrorCode errorCode = ResponseStatusConverter.readErrorCodeFromErrorMap(msg.getStatus());
 
         if (errorCode != null) {
@@ -801,11 +806,6 @@ public class KeyValueHandler
         } else {
             finishedDecoding();
         }
-
-        if (statusDetails != null) {
-            response.statusDetails(statusDetails);
-        }
-
         return response;
     }
 

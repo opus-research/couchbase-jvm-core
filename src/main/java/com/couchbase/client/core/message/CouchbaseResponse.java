@@ -15,9 +15,6 @@
  */
 package com.couchbase.client.core.message;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-
 public interface CouchbaseResponse extends CouchbaseMessage {
 
     /**
@@ -26,25 +23,6 @@ public interface CouchbaseResponse extends CouchbaseMessage {
      * @return the status.
      */
     ResponseStatus status();
-
-    /**
-     * If set, provides more detailed information into the response status than the
-     * always available {@link ResponseStatus} enum.
-     *
-     * @return null or the {@link ResponseStatusDetails}.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    ResponseStatusDetails statusDetails();
-
-    /**
-     * Set the status details if not set previously.
-     *
-     * @param statusDetails the details to be set.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    void statusDetails(final ResponseStatusDetails statusDetails);
 
     /**
      * Potentially has the associated request attached.
