@@ -208,7 +208,8 @@ public class KeyValueHandler
         // Observe has content, but not external, so it should not be retained.
         if (!(msg instanceof ObserveRequest)
             && !(msg instanceof ObserveSeqnoRequest)
-            && (request instanceof FullBinaryMemcacheRequest)) {
+            && (request instanceof FullBinaryMemcacheRequest)
+                && !env().sslEnabled()) {
             ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
@@ -219,7 +220,7 @@ public class KeyValueHandler
         if (msg instanceof GetRequest) {
             return handleGetRequest(ctx, (GetRequest) msg);
         } else if (msg instanceof BinaryStoreRequest) {
-            return handleStoreRequest(ctx, (BinaryStoreRequest) msg);
+            return handleStoreRequest(ctx, (BinaryStoreRequest) msg, env().sslEnabled());
         } else if (msg instanceof ReplicaGetRequest) {
             return handleReplicaGetRequest((ReplicaGetRequest) msg);
         } else if (msg instanceof RemoveRequest) {
@@ -340,7 +341,7 @@ public class KeyValueHandler
      * @return a ready {@link BinaryMemcacheRequest}.
      */
     private static BinaryMemcacheRequest handleStoreRequest(final ChannelHandlerContext ctx,
-        final BinaryStoreRequest msg) {
+        final BinaryStoreRequest msg, boolean sslEnabled) {
         ByteBuf extras = ctx.alloc().buffer(8);
         extras.writeInt(msg.flags());
         extras.writeInt(msg.expiration());
@@ -348,7 +349,13 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
         byte extrasLength = (byte) extras.readableBytes();
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
+        FullBinaryMemcacheRequest request;
+
+        if (sslEnabled) {
+            request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content().copy());
+        } else {
+            request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
+        }
 
         if (msg instanceof InsertRequest) {
             request.setOpcode(OP_INSERT);
