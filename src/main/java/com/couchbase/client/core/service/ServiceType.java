@@ -47,12 +47,7 @@ public enum ServiceType {
     /**
      * HTTP config operations.
      */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
+    CONFIG(BucketServiceMapping.ONE_FOR_ALL);
 
     private final BucketServiceMapping mapping;
 

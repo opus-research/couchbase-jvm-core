@@ -38,7 +38,6 @@ import com.couchbase.client.core.message.kv.ReplicaGetRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.state.LifecycleState;
 import io.netty.util.CharsetUtil;
-
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -147,7 +146,7 @@ public class KeyValueLocator implements Locator {
             }
         }
 
-        throw new IllegalStateException("Node not found for request: " + request);
+        throw new IllegalStateException("Node not found for request" + request);
     }
 
     /**
