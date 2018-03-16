@@ -19,48 +19,43 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
+
+package com.couchbase.client.core.message.dcp;
+
+import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import com.couchbase.client.core.message.CouchbaseResponse;
+import rx.subjects.Subject;
 
 /**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
- *
- * @author Michael Nitschinger
- * @since 1.0
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public enum ServiceType {
+public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implements DCPRequest {
 
-    /**
-     * Views and Design Documents.
-     */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
+    private short partition;
 
-    /**
-     * Key/Value type operations.
-     */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
+    public AbstractDCPRequest(String bucket, String password) {
+        super(bucket, password);
     }
 
-    public BucketServiceMapping mapping() {
-        return mapping;
+    public AbstractDCPRequest(String bucket, String password, Subject<CouchbaseResponse, CouchbaseResponse> observable) {
+        super(bucket, password, observable);
+    }
+
+    @Override
+    public short partition() {
+        if (partition == -1) {
+            throw new IllegalStateException("Partition requested but not set beforehand");
+        }
+        return partition;
+    }
+
+    @Override
+    public DCPRequest partition(short partition) {
+        if (partition < 0) {
+            throw new IllegalArgumentException("Partition must be larger than or equal to zero");
+        }
+        this.partition = partition;
+        return this;
     }
 }
