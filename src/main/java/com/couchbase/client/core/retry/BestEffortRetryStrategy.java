@@ -23,6 +23,8 @@ package com.couchbase.client.core.retry;
 
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.kv.ObserveResponse;
+import rx.Observable;
 
 import java.util.concurrent.TimeUnit;
 
@@ -45,6 +47,11 @@ public class BestEffortRetryStrategy implements RetryStrategy {
     @Override
     public boolean shouldRetry(final CouchbaseRequest request, final CoreEnvironment env) {
         return TimeUnit.MILLISECONDS.toNanos(env.maxRequestLifetime()) > System.nanoTime() - request.creationTime();
+    }
+
+    @Override
+    public Observable<ObserveResponse> retryOnObserve(Observable<ObserveResponse> response) {
+        return response.onErrorResumeNext(Observable.<ObserveResponse>empty());
     }
 
     @Override

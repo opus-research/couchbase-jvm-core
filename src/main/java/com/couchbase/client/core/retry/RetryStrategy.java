@@ -23,6 +23,8 @@ package com.couchbase.client.core.retry;
 
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.kv.ObserveResponse;
+import rx.Observable;
 
 /**
  * Base interface for all {@link RetryStrategy} implementations.
@@ -40,5 +42,7 @@ public interface RetryStrategy {
      * @return true if it should be retried, false otherwise.
      */
     boolean shouldRetry(CouchbaseRequest request, CoreEnvironment environment);
+
+    Observable<ObserveResponse> retryOnObserve(Observable<ObserveResponse> response);
 
 }
