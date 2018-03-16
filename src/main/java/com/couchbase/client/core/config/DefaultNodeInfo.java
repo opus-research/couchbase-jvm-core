@@ -121,7 +121,6 @@ public class DefaultNodeInfo implements NodeInfo {
 
         if (parts.length > 2) {
             // Handle IPv6 syntax
-            System.out.println(Arrays.asList(parts));
             String assembledHost = "";
             for (int i = 0; i < parts.length - 1; i++) {
                 assembledHost += parts[i];
