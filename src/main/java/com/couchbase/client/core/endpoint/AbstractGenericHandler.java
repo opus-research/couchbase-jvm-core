@@ -31,7 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -153,13 +152,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      *   onError of the request's Observable.
      */
     protected abstract CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, RESPONSE msg) throws Exception;
-
-    /**
-     * Returns the {@link ServiceType} associated with this handler.
-     *
-     * @return the service type.
-     */
-    protected abstract ServiceType serviceType();
 
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
