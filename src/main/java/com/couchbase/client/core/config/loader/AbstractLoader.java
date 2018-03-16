@@ -28,7 +28,6 @@ import com.couchbase.client.core.config.parser.BucketConfigParser;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.lang.Tuple;
 import com.couchbase.client.core.lang.Tuple2;
-import com.couchbase.client.core.lang.Tuple3;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
@@ -38,7 +37,6 @@ import com.couchbase.client.core.message.internal.AddServiceResponse;
 import com.couchbase.client.core.service.ServiceType;
 import rx.Observable;
 import rx.functions.Func1;
-
 import java.net.InetAddress;
 import java.util.Set;
 
@@ -125,16 +123,15 @@ public abstract class AbstractLoader implements Loader {
         LOGGER.debug("Loading Config for bucket {}", bucket);
 
         return Observable.mergeDelayError(Observable
-            .from(seedNodes)
-            .map(new Func1<InetAddress, Observable<Tuple3<LoaderType, BucketConfig, Throwable>>>() {
-                @Override
-                public Observable<Tuple3<LoaderType, BucketConfig, Throwable>> call(InetAddress inetAddress) {
-                    return maskPassthroughErrors(loadConfigAtAddr(inetAddress, bucket, password));
-                }
-            })
-        )
-        .take(1)
-        .flatMap(UnmaskPassthroughErrors.INSTANCE);
+                .from(seedNodes)
+                .map(new Func1<InetAddress, Observable<Tuple2<LoaderType, BucketConfig>>>() {
+                    @Override
+                    public Observable<Tuple2<LoaderType, BucketConfig>> call(InetAddress inetAddress) {
+                        return loadConfigAtAddr(inetAddress, bucket, password);
+                    }
+                })
+            )
+            .take(1);
     }
 
     /**
@@ -217,63 +214,5 @@ public abstract class AbstractLoader implements Loader {
      */
     protected String replaceHostWildcard(String input, InetAddress hostname) {
         return input.replace("$HOST", hostname.getHostName());
-    }
-
-    /**
-     * Helper method to mask certain errors which are allowed to pass through the delayed error merging process
-     * as regular messages.
-     *
-     * Certain exception types can be thrown by the loader implementations from actual responses which are not
-     * errors per se, but rather mark the process as "cant be completed". Those errors can be passed through the
-     * mergeDelayError so that the overall stream is not hold up and waiting.
-     *
-     * The main way to distinguish the tuple from a good one is that the actual config carried is null, but the
-     * throwable is set.
-     *
-     * **Note:** This approach is not 100% ideal, but it covers the cases where the loaders (like the carrier one)
-     * get a response from the server, but a non-successful one. Turning it into a message will help keep moving
-     * the chain to the next loader.
-     *
-     * See the companion class {@link UnmaskPassthroughErrors} which turns the message back into an error.
-     *
-     * @param input the input stream.
-     * @return output stream with masked errors.
-     */
-    private Observable<Tuple3<LoaderType, BucketConfig, Throwable>> maskPassthroughErrors(
-        final Observable<Tuple2<LoaderType, BucketConfig>> input) {
-        return input
-            .map(new Func1<Tuple2<LoaderType, BucketConfig>, Tuple3<LoaderType, BucketConfig, Throwable>>() {
-                @Override
-                public Tuple3<LoaderType, BucketConfig, Throwable> call(Tuple2<LoaderType, BucketConfig> in) {
-                    return Tuple.create(in.value1(), in.value2(), null);
-                }
-            })
-            .onErrorResumeNext(new Func1<Throwable, Observable<Tuple3<LoaderType, BucketConfig, Throwable>>>() {
-                @Override
-                public Observable<Tuple3<LoaderType, BucketConfig, Throwable>> call(Throwable throwable) {
-                    if (throwable instanceof LoadingFailedException) {
-                        return Observable.just(Tuple.create(loaderType, (BucketConfig) null, throwable));
-                    }
-                    return Observable.error(throwable);
-                }
-            });
-    }
-
-    /**
-     * Companion helper to {@link #maskPassthroughErrors(Observable)} to unmask the masked errors after merging.
-     */
-    private static class UnmaskPassthroughErrors implements
-        Func1<Tuple3<LoaderType, BucketConfig, Throwable>, Observable<Tuple2<LoaderType, BucketConfig>>> {
-
-        private static UnmaskPassthroughErrors INSTANCE = new UnmaskPassthroughErrors();
-
-        @Override
-        public Observable<Tuple2<LoaderType, BucketConfig>> call(Tuple3<LoaderType, BucketConfig, Throwable> in) {
-            if (in.value3() == null) {
-                return Observable.just(Tuple.create(in.value1(), in.value2()));
-            }
-            return Observable.error(in.value3());
-        }
-
     }
 }
