@@ -26,6 +26,7 @@ import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.service.Service;
+import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.state.Stateful;
 import rx.Observable;
@@ -74,4 +75,5 @@ public interface Node extends Stateful<LifecycleState> {
 
     Observable<Service> removeService(RemoveServiceRequest request);
 
+    boolean hasService(ServiceType type, String bucket);
 }
