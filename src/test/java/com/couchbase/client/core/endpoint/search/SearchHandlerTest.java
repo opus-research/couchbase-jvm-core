@@ -124,7 +124,6 @@ public class SearchHandlerTest {
         when(requestMock1.path()).thenReturn("");
         when(requestMock1.payload()).thenReturn("");
         when(requestMock1.bucket()).thenReturn("foo");
-        when(requestMock1.username()).thenReturn("foo");
         when(requestMock1.password()).thenReturn("");
         when(requestMock1.observable()).thenReturn(obs1);
 
@@ -133,7 +132,6 @@ public class SearchHandlerTest {
         when(requestMock2.path()).thenReturn("");
         when(requestMock2.payload()).thenReturn("");
         when(requestMock2.bucket()).thenReturn("foo");
-        when(requestMock2.username()).thenReturn("foo");
         when(requestMock2.password()).thenReturn("");
         when(requestMock2.observable()).thenReturn(obs2);
 

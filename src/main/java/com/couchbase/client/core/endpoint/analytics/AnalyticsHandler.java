@@ -195,7 +195,7 @@ public class AnalyticsHandler extends AbstractGenericHandler<HttpObject, HttpReq
                 + msg.getClass());
         }
 
-        addHttpBasicAuth(ctx, request, msg.username(), msg.password());
+        addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
         return request;
     }
 
@@ -756,7 +756,7 @@ public class AnalyticsHandler extends AbstractGenericHandler<HttpObject, HttpReq
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements AnalyticsRequest, KeepAlive {
         protected KeepAliveRequest() {
-            super(null, null, null);
+            super(null, null);
         }
     }
 
