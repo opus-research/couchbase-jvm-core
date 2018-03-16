@@ -31,6 +31,7 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.kv.StatResponse;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
@@ -253,7 +254,9 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 public void call() {
                     try {
                         observable.onNext(response);
-                        observable.onCompleted();
+                        if (currentDecodingState == DecodingState.FINISHED) {
+                            observable.onCompleted();
+                        }
                     } catch(Exception ex) {
                         LOGGER.warn("Caught exception while onNext on observable", ex);
                         observable.onError(ex);
