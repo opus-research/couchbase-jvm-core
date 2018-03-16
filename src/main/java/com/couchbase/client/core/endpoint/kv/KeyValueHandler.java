@@ -25,6 +25,8 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
+import com.couchbase.client.core.endpoint.ServerFeatures;
+import com.couchbase.client.core.endpoint.ServerFeaturesEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -44,6 +46,7 @@ import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.message.kv.GetResponse;
 import com.couchbase.client.core.message.kv.InsertRequest;
 import com.couchbase.client.core.message.kv.InsertResponse;
+import com.couchbase.client.core.message.kv.MutationToken;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveResponse;
 import com.couchbase.client.core.message.kv.PrependRequest;
@@ -110,6 +113,8 @@ public class KeyValueHandler
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
     public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
+
+    boolean seqOnMutation = false;
 
 
     /**
@@ -440,57 +445,108 @@ public class KeyValueHandler
         }
 
         ResponseStatus status = ResponseStatusConverter.fromBinary(msg.getStatus());
-
-        // Release request content from external resources if not retried again.
         if (!status.equals(ResponseStatus.RETRY)) {
-            ByteBuf content = null;
-            if (request instanceof BinaryStoreRequest) {
-                content = ((BinaryStoreRequest) request).content();
-            } else if (request instanceof AppendRequest) {
-                content = ((AppendRequest) request).content();
-            } else if (request instanceof PrependRequest) {
-                content = ((PrependRequest) request).content();
-            }
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
+           maybeFreeContent(request);
         }
 
-        CouchbaseResponse response;
-        ByteBuf content = msg.content().retain();
+        msg.content().retain();
+        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
+
+        if (response == null) {
+            response = handleOtherResponseMessages(request, msg, status, seqOnMutation);
+        }
+
+        if (response == null) {
+            throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
+                    + msg.getClass());
+        }
+
+        finishedDecoding();
+        return response;
+    }
+
+    /**
+     * Helper method to decode all common response messages.
+     *
+     * @param request the current request.
+     * @param msg the current response message.
+     * @param ctx the handler context.
+     * @param status the response status code.
+     * @return the decoded response or null if none did match.
+     */
+    private static CouchbaseResponse handleCommonResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
+         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
+        CouchbaseResponse response = null;
+        ByteBuf content = msg.content();
         long cas = msg.getCAS();
+        short statusCode = msg.getStatus();
         String bucket = request.bucket();
+
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
-            int flags = 0;
-            if (msg.getExtrasLength() > 0) {
-                final ByteBuf extrasReleased = msg.getExtras();
-                final ByteBuf extras = ctx.alloc().buffer(msg.getExtrasLength());
-                extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
-                flags = extras.getInt(0);
-                extras.release();
-            }
-            response = new GetResponse(status, cas, flags, bucket, content, request);
+            int flags = extractFlagsFromGetResponse(ctx, msg.getExtras(), msg.getExtrasLength());
+            response = new GetResponse(status, statusCode, cas, flags, bucket, content, request);
         } else if (request instanceof GetBucketConfigRequest) {
-            response = new GetBucketConfigResponse(status, bucket, content,
-                ((GetBucketConfigRequest) request).hostname());
+            response = new GetBucketConfigResponse(status, statusCode, bucket, content,
+                    ((GetBucketConfigRequest) request).hostname());
         } else if (request instanceof InsertRequest) {
-            response = new InsertResponse(status, cas, bucket, content, request);
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new InsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof UpsertRequest) {
-            response = new UpsertResponse(status, cas, bucket, content, request);
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new UpsertResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof ReplaceRequest) {
-            response = new ReplaceResponse(status, cas, bucket, content, request);
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new ReplaceResponse(status, statusCode, cas, bucket, content, descr, request);
         } else if (request instanceof RemoveRequest) {
-            response = new RemoveResponse(status, cas, bucket, content, request);
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new RemoveResponse(status, statusCode, cas, bucket, content, descr, request);
+        }
+
+        return response;
+    }
+
+    private static MutationToken extractToken(boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
+        if (success && seqOnMutation) {
+            return new MutationToken(vbid, extras.readLong(), extras.readLong());
+        }
+        return null;
+    }
+
+    /**
+     * Helper method to decode all other response messages.
+     *
+     * @param request the current request.
+     * @param msg the current response message.
+     * @param status the response status code.
+     * @return the decoded response or null if none did match.
+     */
+    private static CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
+        ResponseStatus status, boolean seqOnMutation) {
+        CouchbaseResponse response = null;
+        ByteBuf content = msg.content();
+        long cas = msg.getCAS();
+        short statusCode = msg.getStatus();
+        String bucket = request.bucket();
+
+        if (request instanceof UnlockRequest) {
+            response = new UnlockResponse(status, statusCode, bucket, content, request);
+        } else if (request instanceof TouchRequest) {
+            response = new TouchResponse(status, statusCode, bucket, content, request);
+        } else if (request instanceof AppendRequest) {
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new AppendResponse(status, statusCode, cas, bucket, content, descr, request);
+        } else if (request instanceof PrependRequest) {
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new PrependResponse(status, statusCode, cas, bucket, content, descr, request);
+        } else if (request instanceof KeepAliveRequest) {
+            releaseContent(content);
+            response = new KeepAliveResponse(status, statusCode, request);
         } else if (request instanceof CounterRequest) {
             long value = status.isSuccess() ? content.readLong() : 0;
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new CounterResponse(status, bucket, value, cas, request);
-        } else if (request instanceof UnlockRequest) {
-            response = new UnlockResponse(status, bucket, content, request);
-        } else if (request instanceof TouchRequest) {
-            response = new TouchResponse(status, bucket, content, request);
+            releaseContent(content);
+
+            MutationToken descr = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+            response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
             long observedCas = 0;
@@ -499,27 +555,62 @@ public class KeyValueHandler
                 observed = content.getByte(keyLength + 4);
                 observedCas = content.getLong(keyLength + 5);
             }
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), observedCas,
-                bucket, request);
-        } else if (request instanceof AppendRequest) {
-            response = new AppendResponse(status, cas, bucket, content, request);
-        } else if (request instanceof PrependRequest) {
-            response = new PrependResponse(status, cas, bucket, content, request);
-        } else if (request instanceof KeepAliveRequest) {
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-            response = new KeepAliveResponse(status, request);
-        } else {
-            throw new IllegalStateException("Unhandled request/response pair: " + request.getClass() + "/"
-                + msg.getClass());
+            releaseContent(content);
+            response = new ObserveResponse(status, statusCode, observed, ((ObserveRequest) request).master(),
+                    observedCas, bucket, request);
         }
 
-        finishedDecoding();
         return response;
+    }
+
+    /**
+     * Helper method to release content from external resources.
+     *
+     * This method should be called when it is clear that the request is not tried again.
+     *
+     * @param request the request where to free the content.
+     */
+    private static void maybeFreeContent(BinaryRequest request) {
+        ByteBuf content = null;
+        if (request instanceof BinaryStoreRequest) {
+            content = ((BinaryStoreRequest) request).content();
+        } else if (request instanceof AppendRequest) {
+            content = ((AppendRequest) request).content();
+        } else if (request instanceof PrependRequest) {
+            content = ((PrependRequest) request).content();
+        }
+        releaseContent(content);
+    }
+
+    /**
+     * Helper method to safely release the content.
+     *
+     * @param content the content to safely release if needed.
+     */
+    private static void releaseContent(ByteBuf content) {
+        if (content != null && content.refCnt() > 0) {
+            content.release();
+        }
+    }
+
+    /**
+     * Helper method to extract the flags from the extras buffer.
+     *
+     * @param ctx the handler context.
+     * @param extrasReleased the extras of the msg.
+     * @param extrasLength the extras length.
+     * @return the extracted flags.
+     */
+    private static int extractFlagsFromGetResponse(ChannelHandlerContext ctx, ByteBuf extrasReleased,
+        int extrasLength) {
+        int flags = 0;
+        if (extrasLength > 0) {
+            final ByteBuf extras = ctx.alloc().buffer(extrasLength);
+            extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
+            flags = extras.getInt(0);
+            extras.release();
+        }
+        return flags;
     }
 
     /**
@@ -546,6 +637,12 @@ public class KeyValueHandler
             LOGGER.debug(logIdent(ctx, endpoint()) + "Identified Idle State, signalling config reload.");
             endpoint().signalConfigReload();
         }
+
+        if (evt instanceof ServerFeaturesEvent) {
+            seqOnMutation = env().mutationTokensEnabled() &&
+                ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
+        }
+
         super.userEventTriggered(ctx, evt);
     }
 
@@ -564,8 +661,8 @@ public class KeyValueHandler
 
     protected static class KeepAliveResponse extends AbstractKeyValueResponse {
 
-        public KeepAliveResponse(ResponseStatus status, CouchbaseRequest request) {
-            super(status, null, null, request);
+        public KeepAliveResponse(ResponseStatus status, short serverStatusCode, CouchbaseRequest request) {
+            super(status, serverStatusCode, null, null, request);
         }
     }
 }
