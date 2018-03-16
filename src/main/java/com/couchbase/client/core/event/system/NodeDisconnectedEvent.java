@@ -23,10 +23,8 @@ package com.couchbase.client.core.event.system;
 
 import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.EventType;
-import com.couchbase.client.core.utils.Events;
 
 import java.net.InetAddress;
-import java.util.Map;
 
 /**
  * Event published when a node is disconnected.
@@ -36,10 +34,10 @@ import java.util.Map;
  */
 public class NodeDisconnectedEvent implements CouchbaseEvent {
 
-    private final InetAddress host;
+    private final InetAddress node;
 
-    public NodeDisconnectedEvent(InetAddress host) {
-        this.host = host;
+    public NodeDisconnectedEvent(InetAddress node) {
+        this.node = node;
     }
 
     @Override
@@ -53,21 +51,14 @@ public class NodeDisconnectedEvent implements CouchbaseEvent {
      * @return the inet address of the disconnected node
      */
     public InetAddress host() {
-        return host;
+        return node;
     }
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("NodeDisconnectedEvent{");
-        sb.append("host=").append(host);
+        sb.append("node=").append(node);
         sb.append('}');
         return sb.toString();
-    }
-
-    @Override
-    public Map<String, Object> toMap() {
-        Map<String, Object> result = Events.identityMap(this);
-        result.put("host", host().toString());
-        return result;
     }
 }
