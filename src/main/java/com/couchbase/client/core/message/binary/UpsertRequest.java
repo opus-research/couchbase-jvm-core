@@ -29,7 +29,7 @@ import io.netty.buffer.ByteBuf;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class UpsertRequest extends AbstractBinaryRequest implements BinaryStoreRequest {
+public class UpsertRequest extends AbstractBinaryRequest {
 
     /**
      * The content of the document.
