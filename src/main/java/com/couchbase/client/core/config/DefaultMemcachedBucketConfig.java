@@ -109,11 +109,6 @@ public class DefaultMemcachedBucketConfig extends AbstractBucketConfig implement
         return ketamaNodes.get(hash).hostname();
     }
 
-    @Override
-    public boolean hasFastForwardMap() {
-        return false;
-    }
-
     /**
      * Calculates the ketama hash for the given key.
      *
