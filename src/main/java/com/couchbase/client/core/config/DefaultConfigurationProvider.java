@@ -234,13 +234,22 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             return Observable.error(new ConfigurationException("Seed node list not provided or empty."));
         }
 
-        Observable<Tuple2<LoaderType, BucketConfig>> observable = loaderChain.get(0).loadConfig(seedHosts,
-            bucket, password);
-        for (int i = 1; i < loaderChain.size(); i++) {
-            observable = observable.onErrorResumeNext(
-                loaderChain.get(i).loadConfig(seedHosts, bucket, password)
-            );
-        }
+        Observable<Tuple2<LoaderType, BucketConfig>> observable = Observable.mergeDelayError(Observable
+            .from(seedHosts)
+            .map(new Func1<InetAddress, Observable<Tuple2<LoaderType, BucketConfig>>>() {
+                @Override
+                public Observable<Tuple2<LoaderType, BucketConfig>> call(InetAddress seedHost) {
+                    Observable<Tuple2<LoaderType, BucketConfig>> node = loaderChain.get(0)
+                        .loadConfig(seedHost, bucket, password);
+                    for (int i = 1; i < loaderChain.size(); i++) {
+                        node = node.onErrorResumeNext(loaderChain.get(i)
+                            .loadConfig(seedHost, bucket, password));
+                    }
+                    return node;
+                }
+            })
+        )
+        .take(1);
 
         return
             observable
@@ -264,6 +273,13 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
                     if (eventBus != null && eventBus.hasSubscribers()) {
                         eventBus.publish(new BucketOpenedEvent(bucket));
                     }
+                }
+            })
+            .doOnError(new Action1<Throwable>() {
+                @Override
+                public void call(Throwable throwable) {
+                    LOGGER.debug("Explicitly closing bucket {} after failed open attempt to clean resources.", bucket);
+                    removeBucketConfig(bucket);
                 }
             })
             .onErrorResumeNext(new Func1<Throwable, Observable<ClusterConfig>>() {
@@ -330,6 +346,11 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     @Override
     public void signalOutdated() {
         LOGGER.debug("Received signal for outdated configuration.");
+
+        if (currentConfig.bucketConfigs().isEmpty()) {
+            LOGGER.debug("Ignoring outdated signal, since no buckets are open.");
+            return;
+        }
 
         for (Refresher refresher : refreshers.values()) {
             refresher.refresh(currentConfig);

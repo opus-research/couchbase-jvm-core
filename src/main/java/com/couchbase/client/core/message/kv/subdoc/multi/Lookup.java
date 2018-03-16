@@ -20,10 +20,32 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.node.locate;
+package com.couchbase.client.core.message.kv.subdoc.multi;
+
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
 
 /**
- * @author Sergey Avseyev
+ * Enumeration of possible mutations inside a sub-document {@link LookupCommand}.
+ *
+ * @author Simon Baslé
+ * @since 1.2
  */
-public class SearchLocator extends QueryLocator {
+@InterfaceStability.Experimental
+@InterfaceAudience.Public
+public enum Lookup {
+
+    GET(KeyValueHandler.OP_SUB_GET),
+    EXIST(KeyValueHandler.OP_SUB_EXIST);
+
+    private final byte opCode;
+
+    Lookup(byte opCode) {
+        this.opCode = opCode;
+    }
+
+    public byte opCode() {
+        return opCode;
+    }
 }

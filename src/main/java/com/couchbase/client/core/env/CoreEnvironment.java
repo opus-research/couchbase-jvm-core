@@ -130,20 +130,6 @@ public interface CoreEnvironment {
     int queryPort();
 
     /**
-     * True if full text search should be enabled manually.
-     *
-     * @return true if manual N1QL querying is enabled.
-     */
-    boolean searchEnabled();
-
-    /**
-     * If manual full text search enabled, this defines the CBFT port to use.
-     *
-     * @return the query port.
-     */
-    int searchPort();
-
-    /**
      * If bootstrapping through HTTP is enabled.
      *
      * @return true if enabled.
@@ -235,6 +221,17 @@ public interface CoreEnvironment {
     int responseBufferSize();
 
     /**
+     * Size of the buffer to control speed of DCP producer.
+     */
+    int dcpConnectionBufferSize();
+
+    /**
+     * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
+     * a DCP Buffer Acknowledge message is sent to the server
+     */
+    double dcpConnectionBufferAckThreshold();
+
+    /**
      * The number of key/value service endpoints.
      *
      * @return amount of endpoints per service.
@@ -254,13 +251,6 @@ public interface CoreEnvironment {
      * @return amount of endpoints per service.
      */
     int queryEndpoints();
-
-    /**
-     * The number of search service endpoints.
-     *
-     * @return amount of endpoints per service.
-     */
-    int searchEndpoints();
 
     /**
      * Library identification string, which can be used as User-Agent header in HTTP requests.

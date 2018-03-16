@@ -26,7 +26,6 @@ import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.kv.BinaryRequest;
 import com.couchbase.client.core.message.query.QueryRequest;
-import com.couchbase.client.core.message.search.SearchRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.service.BucketServiceMapping;
 import com.couchbase.client.core.service.Service;
@@ -173,8 +172,6 @@ public class DefaultServiceRegistry implements ServiceRegistry {
             return ServiceType.QUERY;
         } else if (request instanceof DCPRequest) {
             return ServiceType.DCP;
-        } else if (request instanceof SearchRequest) {
-            return ServiceType.SEARCH;
         } else {
             throw new IllegalStateException("Unknown Request: " + request);
         }

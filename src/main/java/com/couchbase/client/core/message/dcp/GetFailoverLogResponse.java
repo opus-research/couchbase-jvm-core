@@ -20,29 +20,33 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.search;
+package com.couchbase.client.core.message.dcp;
 
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 
-public class SearchQueryResponse extends AbstractCouchbaseResponse {
+import java.util.List;
 
-    private final String payload;
+/**
+ * @author Sergey Avseyev
+ */
+public class GetFailoverLogResponse extends AbstractDCPResponse {
+    private final List<FailoverLogEntry> failoverLog;
 
-    public SearchQueryResponse(String payload, ResponseStatus status) {
-        super(status, null);
-        this.payload = payload;
+    /**
+     * Creates {@link GetFailoverLogResponse}.
+     *
+     * @param status      the status of the response.
+     * @param failoverLog the list of failover log entries or null if response status is not success
+     * @param request
+     */
+    public GetFailoverLogResponse(final ResponseStatus status, final List<FailoverLogEntry> failoverLog,
+                                  final CouchbaseRequest request) {
+        super(status, request);
+        this.failoverLog = failoverLog;
     }
 
-    public String payload() {
-        return payload;
-    }
-
-    @Override
-    public String toString() {
-        return "SearchQueryResponse{"
-                + "status=" + status()
-                + ", payload='" + payload + '\''
-                + '}';
+    public List<FailoverLogEntry> failoverLog() {
+        return failoverLog;
     }
 }

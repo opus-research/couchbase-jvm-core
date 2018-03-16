@@ -16,7 +16,7 @@
 
     <groupId>com.couchbase.client</groupId>
     <artifactId>core-io</artifactId>
-    <version>1.2.2-SNAPSHOT</version>
+    <version>1.2.4-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Couchbase JVM Core IO</name>
@@ -28,7 +28,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <rxjava.version>1.0.14</rxjava.version>
+        <rxjava.version>1.0.15</rxjava.version>
         <netty.version>4.0.32.Final</netty.version>
         <disruptor.version>3.3.2</disruptor.version>
         <jackson.version>2.6.2</jackson.version>
@@ -233,6 +233,13 @@
                         <relocation>
                             <pattern>com.lmax</pattern>
                             <shadedPattern>com.couchbase.client.deps.com.lmax</shadedPattern>
+                        </relocation>
+                        <!-- This is a hack, it should actually be an exclusion pattern on io.netty
+                             but for some reason this doesn't work. This is a workaround to repair
+                             the renaming damage done by the earlier io.netty rule. -->
+                        <relocation>
+                            <pattern>com.couchbase.client.deps.com.couchbase.client</pattern>
+                            <shadedPattern>com.couchbase.client</shadedPattern>
                         </relocation>
                     </relocations>
                     <createSourcesJar>true</createSourcesJar>

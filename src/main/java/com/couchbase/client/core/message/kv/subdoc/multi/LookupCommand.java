@@ -20,29 +20,45 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.search;
+package com.couchbase.client.core.message.kv.subdoc.multi;
 
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
-import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+import io.netty.buffer.ByteBuf;
 
-public class InsertSearchIndexResponse extends AbstractCouchbaseResponse {
+/**
+ * A single lookup description inside a TODO.
+ *
+ * @author Simon Baslé
+ * @since 1.2
+ */
+@InterfaceStability.Experimental
+@InterfaceAudience.Public
+public class LookupCommand {
 
-    private final String payload;
+    private final Lookup lookup;
+    private final String path;
 
-    public InsertSearchIndexResponse(String payload, ResponseStatus status) {
-        super(status, null);
-        this.payload = payload;
+    /**
+     * Create a multi-lookup command.
+     *
+     * @param lookup the lookup type.
+     * @param path the path to look-up inside the document.
+     */
+    public LookupCommand(Lookup lookup, String path) {
+        this.lookup = lookup;
+        this.path = path;
     }
 
-    public String payload() {
-        return payload;
+    public Lookup lookup() {
+        return lookup;
     }
 
-    @Override
-    public String toString() {
-        return "InsertSearchIndexResponse{"
-                + "status=" + status()
-                + ", payload='" + payload + '\''
-                + '}';
+    public String path() {
+        return path;
+    }
+
+    public byte opCode() {
+        return lookup.opCode();
     }
 }
