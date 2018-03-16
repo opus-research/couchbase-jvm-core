@@ -19,48 +19,24 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
+
+package com.couchbase.client.core.message.dcp;
 
 /**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
- *
- * @author Michael Nitschinger
- * @since 1.0
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public enum ServiceType {
+public enum ConnectionType {
+    CONSUMER(0),
+    PRODUCER(1),
+    NOTIFIER(2);
+    private final int flags;
 
-    /**
-     * Views and Design Documents.
-     */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * Key/Value type operations.
-     */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
+    private ConnectionType(int flags) {
+        this.flags = flags;
     }
 
-    public BucketServiceMapping mapping() {
-        return mapping;
+    public int flags() {
+        return flags;
     }
 }
