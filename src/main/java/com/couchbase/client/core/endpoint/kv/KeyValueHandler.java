@@ -25,8 +25,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.ServerFeatures;
-import com.couchbase.client.core.endpoint.ServerFeaturesEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -46,7 +44,6 @@ import com.couchbase.client.core.message.kv.GetRequest;
 import com.couchbase.client.core.message.kv.GetResponse;
 import com.couchbase.client.core.message.kv.InsertRequest;
 import com.couchbase.client.core.message.kv.InsertResponse;
-import com.couchbase.client.core.message.kv.MutationDescriptor;
 import com.couchbase.client.core.message.kv.ObserveRequest;
 import com.couchbase.client.core.message.kv.ObserveResponse;
 import com.couchbase.client.core.message.kv.PrependRequest;
@@ -113,8 +110,6 @@ public class KeyValueHandler
     public static final byte OP_APPEND = BinaryMemcacheOpcodes.APPEND;
     public static final byte OP_PREPEND = BinaryMemcacheOpcodes.PREPEND;
     public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
-
-    boolean seqOnMutation = false;
 
 
     /**
@@ -450,10 +445,10 @@ public class KeyValueHandler
         }
 
         msg.content().retain();
-        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
+        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status);
 
         if (response == null) {
-            response = handleOtherResponseMessages(request, msg, status, seqOnMutation);
+            response = handleOtherResponseMessages(request, msg, status);
         }
 
         if (response == null) {
@@ -475,7 +470,7 @@ public class KeyValueHandler
      * @return the decoded response or null if none did match.
      */
     private static CouchbaseResponse handleCommonResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
+         ChannelHandlerContext ctx, ResponseStatus status) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
         long cas = msg.getCAS();
@@ -489,27 +484,16 @@ public class KeyValueHandler
             response = new GetBucketConfigResponse(status, statusCode, bucket, content,
                     ((GetBucketConfigRequest) request).hostname());
         } else if (request instanceof InsertRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new InsertResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new InsertResponse(status, statusCode, cas, bucket, content, request);
         } else if (request instanceof UpsertRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new UpsertResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new UpsertResponse(status, statusCode, cas, bucket, content, request);
         } else if (request instanceof ReplaceRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new ReplaceResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new ReplaceResponse(status, statusCode, cas, bucket, content, request);
         } else if (request instanceof RemoveRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new RemoveResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new RemoveResponse(status, statusCode, cas, bucket, content, request);
         }
 
         return response;
-    }
-
-    private static MutationDescriptor extractDescriptor(boolean seqOnMutation, boolean success, ByteBuf extras) {
-        if (success && seqOnMutation) {
-            return new MutationDescriptor(extras.readLong(), extras.readLong());
-        }
-        return null;
     }
 
     /**
@@ -521,7 +505,7 @@ public class KeyValueHandler
      * @return the decoded response or null if none did match.
      */
     private static CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-        ResponseStatus status, boolean seqOnMutation) {
+        ResponseStatus status) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
         long cas = msg.getCAS();
@@ -533,20 +517,16 @@ public class KeyValueHandler
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, statusCode, bucket, content, request);
         } else if (request instanceof AppendRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new AppendResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new AppendResponse(status, statusCode, cas, bucket, content, request);
         } else if (request instanceof PrependRequest) {
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new PrependResponse(status, statusCode, cas, bucket, content, descr, request);
+            response = new PrependResponse(status, statusCode, cas, bucket, content, request);
         } else if (request instanceof KeepAliveRequest) {
             releaseContent(content);
             response = new KeepAliveResponse(status, statusCode, request);
         } else if (request instanceof CounterRequest) {
             long value = status.isSuccess() ? content.readLong() : 0;
             releaseContent(content);
-
-            MutationDescriptor descr = extractDescriptor(seqOnMutation, status.isSuccess(), msg.getExtras());
-            response = new CounterResponse(status, statusCode, bucket, value, cas, descr, request);
+            response = new CounterResponse(status, statusCode, bucket, value, cas, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
             long observedCas = 0;
@@ -637,11 +617,6 @@ public class KeyValueHandler
             LOGGER.debug(logIdent(ctx, endpoint()) + "Identified Idle State, signalling config reload.");
             endpoint().signalConfigReload();
         }
-
-        if (evt instanceof ServerFeaturesEvent) {
-            seqOnMutation = ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
-        }
-
         super.userEventTriggered(ctx, evt);
     }
 
