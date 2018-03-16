@@ -22,7 +22,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.state.AbstractStateMachine;
@@ -138,8 +137,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
 
     private final EventLoopGroup ioPool;
 
-    private final boolean pipeline;
-
     /**
      * Factory which handles {@link SSLEngine} creation.
      */
@@ -165,10 +162,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private volatile boolean disconnected;
 
-    private volatile boolean free;
-
-    private volatile long lastResponse;
-
     /**
      * Preset the stack trace for the static exceptions.
      */
@@ -180,7 +173,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Constructor to which allows to pass in an artificial bootstrap adapter.
      *
      * This method should not be used outside of tests. Please use the
-     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup, boolean)}
+     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup)}
      * constructor instead.
      *
      * @param bucket the name of the bucket.
@@ -188,7 +181,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param adapter the bootstrap adapter.
      */
     protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient, CoreEnvironment env, final boolean pipeline) {
+        final boolean isTransient, CoreEnvironment env) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
@@ -197,11 +190,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.env = env;
         this.isTransient = isTransient;
         this.disconnected = false;
-        this.pipeline = pipeline;
-        this.free = true;
         this.connectCallbackGracePeriod = Integer.parseInt(DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD);
         this.ioPool = env.ioPool();
-        this.lastResponse = 0;
     }
 
     /**
@@ -216,7 +206,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
-        final EventLoopGroup ioPool, final boolean pipeline) {
+        final EventLoopGroup ioPool) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
         this.password = password;
@@ -224,7 +214,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.env = environment;
         this.isTransient = isTransient;
         this.ioPool = ioPool;
-        this.pipeline = pipeline;
         this.connectCallbackGracePeriod = Integer.parseInt(
             System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
         );
@@ -492,9 +481,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
             } else {
                 if (channel.isActive() && channel.isWritable()) {
-                    if (!pipeline) {
-                        free = false;
-                    }
                     channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
@@ -550,32 +536,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     }
 
     /**
-     * Called by the underlying channel to notify when the channel finished decoding the current response.
-     */
-    public void notifyResponseDecoded() {
-        free = true;
-        lastResponse = System.nanoTime();
-    }
-
-    @Override
-    public long lastResponse() {
-        return lastResponse;
-    }
-
-    /**
      * Signal a "config reload" event to the upper config layers.
      */
     public void signalConfigReload() {
         responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
-    }
-
-    @Override
-    public boolean isFree() {
-        if (pipeline) {
-            return true;
-        } else {
-            return free;
-        }
     }
 
     /**
