@@ -15,9 +15,8 @@
  */
 package com.couchbase.client.core.endpoint;
 
+import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.SecureEnvironment;
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -33,11 +32,6 @@ import java.security.KeyStore;
  * @since 1.0
  */
 public class SSLEngineFactory {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(SSLEngineFactory.class);
 
     /**
      * The global environment which is shared.
@@ -65,41 +59,18 @@ public class SSLEngineFactory {
 
             KeyStore ks = env.sslKeystore();
             if (ks == null) {
+                ks = KeyStore.getInstance(KeyStore.getDefaultType());
                 String ksFile = env.sslKeystoreFile();
-                if (ksFile != null && !ksFile.isEmpty()) {
-                    ks = KeyStore.getInstance(KeyStore.getDefaultType());
-                    ks.load(new FileInputStream(ksFile), password);
+                if (ksFile == null || ksFile.isEmpty()) {
+                    throw new IllegalArgumentException("Path to Keystore File must not be null or empty.");
                 }
+                ks.load(new FileInputStream(ksFile), password);
             }
-
-            KeyStore ts = env.sslTruststore();
-            if (ts == null) {
-                String tsFile = env.sslTruststoreFile();
-                if (tsFile != null && !tsFile.isEmpty()) {
-                    // filepath found, open and init
-                    String tsPassword = env.sslTruststorePassword();
-                    char[] tspass = tsPassword == null || tsPassword.isEmpty() ? null : tsPassword.toCharArray();
-                    ts = KeyStore.getInstance(KeyStore.getDefaultType());
-                    ts.load(new FileInputStream(tsFile), tspass);
-                }
-            }
-
-            if (ks == null && ts == null) {
-                throw new IllegalStateException("At least either a KeyStore or a TrustStore " +
-                    "need to be provided.");
-            } else if (ks == null) {
-                ks = ts;
-                LOGGER.debug("No KeyStore provided, using provided TrustStore to initialize both factories.");
-            } else if (ts == null) {
-                ts = ks;
-                LOGGER.debug("No TrustStore provided, using provided KeyStore to initialize both factories.");
-            }
-
             String defaultAlgorithm = KeyManagerFactory.getDefaultAlgorithm();
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(defaultAlgorithm);
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(defaultAlgorithm);
             kmf.init(ks, password);
-            tmf.init(ts);
+            tmf.init(ks);
 
             SSLContext ctx = SSLContext.getInstance("TLS");
             ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
