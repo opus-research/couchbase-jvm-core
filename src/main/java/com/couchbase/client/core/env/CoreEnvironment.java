@@ -115,34 +115,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     EventLoopGroup searchIoPool();
 
     /**
-     * Returns the current {@link com.couchbase.client.core.service.KeyValueService} configuration.
-     *
-     * @return the current config for the kv service.
-     */
-    KeyValueServiceConfig kvServiceConfig();
-
-    /**
-     * Returns the current {@link com.couchbase.client.core.service.QueryService} configuration.
-     *
-     * @return the current config for the query service.
-     */
-    QueryServiceConfig queryServiceConfig();
-
-    /**
-     * Returns the current {@link com.couchbase.client.core.service.ViewService} configuration.
-     *
-     * @return the current config for the view service.
-     */
-    ViewServiceConfig viewServiceConfig();
-
-    /**
-     * Returns the current {@link com.couchbase.client.core.service.SearchService} configuration.
-     *
-     * @return the current config for the search service.
-     */
-    SearchServiceConfig searchServiceConfig();
-
-    /**
      * Returns the scheduler which should be used for all core actions that need to happen
      * asynchronously.
      *
@@ -155,7 +127,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      *
      * @return true if DCP is enabled, false otherwise.
      */
-    @Deprecated
     boolean dcpEnabled();
 
     /**
@@ -252,14 +223,12 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     /**
      * Size of the buffer to control speed of DCP producer.
      */
-    @Deprecated
     int dcpConnectionBufferSize();
 
     /**
      * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
      * a DCP Buffer Acknowledge message is sent to the server
      */
-    @Deprecated
     double dcpConnectionBufferAckThreshold();
 
     /**
@@ -433,7 +402,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      */
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
-    @Deprecated
     String dcpConnectionName();
 
     /**
@@ -445,15 +413,4 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     WaitStrategyFactory requestBufferWaitStrategy();
-
-    /**
-     * Returns the proactive polling interval for cluster configurations.
-     *
-     * @return the polling interval in milliseconds.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    long configPollInterval();
-
-
 }

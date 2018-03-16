@@ -22,7 +22,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.state.AbstractStateMachine;
@@ -114,12 +113,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private final String bucket;
 
     /**
-     * User authorized for bucket access
-     */
-    private final String username;
-
-    /**
-     * The password of the couchbase bucket/user.
+     * The password of the couchbase bucket (needed for bucket-level endpoints).
      */
     private final String password;
 
@@ -142,8 +136,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private final int connectCallbackGracePeriod;
 
     private final EventLoopGroup ioPool;
-
-    private final boolean pipeline;
 
     /**
      * Factory which handles {@link SSLEngine} creation.
@@ -171,13 +163,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private volatile boolean disconnected;
 
     /**
-     * This endpoint is currently free to accept new writes. We always start out with true.
-     */
-    private volatile boolean free;
-
-    private volatile long lastResponse;
-
-    /**
      * Preset the stack trace for the static exceptions.
      */
     static {
@@ -188,30 +173,25 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Constructor to which allows to pass in an artificial bootstrap adapter.
      *
      * This method should not be used outside of tests. Please use the
-     * {@link #AbstractEndpoint(String, String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup, boolean)}
+     * {@link #AbstractEndpoint(String, String, String, int, CoreEnvironment, RingBuffer, boolean, EventLoopGroup)}
      * constructor instead.
      *
      * @param bucket the name of the bucket.
-     * @param username user authorized for bucket access.
-     * @param password the password of the user.
+     * @param password the password of the bucket.
      * @param adapter the bootstrap adapter.
      */
-    protected AbstractEndpoint(final String bucket, final String username, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient, CoreEnvironment env, final boolean pipeline) {
+    protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
+        final boolean isTransient, CoreEnvironment env) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
-        this.username = username;
         this.password = password;
         this.responseBuffer = null;
         this.env = env;
         this.isTransient = isTransient;
         this.disconnected = false;
-        this.pipeline = pipeline;
         this.connectCallbackGracePeriod = Integer.parseInt(DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD);
         this.ioPool = env.ioPool();
-        this.lastResponse = 0;
-        this.free = true;
     }
 
     /**
@@ -219,25 +199,21 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      *
      * @param hostname the hostname/ipaddr of the remote channel.
      * @param bucket the name of the bucket.
-     * @param username the user authorized for bucket access.
-     * @param password the password of the user.
+     * @param password the password of the bucket.
      * @param port the port of the remote channel.
      * @param environment the environment of the core.
      * @param responseBuffer the response buffer for passing responses up the stack.
      */
-    protected AbstractEndpoint(final String hostname, final String bucket, final String username, final String password, final int port,
+    protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
         final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
-        final EventLoopGroup ioPool, final boolean pipeline) {
+        final EventLoopGroup ioPool) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
-        this.username = username;
         this.password = password;
         this.responseBuffer = responseBuffer;
         this.env = environment;
         this.isTransient = isTransient;
         this.ioPool = ioPool;
-        this.pipeline = pipeline;
-        this.free = true;
         this.connectCallbackGracePeriod = Integer.parseInt(
             System.getProperty("com.couchbase.connectCallbackGracePeriod", DEFAULT_CONNECT_CALLBACK_GRACE_PERIOD)
         );
@@ -505,9 +481,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
             } else {
                 if (channel.isActive() && channel.isWritable()) {
-                    if (!pipeline) {
-                        free = false;
-                    }
                     channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
@@ -563,36 +536,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     }
 
     /**
-     * Called by the underlying channel to notify when the channel finished decoding the current response.
-     *
-     * If hidden is set to true, the last response time will not be updated.
-     */
-    public void notifyResponseDecoded(boolean hidden) {
-        free = true;
-        if (!hidden) {
-            lastResponse = System.nanoTime();
-        }
-    }
-
-    @Override
-    public long lastResponse() {
-        return lastResponse;
-    }
-
-    /**
      * Signal a "config reload" event to the upper config layers.
      */
     public void signalConfigReload() {
         responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
-    }
-
-    @Override
-    public boolean isFree() {
-        if (pipeline) {
-            return true;
-        } else {
-            return free;
-        }
     }
 
     /**
@@ -605,18 +552,9 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     }
 
     /**
-     * Username of the bucket.
+     * The password of the bucket.
      *
-     * @return user authorized for bucket access.
-     */
-    protected String username() {
-        return username;
-    }
-
-    /**
-     * The password of the bucket/user.
-     *
-     * @return the bucket/user password.
+     * @return the bucket password.
      */
     protected String password() {
         return password;

@@ -30,16 +30,16 @@ import java.util.concurrent.TimeUnit;
  */
 public class ViewEndpoint extends AbstractEndpoint {
 
-    @Deprecated
+    /**
+     * Create a new {@link ViewEndpoint}.
+     *
+     * @param hostname the hostname to connect on this endpoint.
+     * @param env the couchbase environment.
+     */
     public ViewEndpoint(final String hostname, String bucket, String password, int port, final CoreEnvironment env,
-                        final RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    public ViewEndpoint(final String hostname, String bucket, String username, String password, int port, final CoreEnvironment env,
         final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, responseBuffer, false,
-                env.viewIoPool() == null ? env.ioPool() : env.viewIoPool(), false);
+        super(hostname, bucket, password, port, env, responseBuffer, false,
+                env.viewIoPool() == null ? env.ioPool() : env.viewIoPool());
     }
 
     @Override

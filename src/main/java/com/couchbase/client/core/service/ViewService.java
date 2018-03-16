@@ -29,7 +29,7 @@ import com.lmax.disruptor.RingBuffer;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class ViewService extends PooledService {
+public class ViewService extends AbstractPoolingService {
 
     /**
      * The endpoint selection strategy.
@@ -51,26 +51,10 @@ public class ViewService extends PooledService {
      * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    @Deprecated
     public ViewService(final String hostname, final String bucket, final String password, final int port,
-                       final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, env, responseBuffer);
-    }
-
-    /**
-     * Creates a new {@link ViewService}.
-     *
-     * @param hostname the hostname of the service.
-     * @param bucket the name of the bucket.
-     * @param username the user authorized for bucket access.
-     * @param password the password of the user.
-     * @param port the port of the service.
-     * @param env the shared environment.
-     * @param responseBuffer the shared response buffer.
-     */
-    public ViewService(final String hostname, final String bucket, final String username, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, env, env.viewServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+        super(hostname, bucket, password, port, env, env.viewEndpoints(), env.viewEndpoints(), STRATEGY, responseBuffer,
+            FACTORY);
     }
 
     @Override
@@ -83,9 +67,9 @@ public class ViewService extends PooledService {
      */
     static class ViewEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(final String hostname, final String bucket, final String username, final String password, final int port,
+        public Endpoint create(final String hostname, final String bucket, final String password, final int port,
             final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-            return new ViewEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
+            return new ViewEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
 }

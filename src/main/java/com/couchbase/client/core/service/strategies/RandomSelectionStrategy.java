@@ -19,7 +19,6 @@ import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.state.LifecycleState;
 
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -46,15 +45,15 @@ public class RandomSelectionStrategy implements SelectionStrategy {
     private static final int MAX_TRIES = 100;
 
     @Override
-    public Endpoint select(final CouchbaseRequest request, final List<Endpoint> endpoints) {
-        if (endpoints.size() == 0) {
+    public Endpoint select(final CouchbaseRequest request, final Endpoint[] endpoints) {
+        if (endpoints.length == 0) {
             return null;
         }
 
         for (int i = 0; i < MAX_TRIES; i++) {
-            int selected = RANDOM.get().nextInt(endpoints.size());
-            Endpoint endpoint = endpoints.get(selected);
-            if (endpoint.isState(LifecycleState.CONNECTED) && endpoint.isFree()) {
+            int selected = RANDOM.get().nextInt(endpoints.length);
+            Endpoint endpoint = endpoints[selected];
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
                 return endpoint;
             }
         }

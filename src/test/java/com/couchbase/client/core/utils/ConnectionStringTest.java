@@ -18,10 +18,7 @@ package com.couchbase.client.core.utils;
 import com.couchbase.client.core.CouchbaseException;
 import org.junit.Test;
 
-import java.net.InetSocketAddress;
-
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ConnectionStringTest {
@@ -55,11 +52,8 @@ public class ConnectionStringTest {
         assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
         assertTrue(parsed.params().isEmpty());
         assertEquals(1, parsed.hosts().size());
-        assertFalse(parsed.hosts().get(0).isUnresolved());
         assertEquals("localhost", parsed.hosts().get(0).getHostName());
-        assertEquals("127.0.0.1", parsed.hosts().get(0).getAddress().getHostAddress());
         assertEquals(0, parsed.hosts().get(0).getPort());
-        assertEquals(null, parsed.username());
 
         parsed = ConnectionString.create("couchbase://localhost:1234");
         assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
@@ -67,7 +61,6 @@ public class ConnectionStringTest {
         assertEquals(1, parsed.hosts().size());
         assertEquals("localhost", parsed.hosts().get(0).getHostName());
         assertEquals(1234, parsed.hosts().get(0).getPort());
-        assertEquals(null, parsed.username());
 
         parsed = ConnectionString.create("couchbase://foo:1234,bar:5678");
         assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
@@ -77,7 +70,6 @@ public class ConnectionStringTest {
         assertEquals(1234, parsed.hosts().get(0).getPort());
         assertEquals("bar", parsed.hosts().get(1).getHostName());
         assertEquals(5678, parsed.hosts().get(1).getPort());
-        assertEquals(null, parsed.username());
 
         parsed = ConnectionString.create("couchbase://foo,bar:5678,baz");
         assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
@@ -89,7 +81,6 @@ public class ConnectionStringTest {
         assertEquals(5678, parsed.hosts().get(1).getPort());
         assertEquals("baz", parsed.hosts().get(2).getHostName());
         assertEquals(0, parsed.hosts().get(2).getPort());
-        assertEquals(null, parsed.username());
     }
 
     @Test
@@ -99,31 +90,10 @@ public class ConnectionStringTest {
         assertEquals(1, parsed.hosts().size());
         assertEquals(1, parsed.params().size());
         assertEquals("bar", parsed.params().get("foo"));
-        assertEquals(null, parsed.username());
 
         parsed = ConnectionString.create("couchbase://localhost?foo=bar&setting=true");
         assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
         assertEquals(1, parsed.hosts().size());
-        assertEquals(2, parsed.params().size());
-        assertEquals("bar", parsed.params().get("foo"));
-        assertEquals("true", parsed.params().get("setting"));
-        assertEquals(null, parsed.username());
-    }
-
-    @Test
-    public void shouldParseUsername() {
-        ConnectionString parsed = ConnectionString.create("couchbase://user@localhost?foo=bar");
-        assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
-        assertEquals("user", parsed.username());
-        assertEquals(new InetSocketAddress("localhost", 0), parsed.hosts().get(0));
-        assertEquals(1, parsed.params().size());
-        assertEquals("bar", parsed.params().get("foo"));
-
-        parsed = ConnectionString.create("couchbase://user123@host1,host2?foo=bar&setting=true");
-        assertEquals(ConnectionString.Scheme.COUCHBASE, parsed.scheme());
-        assertEquals("user123", parsed.username());
-        assertEquals(new InetSocketAddress("host1", 0), parsed.hosts().get(0));
-        assertEquals(new InetSocketAddress("host2", 0), parsed.hosts().get(1));
         assertEquals(2, parsed.params().size());
         assertEquals("bar", parsed.params().get("foo"));
         assertEquals("true", parsed.params().get("setting"));

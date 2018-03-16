@@ -28,7 +28,6 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
-import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
@@ -136,11 +135,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private UnicastAutoReleaseSubject<ByteBuf> queryInfoObservable;
 
     /**
-     * Represents an observable containing profile info on a terminated query.
-     */
-    private UnicastAutoReleaseSubject<ByteBuf> queryProfileInfoObservable;
-
-    /**
      * Represents the current query parsing state.
      */
     private byte queryParsingState = QUERY_STATE_INITIAL;
@@ -200,7 +194,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
                 + msg.getClass());
         }
 
-        addHttpBasicAuth(ctx, request, msg.username(), msg.password());
+        addHttpBasicAuth(ctx, request, msg.bucket(), msg.password());
         return request;
     }
 
@@ -365,33 +359,21 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryStatusObservable = AsyncSubject.create();
         queryInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         querySignatureObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        queryProfileInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
 
         //set up trace ids on all these UnicastAutoReleaseSubjects, so that if they get in a bad state
         // (multiple subscribers or subscriber coming in too late) we can trace back to here
         String rid = clientId == null ? requestId : clientId + " / " + requestId;
-        queryRowObservable.withTraceIdentifier("queryRow." + rid).onBackpressureBuffer();
-        queryErrorObservable.withTraceIdentifier("queryError." + rid).onBackpressureBuffer();
-        queryInfoObservable.withTraceIdentifier("queryInfo." + rid).onBackpressureBuffer();
-        querySignatureObservable.withTraceIdentifier("querySignature." + rid).onBackpressureBuffer();
-        queryProfileInfoObservable.withTraceIdentifier("queryProfileInfo." + rid).onBackpressureBuffer();
-        queryStatusObservable.onBackpressureBuffer();
-
-        if (!env().callbacksOnIoPool()) {
-            queryErrorObservable.observeOn(scheduler);
-            queryRowObservable.observeOn(scheduler);
-            querySignatureObservable.observeOn(scheduler);
-            queryStatusObservable.observeOn(scheduler);
-            queryInfoObservable.observeOn(scheduler);
-        }
+        queryRowObservable.withTraceIdentifier("queryRow." + rid);
+        queryErrorObservable.withTraceIdentifier("queryError." + rid);
+        queryInfoObservable.withTraceIdentifier("queryInfo." + rid);
+        querySignatureObservable.withTraceIdentifier("querySignature." + rid);
 
         return new GenericQueryResponse(
-                queryErrorObservable,
-                queryRowObservable,
-                querySignatureObservable,
-                queryStatusObservable,
-                queryInfoObservable,
-                queryProfileInfoObservable,
+                queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
+                querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryStatusObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryInfoObservable.onBackpressureBuffer().observeOn(scheduler),
                 currentRequest(),
                 status, requestId, clientId
         );
@@ -447,9 +429,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             sectionDone = lastChunk;
             //if false this will allow next iteration to skip non-relevant automatic
             //transition to next token (which is desirable since there is no more token).
-
-            //complete queryProfile as we are parsing it only in handler v2
-            queryProfileInfoObservable.onCompleted();
             if (sectionDone) {
                 cleanupQueryStates();
             }
@@ -742,7 +721,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryErrorObservable = null;
         queryStatusObservable = null;
         querySignatureObservable = null;
-        queryProfileInfoObservable = null;
         queryParsingState = QUERY_STATE_INITIAL;
     }
 
@@ -763,9 +741,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         if (querySignatureObservable != null) {
             querySignatureObservable.onCompleted();
         }
-        if (queryProfileInfoObservable != null) {
-            queryProfileInfoObservable.onCompleted();
-        }
         cleanupQueryStates();
         if (responseContent != null && responseContent.refCnt() > 0) {
             responseContent.release();
@@ -778,7 +753,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
+    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest {
         protected KeepAliveRequest() {
             super(null, null);
         }

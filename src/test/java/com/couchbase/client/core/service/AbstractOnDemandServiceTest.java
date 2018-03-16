@@ -31,8 +31,6 @@ import org.junit.Test;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 
-import java.util.List;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -70,11 +68,11 @@ public class AbstractOnDemandServiceTest {
         final EndpointStates endpointStates = new EndpointStates(LifecycleState.DISCONNECTED);
         when(endpoint.states()).thenReturn(endpointStates.states());
         when(endpoint.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(factory.create(host, bucket, bucket, password, port, env, null)).thenReturn(endpoint);
+        when(factory.create(host, bucket, password, port, env, null)).thenReturn(endpoint);
 
-        assertEquals(0, service.endpoints().size());
+        assertEquals(0, service.endpoints().length);
         assertEquals(LifecycleState.IDLE, service.connect().toBlocking().single());
-        assertEquals(0, service.endpoints().size());
+        assertEquals(0, service.endpoints().length);
 
         CouchbaseRequest req = mock(CouchbaseRequest.class);
         AsyncSubject<CouchbaseResponse> reqObservable = AsyncSubject.create();
@@ -100,7 +98,7 @@ public class AbstractOnDemandServiceTest {
         final EndpointStates endpointStates = new EndpointStates(LifecycleState.DISCONNECTED);
         when(endpoint.states()).thenReturn(endpointStates.states());
         when(endpoint.connect()).thenReturn(Observable.just(LifecycleState.DISCONNECTED));
-        when(factory.create(host, bucket, bucket, password, port, env, null)).thenReturn(endpoint);
+        when(factory.create(host, bucket, password, port, env, null)).thenReturn(endpoint);
 
         CouchbaseRequest req = mock(CouchbaseRequest.class);
         AsyncSubject<CouchbaseResponse> reqObservable = AsyncSubject.create();
@@ -125,7 +123,7 @@ public class AbstractOnDemandServiceTest {
         final EndpointStates endpointStates = new EndpointStates(LifecycleState.DISCONNECTED);
         when(endpoint.states()).thenReturn(endpointStates.states());
         when(endpoint.connect()).thenReturn(Observable.<LifecycleState>error(new AuthenticationException()));
-        when(factory.create(host, bucket, bucket, password, port, env, null)).thenReturn(endpoint);
+        when(factory.create(host, bucket, password, port, env, null)).thenReturn(endpoint);
 
         CouchbaseRequest req = mock(CouchbaseRequest.class);
         AsyncSubject<CouchbaseResponse> reqObservable = AsyncSubject.create();
@@ -146,7 +144,7 @@ public class AbstractOnDemandServiceTest {
     class InstrumentedService extends AbstractOnDemandService {
         public InstrumentedService(String hostname, String bucket, String password, int port, CoreEnvironment env,
             RingBuffer<ResponseEvent> responseBuffer, EndpointFactory endpointFactory) {
-            super(hostname, bucket, bucket, password, port, env, responseBuffer, endpointFactory);
+            super(hostname, bucket, password, port, env, responseBuffer, endpointFactory);
         }
 
         @Override
@@ -155,7 +153,7 @@ public class AbstractOnDemandServiceTest {
         }
 
         @Override
-        public List<Endpoint> endpoints() {
+        public Endpoint[] endpoints() {
             return super.endpoints();
         }
 

@@ -18,13 +18,10 @@ package com.couchbase.client.core.config;
 import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -44,7 +41,6 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
 
     private final boolean tainted;
     private final long rev;
-    private final boolean ephemeral;
 
     /**
      * Creates a new {@link CouchbaseBucketConfig}.
@@ -65,18 +61,13 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         @JsonProperty("streamingUri") String streamingUri,
         @JsonProperty("vBucketServerMap") CouchbasePartitionInfo partitionInfo,
         @JsonProperty("nodes") List<NodeInfo> nodeInfos,
-        @JsonProperty("nodesExt") List<PortInfo> portInfos,
-        @JsonProperty("bucketCapabilities") List<BucketCapabilities> bucketCapabilities) {
-        super(name, BucketNodeLocator.VBUCKET, uri, streamingUri, nodeInfos, portInfos, bucketCapabilities);
+        @JsonProperty("nodesExt") List<PortInfo> portInfos) {
+        super(name, BucketNodeLocator.VBUCKET, uri, streamingUri, nodeInfos, portInfos);
         this.partitionInfo = partitionInfo;
         this.tainted = partitionInfo.tainted();
         this.partitionHosts = buildPartitionHosts(nodeInfos, partitionInfo);
         this.nodesWithPrimaryPartitions = buildNodesWithPrimaryPartitions(nodeInfos, partitionInfo.partitions());
         this.rev = rev;
-
-        // Use bucket capabilities to identify if couchapi is missing (then its ephemeral). If its null then
-        // we are running an old version of couchbase which doesn't have ephemeral buckets at all.
-        this.ephemeral = bucketCapabilities != null && !bucketCapabilities.contains(BucketCapabilities.COUCHAPI);
     }
 
     /**
@@ -109,22 +100,13 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
         List<NodeInfo> partitionHosts = new ArrayList<NodeInfo>();
         for (String rawHost : partitionInfo.partitionHosts()) {
             InetAddress convertedHost;
-            int directPort;
             try {
-                String pair[] = rawHost.split(":");
-                convertedHost = InetAddress.getByName(pair[0]);
-                try {
-                    directPort = Integer.parseInt(pair[1]);
-                } catch (NumberFormatException e) {
-                    LOGGER.warn("Could not parse port from the node address: {}, fallback to 0", rawHost);
-                    directPort = 0;
-                }
+                convertedHost = InetAddress.getByName(rawHost);
             } catch (UnknownHostException e) {
                 throw new ConfigurationException("Could not resolve " + rawHost + "on config building.");
             }
             for (NodeInfo nodeInfo : nodeInfos) {
-                if (nodeInfo.hostname().equals(convertedHost) &&
-                        (nodeInfo.services().get(ServiceType.BINARY) == directPort || directPort == 0)) {
+                if (nodeInfo.hostname().equals(convertedHost)) {
                     partitionHosts.add(nodeInfo);
                 }
             }
@@ -204,11 +186,6 @@ public class DefaultCouchbaseBucketConfig extends AbstractBucketConfig implement
     @Override
     public boolean hasFastForwardMap() {
         return partitionInfo.hasFastForwardMap();
-    }
-
-    @Override
-    public boolean ephemeral() {
-        return ephemeral;
     }
 
     @Override

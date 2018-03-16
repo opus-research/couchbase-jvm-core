@@ -33,16 +33,10 @@ import java.util.concurrent.TimeUnit;
  */
 public class QueryEndpoint extends AbstractEndpoint {
 
-    @Deprecated
     public QueryEndpoint(String hostname, String bucket, String password, int port, CoreEnvironment environment,
-                         RingBuffer<ResponseEvent> responseBuffer) {
-        this(hostname, bucket, bucket, password, port, environment, responseBuffer);
-    }
-
-    public QueryEndpoint(String hostname, String bucket, String username, String password, int port, CoreEnvironment environment,
         RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, username, password, port, environment, responseBuffer, false,
-                environment.queryIoPool() == null ? environment.ioPool() : environment.queryIoPool(), false);
+        super(hostname, bucket, password, port, environment, responseBuffer, false,
+                environment.queryIoPool() == null ? environment.ioPool() : environment.queryIoPool());
     }
 
     @Override
@@ -50,13 +44,8 @@ public class QueryEndpoint extends AbstractEndpoint {
         if (environment().keepAliveInterval() > 0) {
             pipeline.addLast(new IdleStateHandler(environment().keepAliveInterval(), 0, 0, TimeUnit.MILLISECONDS));
         }
-
-        pipeline.addLast(new HttpClientCodec());
-        boolean enableV2 = Boolean.parseBoolean(System.getProperty("com.couchbase.enableYasjlQueryResponseParser", "false"));
-        if (!enableV2) {
-            pipeline.addLast(new QueryHandler(this, responseBuffer(), false, false));
-        } else {
-            pipeline.addLast(new QueryHandlerV2(this, responseBuffer(), false, false));
-        }
+        pipeline
+            .addLast(new HttpClientCodec())
+            .addLast(new QueryHandler(this, responseBuffer(), false, false));
     }
 }
