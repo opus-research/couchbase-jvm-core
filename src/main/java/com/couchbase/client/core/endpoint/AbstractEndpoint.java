@@ -23,8 +23,10 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
+import com.couchbase.client.core.message.internal.EndpointHealth;
 import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.internal.SignalFlush;
+import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.AbstractStateMachine;
 import com.couchbase.client.core.state.LifecycleState;
 import com.couchbase.client.core.state.NotConnectedException;
@@ -599,6 +601,18 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         } else {
             return free;
         }
+    }
+
+    @Override
+    public Single<EndpointHealth> healthCheck(ServiceType type) {
+        LifecycleState currentState = state();
+        SocketAddress remoteAddr = null;
+        SocketAddress localAddr = null;
+        if(channel != null) {
+            remoteAddr = channel.remoteAddress();
+            localAddr = channel.localAddress();
+        }
+        return Single.just(new EndpointHealth(type, currentState, localAddr, remoteAddr));
     }
 
     /**
