@@ -59,6 +59,8 @@ public class ServiceFactory {
                     return new ConfigService(hostname, bucket, username, password, port, env, responseBuffer);
                 case QUERY:
                     return new OldQueryService(hostname, bucket, username, password, port, env, responseBuffer);
+                case DCP:
+                    return new DCPService(hostname, bucket, username, password, port, env, responseBuffer);
                 case SEARCH:
                     return new OldSearchService(hostname, bucket, username, password, port, env, responseBuffer);
                 case ANALYTICS:
@@ -76,6 +78,8 @@ public class ServiceFactory {
                     return new ConfigService(hostname, bucket, username, password, port, env, responseBuffer);
                 case QUERY:
                     return new QueryService(hostname, bucket, username, password, port, env, responseBuffer);
+                case DCP:
+                    return new DCPService(hostname, bucket, username, password, port, env, responseBuffer);
                 case SEARCH:
                     return new SearchService(hostname, bucket, username, password, port, env, responseBuffer);
                 case ANALYTICS:
