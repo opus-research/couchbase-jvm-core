@@ -905,11 +905,7 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         result = response.content().toString(CharsetUtil.UTF_8);
 
         assertEquals(result, 0, result.length());
-        /*
-         * Was SUBDOC_DELTA_RANGE, but changed to VALUE_CANTINSERT between 4.5 dp and BETA.
-         * See https://issues.couchbase.com/browse/JCBC-931, https://issues.couchbase.com/browse/MB-18169
-         */
-        assertEquals(ResponseStatus.SUBDOC_VALUE_CANTINSERT, response.status());
+        assertEquals(ResponseStatus.SUBDOC_DELTA_RANGE, response.status());
     }
 
     @Test
