@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2016 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,15 +19,24 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.config.ClusterConfig;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.node.Node;
+package com.couchbase.client.core.message.dcp;
 
-import java.util.List;
+/**
+ * Returns the last checkpoint for a particular VBucket. This is useful
+ * for starting a DCP stream from wherever the server currently is.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.6
+ */
+public class GetLastCheckpointRequest extends AbstractDCPRequest {
+    public GetLastCheckpointRequest(final short partition, final String bucket) {
+        super(bucket, null);
+        partition(partition);
+    }
 
-public interface Locator {
-
-    Node[] locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config);
+    public GetLastCheckpointRequest(final short partition, final String bucket, final String password) {
+        super(bucket, password);
+        partition(partition);
+    }
 }
