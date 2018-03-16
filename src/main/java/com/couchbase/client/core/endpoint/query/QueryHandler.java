@@ -33,7 +33,6 @@ import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufProcessor;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -216,33 +215,22 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * @return
      */
     private static int findSectionClosingPosition(ByteBuf buf, char openingChar, char closingChar) {
-        ClosingPositionBufProcessor processor = new ClosingPositionBufProcessor(openingChar, closingChar);
-        return buf.forEachByte(processor);
-    }
-
-    private static class ClosingPositionBufProcessor implements ByteBufProcessor {
-        private int openCount = 0;
-        private final char openingChar;
-        private final char closingChar;
-
-        public ClosingPositionBufProcessor(char openingChar, char closingChar) {
-            this.openingChar = openingChar;
-            this.closingChar = closingChar;
-        }
-
-        @Override
-        public boolean process(byte current) throws Exception {
+        int closePos = -1;
+        int openCount = 0;
+        //TODO an optimization could be to use a ByteBufProcessor here...
+        for (int i = buf.readerIndex(); i <= buf.writerIndex(); i++) {
+            byte current = buf.getByte(i);
             if (current == openingChar) {
                 openCount++;
             } else if (current == closingChar && openCount > 0) {
                 openCount--;
                 if (openCount == 0) {
-                    //This will make the ByteBuf.forEachByte return current byte's index
-                    return false;
+                    closePos = i;
+                    break;
                 }
             }
-            return true;
         }
+        return closePos;
     }
 
     /**
