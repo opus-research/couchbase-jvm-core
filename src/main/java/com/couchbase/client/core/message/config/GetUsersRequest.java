@@ -24,14 +24,11 @@ import com.couchbase.client.core.message.AbstractCouchbaseRequest;
  */
 public class GetUsersRequest extends AbstractCouchbaseRequest implements ConfigRequest {
 
-    private String userid;
-
-    public GetUsersRequest(String username, String password, String userid) {
+    public GetUsersRequest(String username, String password) {
         super(username, password);
-        this.userid = userid;
     }
 
     public String path() {
-        return "/settings/rbac/users/local" + (this.userid.compareTo("") == 0 ? "" : "/" + this.userid );
+        return "/settings/rbac/users";
     }
 }
