@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,43 +19,46 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.event;
 
-import rx.Observable;
-import rx.Scheduler;
-import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
+package com.couchbase.client.core.metrics;
 
-/**
- * The default event bus implementation.
- *
- * @author Michael Nitschinger
- * @since 1.1.0
- */
-public class DefaultEventBus implements EventBus {
+import com.couchbase.client.core.service.ServiceType;
 
-    private final Subject<CouchbaseEvent, CouchbaseEvent> bus;
-    private final Scheduler scheduler;
+public class MetricIdentifier {
 
-    public DefaultEventBus(final Scheduler scheduler) {
-        bus = PublishSubject.<CouchbaseEvent>create().toSerialized();
-        this.scheduler = scheduler;
+    private final String node;
+    private final ServiceType service;
+    private final String suffix;
+
+    public MetricIdentifier(String node, ServiceType service, String suffix) {
+        this.node = node;
+        this.service = service;
+        this.suffix = suffix;
     }
 
     @Override
-    public Observable<CouchbaseEvent> get() {
-        return bus.onBackpressureDrop().observeOn(scheduler);
+    public String toString() {
+        return node + "." + service + "." + suffix;
     }
 
     @Override
-    public void publish(final CouchbaseEvent event) {
-        if (bus.hasObservers()) {
-            bus.onNext(event);
-        }
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MetricIdentifier that = (MetricIdentifier) o;
+
+        if (node != null ? !node.equals(that.node) : that.node != null) return false;
+        if (service != that.service) return false;
+        return !(suffix != null ? !suffix.equals(that.suffix) : that.suffix != null);
+
     }
 
     @Override
-    public boolean hasSubscribers() {
-        return bus.hasObservers();
+    public int hashCode() {
+        int result = node != null ? node.hashCode() : 0;
+        result = 31 * result + (service != null ? service.hashCode() : 0);
+        result = 31 * result + (suffix != null ? suffix.hashCode() : 0);
+        return result;
     }
 }

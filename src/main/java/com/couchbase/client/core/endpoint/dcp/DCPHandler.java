@@ -40,6 +40,7 @@ import com.couchbase.client.core.message.dcp.RemoveMessage;
 import com.couchbase.client.core.message.dcp.SnapshotMarkerMessage;
 import com.couchbase.client.core.message.dcp.StreamRequestRequest;
 import com.couchbase.client.core.message.dcp.StreamRequestResponse;
+import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBinaryMemcacheResponse;
@@ -316,6 +317,11 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         DCPStream stream = new DCPStream(streamId, bucket);
         streams.put(streamId, stream);
         return streamId;
+    }
+
+    @Override
+    protected ServiceType serviceType() {
+        return ServiceType.DCP;
     }
 
 }

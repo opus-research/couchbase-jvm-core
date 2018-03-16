@@ -46,6 +46,7 @@ import com.couchbase.client.core.message.config.RemoveBucketRequest;
 import com.couchbase.client.core.message.config.RemoveBucketResponse;
 import com.couchbase.client.core.message.config.UpdateBucketRequest;
 import com.couchbase.client.core.message.config.UpdateBucketResponse;
+import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
@@ -303,6 +304,11 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         }
         super.handlerRemoved(ctx);
         releaseResponseContent();
+    }
+
+    @Override
+    protected ServiceType serviceType() {
+        return ServiceType.CONFIG;
     }
 
 }

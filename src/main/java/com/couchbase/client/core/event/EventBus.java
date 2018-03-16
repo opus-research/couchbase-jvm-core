@@ -39,6 +39,15 @@ public interface EventBus {
     Observable<CouchbaseEvent> get();
 
     /**
+     * Check if the event bus has subscribers.
+     *
+     * This can be used as an optimization to not generate data if noone is listening in the first place.
+     *
+     * @return true if there are subscribers, false otherwise.
+     */
+    boolean hasSubscribers();
+
+    /**
      * Publish a {@link CouchbaseEvent} into the bus.
      *
      * @param event the event to publish.

@@ -27,6 +27,8 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
+import com.couchbase.client.core.metrics.DefaultMetricsCollector;
+import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -168,6 +170,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final EventLoopGroup ioPool;
     private final Scheduler coreScheduler;
     private final EventBus eventBus;
+    private final MetricsCollector metricsCollector;
     private volatile boolean shutdown;
 
     protected DefaultCoreEnvironment(final Builder builder) {
@@ -225,6 +228,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         this.coreScheduler = builder.scheduler() == null
             ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
+        this.metricsCollector = new DefaultMetricsCollector(eventBus, 5, TimeUnit.SECONDS, TimeUnit.MILLISECONDS, coreScheduler);
         this.shutdown = false;
     }
 
@@ -455,6 +459,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public boolean bufferPoolingEnabled() {
         return bufferPoolingEnabled;
+    }
+
+    @Override
+    public MetricsCollector metricsCollector() {
+        return metricsCollector;
     }
 
     public static class Builder implements CoreEnvironment {
@@ -959,6 +968,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder eventBus(final EventBus eventBus) {
             this.eventBus = eventBus;
             return this;
+        }
+
+        @Override
+        public MetricsCollector metricsCollector() {
+            return null;
         }
 
         @Override

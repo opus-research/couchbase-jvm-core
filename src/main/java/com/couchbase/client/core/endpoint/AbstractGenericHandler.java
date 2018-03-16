@@ -31,6 +31,9 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.metrics.MetricIdentifier;
+import com.couchbase.client.core.metrics.MetricsCollector;
+import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -93,6 +96,11 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private DecodingState currentDecodingState;
 
     /**
+     * Tracks the start and end time of the
+     */
+    private long startWireTime;
+
+    /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
      *
      * @param endpoint the endpoint reference.
@@ -144,11 +152,19 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected abstract CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, RESPONSE msg) throws Exception;
 
+    /**
+     * The service type this handler is associated with.
+     *
+     * @return the service type
+     */
+    protected abstract ServiceType serviceType();
+
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
         ENCODED request = encodeRequest(ctx, msg);
         sentRequestQueue.offer(msg);
         out.add(request);
+        startWireTime = System.nanoTime();
     }
 
     @Override
@@ -156,6 +172,17 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
+            if (currentRequest != null && env() != null) {
+                MetricIdentifier metricIdentifier = new MetricIdentifier(
+                        ctx.channel().remoteAddress().toString(),
+                        serviceType(),
+                        currentRequest.getClass().getSimpleName()
+                );
+                MetricsCollector collector = env().metricsCollector();
+                if (collector != null) {
+                    env().metricsCollector().recordLatency(metricIdentifier, System.nanoTime() - startWireTime);
+                }
+            }
             if (LOGGER.isTraceEnabled()) {
                 LOGGER.trace(logIdent(ctx, endpoint) + "Started decoding of " + currentRequest);
             }

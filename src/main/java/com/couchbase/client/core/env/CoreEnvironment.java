@@ -23,6 +23,7 @@ package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.message.observe.Observe;
+import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
@@ -235,6 +236,8 @@ public interface CoreEnvironment {
      * @return the configured event bus.
      */
     EventBus eventBus();
+
+    MetricsCollector metricsCollector();
 
     /**
      * Returns if buffer pooling is enabled for greater GC efficiency.

@@ -42,6 +42,7 @@ import com.couchbase.client.core.message.view.UpsertDesignDocumentResponse;
 import com.couchbase.client.core.message.view.ViewQueryRequest;
 import com.couchbase.client.core.message.view.ViewQueryResponse;
 import com.couchbase.client.core.message.view.ViewRequest;
+import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
@@ -572,6 +573,11 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     @Override
     protected CouchbaseRequest createKeepAliveRequest() {
         return new KeepAliveRequest();
+    }
+
+    @Override
+    protected ServiceType serviceType() {
+        return ServiceType.VIEW;
     }
 
     protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements ViewRequest {

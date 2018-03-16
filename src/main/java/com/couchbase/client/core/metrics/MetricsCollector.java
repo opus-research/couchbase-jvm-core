@@ -19,43 +19,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.event;
-
-import rx.Observable;
-import rx.Scheduler;
-import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
+package com.couchbase.client.core.metrics;
 
 /**
- * The default event bus implementation.
+ * Defines a collector which collects metrics from sources and emits them into an event bus.
  *
  * @author Michael Nitschinger
- * @since 1.1.0
+ * @since 1.2.0
  */
-public class DefaultEventBus implements EventBus {
+public interface MetricsCollector {
 
-    private final Subject<CouchbaseEvent, CouchbaseEvent> bus;
-    private final Scheduler scheduler;
+    void recordLatency(MetricIdentifier identifier, long latency);
 
-    public DefaultEventBus(final Scheduler scheduler) {
-        bus = PublishSubject.<CouchbaseEvent>create().toSerialized();
-        this.scheduler = scheduler;
-    }
 
-    @Override
-    public Observable<CouchbaseEvent> get() {
-        return bus.onBackpressureDrop().observeOn(scheduler);
-    }
-
-    @Override
-    public void publish(final CouchbaseEvent event) {
-        if (bus.hasObservers()) {
-            bus.onNext(event);
-        }
-    }
-
-    @Override
-    public boolean hasSubscribers() {
-        return bus.hasObservers();
-    }
 }
