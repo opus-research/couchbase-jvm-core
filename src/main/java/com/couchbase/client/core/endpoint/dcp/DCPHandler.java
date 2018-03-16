@@ -85,9 +85,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      * @param endpoint       the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link EventSink} to push responses into.
      */
-    public DCPHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient,
-                      final boolean pipeline) {
-        this(endpoint, responseBuffer, new ArrayDeque<DCPRequest>(), isTransient, pipeline);
+    public DCPHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, boolean isTransient) {
+        this(endpoint, responseBuffer, new ArrayDeque<DCPRequest>(), isTransient);
     }
 
     /**
@@ -97,9 +96,8 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
      * @param responseBuffer the {@link EventSink} to push responses into.
      * @param queue          the queue which holds all outstanding open requests.
      */
-    public DCPHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<DCPRequest> queue,
-                      boolean isTransient, final boolean pipeline) {
-        super(endpoint, responseBuffer, queue, isTransient, pipeline);
+    public DCPHandler(AbstractEndpoint endpoint, EventSink<ResponseEvent> responseBuffer, Queue<DCPRequest> queue, boolean isTransient) {
+        super(endpoint, responseBuffer, queue, isTransient);
     }
 
     @Override
