@@ -99,7 +99,7 @@ public class KeyValueHandler
     /**
      * Represents the "Not My VBucket" status response.
      */
-    public static final byte STATUS_NOT_MY_VBUCKET = 0x07;
+    private static final byte STATUS_NOT_MY_VBUCKET = 0x07;
 
     /**
      * Creates a new {@link KeyValueHandler} with the default queue for requests.
@@ -156,13 +156,6 @@ public class KeyValueHandler
 
         if (msg.partition() >= 0) {
             request.setReserved(msg.partition());
-        }
-
-        // Retain just the content, since a response could be "Not my Vbucket".
-        // The response handler checks the status and then releases if needed.
-        // Observe has content, but not external, so it should not be retained.
-        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
-            ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
         return request;
@@ -403,23 +396,8 @@ public class KeyValueHandler
         BinaryRequest request = currentRequest();
         ResponseStatus status = convertStatus(msg.getStatus());
 
-        // Release request content from external resources if not retried again.
-        if (!status.equals(ResponseStatus.RETRY)) {
-            ByteBuf content = null;
-            if (request instanceof BinaryStoreRequest) {
-                content = ((BinaryStoreRequest) request).content();
-            } else if (request instanceof AppendRequest) {
-                content = ((AppendRequest) request).content();
-            } else if (request instanceof PrependRequest) {
-                content = ((PrependRequest) request).content();
-            }
-            if (content != null && content.refCnt() > 0) {
-                content.release();
-            }
-        }
-
         CouchbaseResponse response;
-        ByteBuf content = msg.content().retain();
+        ByteBuf content = msg.content().copy();
         long cas = msg.getCAS();
         String bucket = request.bucket();
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
@@ -444,18 +422,13 @@ public class KeyValueHandler
         } else if (request instanceof RemoveRequest) {
             response = new RemoveResponse(status, cas, bucket, content, request);
         } else if (request instanceof CounterRequest) {
-            long value = status.isSuccess() ? msg.content().readLong() : 0;
-            if (msg.content() != null) {
-                msg.content().release();
-            }
-            response = new CounterResponse(status, bucket, value, cas, request);
+            response = new CounterResponse(status, bucket, msg.content().readLong(), cas, request);
         } else if (request instanceof UnlockRequest) {
             response = new UnlockResponse(status, bucket, content, request);
         } else if (request instanceof TouchRequest) {
             response = new TouchResponse(status, bucket, content, request);
         } else if (request instanceof ObserveRequest) {
-            byte observed = status.isSuccess()
-                ? content.getByte(content.getShort(2) + 4) : ObserveResponse.ObserveStatus.UNKNOWN.value();
+            byte observed = content.getByte(content.getShort(2) + 4);
             response = new ObserveResponse(status, observed, ((ObserveRequest) request).master(), bucket,
                 content, request);
         } else if (request instanceof AppendRequest) {
@@ -469,24 +442,6 @@ public class KeyValueHandler
 
         finishedDecoding();
         return response;
-    }
-
-    /**
-     * Releasing the content of requests that are to be cancelled.
-     *
-     * @param request the request to side effect on.
-     */
-    @Override
-    protected void sideEffectRequestToCancel(final BinaryRequest request) {
-        super.sideEffectRequestToCancel(request);
-
-        if (request instanceof BinaryStoreRequest) {
-            ((BinaryStoreRequest) request).content().release();
-        } else if (request instanceof AppendRequest) {
-            ((AppendRequest) request).content().release();
-        } else if (request instanceof PrependRequest) {
-            ((PrependRequest) request).content().release();
-        }
     }
 
     /**

@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.endpoint;
 
-import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.ResponseHandler;
@@ -129,8 +128,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param ctx the context passed in.
      * @param msg the incoming message.
      * @return a response or null if nothing should be returned.
-     * @throws Exception as a generic error. It will be bubbled up to the user (wrapped in a CouchbaseException) in the
-     *   onError of the request's Observable.
+     * @throws Exception as a generic error.
      */
     protected abstract CouchbaseResponse decodeResponse(ChannelHandlerContext ctx, RESPONSE msg) throws Exception;
 
@@ -151,15 +149,9 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             }
         }
 
-        try {
-            CouchbaseResponse response = decodeResponse(ctx, msg);
-            if (response != null) {
-                publishResponse(response, currentRequest.observable());
-            }
-        } catch (CouchbaseException e) {
-            currentRequest.observable().onError(e);
-        } catch (Exception e) {
-            currentRequest.observable().onError(new CouchbaseException(e));
+        CouchbaseResponse response = decodeResponse(ctx, msg);
+        if (response != null) {
+            publishResponse(response, currentRequest.observable());
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
@@ -246,25 +238,11 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         while (!sentRequestQueue.isEmpty()) {
             REQUEST req = sentRequestQueue.poll();
             try {
-                sideEffectRequestToCancel(req);
                 req.observable().onError(new RequestCancelledException("Request cancelled in-flight."));
             } catch (Exception ex) {
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
         }
-    }
-
-
-    /**
-     * This method can be overridden as it is called every time an operation is cancelled.
-     *
-     * Overriding implementations may do some custom logic with them, for example freeing resources they know of
-     * to avoid leaking.
-     *
-     * @param request the request to side effect on.
-     */
-    protected void sideEffectRequestToCancel(final REQUEST request) {
-        // Nothing to do in the generic implementation.
     }
 
     /**
@@ -274,16 +252,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected REQUEST currentRequest() {
         return currentRequest;
-    }
-
-    /**
-     * Sets current request.
-     *
-     * FIXME this is temporary solution for {@link com.couchbase.client.core.endpoint.dcp.DCPHandler}
-     * @param request request to become the current one
-     */
-    protected void currentRequest(REQUEST request) {
-        currentRequest = request;
     }
 
     /**

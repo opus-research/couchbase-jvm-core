@@ -27,15 +27,18 @@ import com.couchbase.client.core.message.CouchbaseMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.couchbase.client.core.message.kv.BinaryResponse;
+import com.couchbase.client.core.message.internal.SignalConfigReload;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorTwoArg;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.Subscription;
 import rx.functions.Action0;
 import rx.subjects.Subject;
+
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ResponseHandler implements EventHandler<ResponseEvent> {
 
@@ -85,35 +88,30 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
      */
     @Override
     public void onEvent(final ResponseEvent event, long sequence, boolean endOfBatch) throws Exception {
-        try {
-            CouchbaseMessage message = event.getMessage();
-            if (message instanceof SignalConfigReload) {
-                configurationProvider.signalOutdated();
-            } else if (message instanceof CouchbaseResponse) {
-                CouchbaseResponse response = (CouchbaseResponse) message;
-                ResponseStatus status = response.status();
-                switch (status) {
-                    case SUCCESS:
-                    case EXISTS:
-                    case NOT_EXISTS:
-                    case FAILURE:
-                        event.getObservable().onNext(response);
-                        event.getObservable().onCompleted();
-                        break;
-                    case RETRY:
-                        retry(event);
-                        break;
-                    default:
-                        throw new UnsupportedOperationException("The ResponseStatus " + status + " is not supported.");
-                }
-            } else if (message instanceof CouchbaseRequest) {
-                retry(event);
-            } else {
-                throw new IllegalStateException("Got message type I do not understand: " + message);
+        CouchbaseMessage message = event.getMessage();
+        if (message instanceof SignalConfigReload) {
+            configurationProvider.signalOutdated();
+        } else if (message instanceof CouchbaseResponse) {
+            CouchbaseResponse response = (CouchbaseResponse) message;
+            ResponseStatus status = response.status();
+            switch (status) {
+                case SUCCESS:
+                case EXISTS:
+                case NOT_EXISTS:
+                case FAILURE:
+                    event.getObservable().onNext(response);
+                    event.getObservable().onCompleted();
+                    break;
+                case RETRY:
+                    retry(event);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("The ResponseStatus " + status + " is not supported.");
             }
-        } finally {
-           event.setMessage(null);
-           event.setObservable(null);
+        } else if (message instanceof CouchbaseRequest) {
+            retry(event);
+        } else {
+            throw new IllegalStateException("Got message type I do not understand: " + message);
         }
     }
 
@@ -122,7 +120,6 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         if (message instanceof CouchbaseRequest) {
             scheduleForRetry((CouchbaseRequest) message);
         } else {
-
             CouchbaseRequest request = ((CouchbaseResponse) message).request();
             if (request != null) {
                 scheduleForRetry(request);
@@ -133,25 +130,21 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             if (message instanceof BinaryResponse) {
                 BinaryResponse response = (BinaryResponse) message;
                 if (response.content() != null && response.content().readableBytes() > 0) {
-                    try {
-                        String config = response.content().toString(CharsetUtil.UTF_8).trim();
-                        if (config.startsWith("{")) {
-                            configurationProvider.proposeBucketConfig(response.bucket(), config);
-                        }
-                    } finally {
-                        response.content().release();
-                    }
+                    configurationProvider.proposeBucketConfig(response.bucket(),
+                        response.content().toString(CharsetUtil.UTF_8));
                 }
             }
         }
     }
 
     private void scheduleForRetry(final CouchbaseRequest request) {
-        worker.schedule(new Action0() {
+        final AtomicReference<Subscription> subscription = new AtomicReference<Subscription>();
+        subscription.set(worker.schedule(new Action0() {
             @Override
             public void call() {
                 cluster.send(request);
+                subscription.get().unsubscribe();
             }
-        }, 10, TimeUnit.MILLISECONDS);
+        }, 10, TimeUnit.MILLISECONDS));
     }
 }

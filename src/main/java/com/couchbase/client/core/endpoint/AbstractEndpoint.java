@@ -51,11 +51,10 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
+
 import javax.net.ssl.SSLEngine;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -78,11 +77,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     public static final int MAX_RECONNECT_DELAY = 4096;
 
     /**
-     * The minimum reconnect delay in milliseconds, so it does not retry immediately.
-     */
-    public static final int MIN_RECONNECT_DELAY = 128;
-
-    /**
      * The logger used.
      */
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(Endpoint.class);
@@ -96,11 +90,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Pre-created not connected exception for performance reasons.
      */
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
-
-    /**
-     * A static listener which logs failed writes.
-     */
-    private static final WriteLogListener WRITE_LOG_LISTENER = new WriteLogListener();
 
     /**
      * The netty bootstrap adapter.
@@ -337,8 +326,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     hasWritten = false;
                 }
             } else {
-                if (channel.isActive() && channel.isWritable()) {
-                    channel.write(request).addListener(WRITE_LOG_LISTENER);
+                if (channel.isWritable()) {
+                    channel.write(request, channel.voidPromise());
                     hasWritten = true;
                 } else {
                     responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
@@ -374,16 +363,12 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Returns the reconnect retry delay in  milliseconds.
      *
      * It uses an exponential back-off algorithm (2^attempt) until a fixed
-     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}). If the computed delay is below
-     * {@link #MIN_RECONNECT_DELAY}, then this one is returned instead.
+     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}).
      *
      * @return the retry delay.
      */
     private long reconnectDelay() {
         int delay = 1 << (reconnectAttempt++);
-        if (delay <= MIN_RECONNECT_DELAY) {
-            return MIN_RECONNECT_DELAY;
-        }
         return delay >= MAX_RECONNECT_DELAY ? MAX_RECONNECT_DELAY : delay;
     }
 
@@ -434,22 +419,4 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         SocketAddress addr = chan != null ? chan.remoteAddress() : null;
         return "[" + addr + "][" + endpoint.getClass().getSimpleName() + "]: ";
     }
-
-    /**
-     * A generic future listener which logs unsuccessful writes.
-     *
-     * Note that {@link ClosedChannelException}s are ignored because they are handled
-     * gracefully by the {@link AbstractGenericHandler}.
-     */
-    static class WriteLogListener implements GenericFutureListener<Future<Void>> {
-
-        @Override
-        public void operationComplete(Future<Void> future) throws Exception {
-            if (!future.isSuccess() && !(future.cause() instanceof ClosedChannelException)) {
-                LOGGER.warn("Error during IO write phase.", future.cause());
-            }
-        }
-
-    }
-
 }
