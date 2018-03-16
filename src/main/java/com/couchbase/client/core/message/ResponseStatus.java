@@ -85,8 +85,7 @@ public enum ResponseStatus {
     INTERNAL_ERROR,
 
     /**
-     * Generic failure status. Usually indicates a server status code that is
-     * unknown to the SDK (for binary responses it can be found in the response).
+     * Generic failure status.
      */
     FAILURE,
 
@@ -95,19 +94,7 @@ public enum ResponseStatus {
      *
      * This is a internal response and should not bubble up to the user level.
      */
-    RETRY,
-
-    /**
-     * The server reports that requested vBucketID or sequence number does
-     * not fit allowed range.
-     */
-    RANGE_ERROR,
-
-    /**
-     * The server tells client to rollback its view of the DCP stream state.
-     * New sequence number passed in the payload.
-     */
-    ROLLBACK;
+    RETRY;
 
     /**
      * Check if the current {@link ResponseStatus} is success.

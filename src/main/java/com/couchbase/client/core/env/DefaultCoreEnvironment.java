@@ -25,22 +25,11 @@ import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
 import com.couchbase.client.core.env.resources.NoOpShutdownHook;
 import com.couchbase.client.core.env.resources.ShutdownHook;
-import com.couchbase.client.core.event.CouchbaseEvent;
 import com.couchbase.client.core.event.DefaultEventBus;
 import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.event.EventType;
-import com.couchbase.client.core.event.consumers.LoggingConsumer;
-import com.couchbase.client.core.logging.CouchbaseLogLevel;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
-import com.couchbase.client.core.metrics.DefaultLatencyMetricsCollectorConfig;
-import com.couchbase.client.core.metrics.DefaultMetricsCollectorConfig;
-import com.couchbase.client.core.metrics.LatencyMetricsCollectorConfig;
-import com.couchbase.client.core.metrics.MetricsCollector;
-import com.couchbase.client.core.metrics.MetricsCollectorConfig;
-import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
-import com.couchbase.client.core.metrics.RuntimeMetricsCollector;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -49,8 +38,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.Scheduler;
-import rx.Subscription;
-import rx.functions.Func1;
+import rx.functions.Action1;
 import rx.functions.Func2;
 
 import java.util.Properties;
@@ -90,8 +78,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long KEEPALIVEINTERVAL = TimeUnit.SECONDS.toMillis(30);
     public static final long AUTORELEASE_AFTER = TimeUnit.SECONDS.toMillis(2);
     public static final boolean BUFFER_POOLING_ENABLED = true;
-    public static final boolean TCP_NODELAY_ENALED = true;
-    public static final boolean MUTATION_TOKENS_ENABLED = false;
     public static final int SOCKET_CONNECT_TIMEOUT = 1000;
 
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
@@ -178,8 +164,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final long keepAliveInterval;
     private final long autoreleaseAfter;
     private final boolean bufferPoolingEnabled;
-    private final boolean tcpNodelayEnabled;
-    private final boolean mutationTokensEnabled;
     private final int socketConnectTimeout;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
@@ -192,47 +176,42 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final ShutdownHook ioPoolShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
 
-    private final MetricsCollector runtimeMetricsCollector;
-    private final NetworkLatencyMetricsCollector networkLatencyMetricsCollector;
-    private final Subscription metricsCollectorSubscription;
-
     protected DefaultCoreEnvironment(final Builder builder) {
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
             LOGGER.warn("More than " + MAX_ALLOWED_INSTANCES + " Couchbase Environments found (" + instanceCounter
                 + "), this can have severe impact on performance and stability. Reuse environments!");
         }
-        dcpEnabled = booleanPropertyOr("dcpEnabled", builder.dcpEnabled);
-        sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
-        sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
-        sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
-        queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled);
-        queryPort = intPropertyOr("queryPort", builder.queryPort);
-        bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
-        bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
-        bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
-        bootstrapCarrierEnabled = booleanPropertyOr("bootstrapCarrierEnabled", builder.bootstrapCarrierEnabled);
-        bootstrapCarrierDirectPort = intPropertyOr("bootstrapCarrierDirectPort", builder.bootstrapCarrierDirectPort);
-        bootstrapCarrierSslPort = intPropertyOr("bootstrapCarrierSslPort", builder.bootstrapCarrierSslPort);
-        int ioPoolSize = intPropertyOr("ioPoolSize", builder.ioPoolSize);
-        int computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize);
-        responseBufferSize = intPropertyOr("responseBufferSize", builder.responseBufferSize);
-        requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize);
-        kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
-        viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
-        queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
-        packageNameAndVersion = stringPropertyOr("packageNameAndVersion", builder.packageNameAndVersion);
-        userAgent = stringPropertyOr("userAgent", builder.userAgent);
-        observeIntervalDelay = builder.observeIntervalDelay;
-        reconnectDelay = builder.reconnectDelay;
-        retryDelay = builder.retryDelay;
-        retryStrategy = builder.retryStrategy;
-        maxRequestLifetime = longPropertyOr("maxRequestLifetime", builder.maxRequestLifetime);
-        keepAliveInterval = longPropertyOr("keepAliveInterval", builder.keepAliveInterval);
-        autoreleaseAfter = longPropertyOr("autoreleaseAfter", builder.autoreleaseAfter);
-        bufferPoolingEnabled = booleanPropertyOr("bufferPoolingEnabled", builder.bufferPoolingEnabled);
-        tcpNodelayEnabled = booleanPropertyOr("tcpNodelayEnabled", builder.tcpNodelayEnabled);
-        mutationTokensEnabled = booleanPropertyOr("mutationTokensEnabled", builder.mutationTokensEnabled);
-        socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
+
+        dcpEnabled = booleanPropertyOr("dcpEnabled", builder.dcpEnabled());
+        sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled());
+        sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile());
+        sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword());
+        queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled());
+        queryPort = intPropertyOr("queryPort", builder.queryPort());
+        bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled());
+        bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort());
+        bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort());
+        bootstrapCarrierEnabled = booleanPropertyOr("bootstrapCarrierEnabled", builder.bootstrapCarrierEnabled());
+        bootstrapCarrierDirectPort = intPropertyOr("bootstrapCarrierDirectPort", builder.bootstrapCarrierDirectPort());
+        bootstrapCarrierSslPort = intPropertyOr("bootstrapCarrierSslPort", builder.bootstrapCarrierSslPort());
+        int ioPoolSize = intPropertyOr("ioPoolSize", builder.ioPoolSize());
+        int computationPoolSize = intPropertyOr("computationPoolSize", builder.computationPoolSize());
+        responseBufferSize = intPropertyOr("responseBufferSize", builder.responseBufferSize());
+        requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize());
+        kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints());
+        viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints());
+        queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints());
+        packageNameAndVersion = stringPropertyOr("packageNameAndVersion", builder.packageNameAndVersion());
+        userAgent = stringPropertyOr("userAgent", builder.userAgent());
+        observeIntervalDelay = builder.observeIntervalDelay();
+        reconnectDelay = builder.reconnectDelay();
+        retryDelay = builder.retryDelay();
+        retryStrategy = builder.retryStrategy();
+        maxRequestLifetime = longPropertyOr("maxRequestLifetime", builder.maxRequestLifetime());
+        keepAliveInterval = longPropertyOr("keepAliveInterval", builder.keepAliveInterval());
+        autoreleaseAfter = longPropertyOr("autoreleaseAfter", builder.autoreleaseAfter());
+        bufferPoolingEnabled = booleanPropertyOr("bufferPoolingEnabled", builder.bufferPoolingEnabled());
+        socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout());
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -249,11 +228,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             this.computationPoolSize = computationPoolSize;
         }
 
-        if (builder.ioPool == null) {
+        if (builder.ioPool() == null) {
             this.ioPool = new NioEventLoopGroup(ioPoolSize(), new DefaultThreadFactory("cb-io", true));
             this.ioPoolShutdownHook = new IoPoolShutdownHook(this.ioPool);
         } else {
-            this.ioPool = builder.ioPool;
+            this.ioPool = builder.ioPool();
             this.ioPoolShutdownHook = builder.ioPoolShutdownHook == null
                     ? new NoOpShutdownHook()
                     : builder.ioPoolShutdownHook;
@@ -265,40 +244,12 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             this.coreSchedulerShutdownHook = managed
             ;
         } else {
-            this.coreScheduler = builder.scheduler;
+            this.coreScheduler = builder.scheduler();
             this.coreSchedulerShutdownHook = builder.schedulerShutdownHook == null
                     ? new NoOpShutdownHook()
                     : builder.schedulerShutdownHook;
         }
-        this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus;
-        this.runtimeMetricsCollector = new RuntimeMetricsCollector(
-            eventBus,
-            coreScheduler,
-            builder.runtimeMetricsCollectorConfig == null
-                ? DefaultMetricsCollectorConfig.create()
-                : builder.runtimeMetricsCollectorConfig
-        );
-        this.networkLatencyMetricsCollector = new NetworkLatencyMetricsCollector(
-            eventBus,
-            coreScheduler,
-            builder.networkLatencyMetricsCollectorConfig == null
-                ? DefaultLatencyMetricsCollectorConfig.create()
-                : builder.networkLatencyMetricsCollectorConfig
-        );
-
-        if (builder.defaultMetricsLoggingConsumer != null) {
-            metricsCollectorSubscription = eventBus
-                .get()
-                .filter(new Func1<CouchbaseEvent, Boolean>() {
-                    @Override
-                    public Boolean call(CouchbaseEvent evt) {
-                        return evt.type().equals(EventType.METRIC);
-                    }
-                })
-                .subscribe(builder.defaultMetricsLoggingConsumer);
-        } else {
-            metricsCollectorSubscription = null;
-        }
+        this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus();
     }
 
     public static DefaultCoreEnvironment create() {
@@ -346,15 +297,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     @SuppressWarnings("unchecked")
     public Observable<Boolean> shutdown() {
-        if (metricsCollectorSubscription != null && !metricsCollectorSubscription.isUnsubscribed()) {
-            metricsCollectorSubscription.unsubscribe();
-        }
-
         return Observable.mergeDelayError(
-            ioPoolShutdownHook.shutdown(),
-            coreSchedulerShutdownHook.shutdown(),
-            Observable.just(runtimeMetricsCollector.shutdown()),
-            Observable.just(networkLatencyMetricsCollector.shutdown())
+                ioPoolShutdownHook.shutdown(),
+                coreSchedulerShutdownHook.shutdown()
         ).reduce(true, new Func2<Boolean, Boolean, Boolean>() {
             @Override
             public Boolean call(Boolean a, Boolean b) {
@@ -519,31 +464,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public boolean tcpNodelayEnabled() {
-        return tcpNodelayEnabled;
-    }
-
-    @Override
-    public boolean mutationTokensEnabled() {
-        return mutationTokensEnabled;
-    }
-
-    @Override
-    public MetricsCollector runtimeMetricsCollector() {
-        return runtimeMetricsCollector;
-    }
-
-    @Override
-    public NetworkLatencyMetricsCollector networkLatencyMetricsCollector() {
-        return networkLatencyMetricsCollector;
-    }
-
-    @Override
     public int socketConnectTimeout() {
         return socketConnectTimeout;
     }
 
-    public static class Builder {
+    public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
         private boolean sslEnabled = SSL_ENABLED;
@@ -563,9 +488,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int computationPoolSize = COMPUTATION_POOL_SIZE;
         private int responseBufferSize = RESPONSE_BUFFER_SIZE;
         private int requestBufferSize = REQUEST_BUFFER_SIZE;
-        private int kvEndpoints = KEYVALUE_ENDPOINTS;
-        private int viewEndpoints = VIEW_ENDPOINTS;
-        private int queryEndpoints = QUERY_ENDPOINTS;
+        private int kvServiceEndpoints = KEYVALUE_ENDPOINTS;
+        private int viewServiceEndpoints = VIEW_ENDPOINTS;
+        private int queryServiceEndpoints = QUERY_ENDPOINTS;
         private Delay observeIntervalDelay = OBSERVE_INTERVAL_DELAY;
         private Delay reconnectDelay = RECONNECT_DELAY;
         private Delay retryDelay = RETRY_DELAY;
@@ -579,15 +504,14 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private long keepAliveInterval = KEEPALIVEINTERVAL;
         private long autoreleaseAfter = AUTORELEASE_AFTER;
         private boolean bufferPoolingEnabled = BUFFER_POOLING_ENABLED;
-        private boolean tcpNodelayEnabled = TCP_NODELAY_ENALED;
-        private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
         private int socketConnectTimeout = SOCKET_CONNECT_TIMEOUT;
 
-        private MetricsCollectorConfig runtimeMetricsCollectorConfig = null;
-        private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig = null;
-        private LoggingConsumer defaultMetricsLoggingConsumer = LoggingConsumer.create();
-
         protected Builder() {
+        }
+
+        @Override
+        public boolean dcpEnabled() {
+            return dcpEnabled;
         }
 
         /**
@@ -596,6 +520,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder dcpEnabled(final boolean dcpEnabled) {
             this.dcpEnabled = dcpEnabled;
             return this;
+        }
+
+        @Override
+        public boolean sslEnabled() {
+            return sslEnabled;
         }
 
         /**
@@ -607,12 +536,22 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public String sslKeystoreFile() {
+            return sslKeystoreFile;
+        }
+
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
             return this;
+        }
+
+        @Override
+        public String sslKeystorePassword() {
+            return sslKeystorePassword;
         }
 
         /**
@@ -622,6 +561,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder sslKeystorePassword(final String sslKeystorePassword) {
             this.sslKeystorePassword = sslKeystorePassword;
             return this;
+        }
+
+        @Override
+        public boolean queryEnabled() {
+            return queryEnabled;
         }
 
         /**
@@ -635,6 +579,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int queryPort() {
+            return queryPort;
+        }
+
         /**
          * Defines the port for N1QL Query (default value {@value #QUERY_PORT}).
          * This parameter will be deprecated once N1QL is in General Availability and shipped with the server.
@@ -646,6 +595,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public boolean bootstrapHttpEnabled() {
+            return bootstrapHttpEnabled;
+        }
+
         /**
          * Toggles bootstrap via Http (default value {@value #BOOTSTRAP_HTTP_ENABLED}).
          */
@@ -654,12 +608,22 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public boolean bootstrapCarrierEnabled() {
+            return bootstrapCarrierEnabled;
+        }
+
         /**
          * Toggles bootstrap via carrier publication (default value {@value #BOOTSTRAP_CARRIER_ENABLED}).
          */
         public Builder bootstrapCarrierEnabled(final boolean bootstrapCarrierEnabled) {
             this.bootstrapCarrierEnabled = bootstrapCarrierEnabled;
             return this;
+        }
+
+        @Override
+        public int bootstrapHttpDirectPort() {
+            return bootstrapHttpDirectPort;
         }
 
         /**
@@ -671,6 +635,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int bootstrapHttpSslPort() {
+            return bootstrapHttpSslPort;
+        }
+
         /**
          * If Http bootstrap and SSL are enabled, sets the port to use
          * (default value {@value #BOOTSTRAP_HTTP_SSL_PORT}).
@@ -678,6 +647,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder bootstrapHttpSslPort(final int bootstrapHttpSslPort) {
             this.bootstrapHttpSslPort = bootstrapHttpSslPort;
             return this;
+        }
+
+        @Override
+        public int bootstrapCarrierDirectPort() {
+            return bootstrapCarrierDirectPort;
         }
 
         /**
@@ -689,6 +663,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int bootstrapCarrierSslPort() {
+            return bootstrapCarrierSslPort;
+        }
+
         /**
          * If carrier publication bootstrap and SSL are enabled, sets the port to use
          * (default value {@value #BOOTSTRAP_CARRIER_SSL_PORT}).
@@ -696,6 +675,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder bootstrapCarrierSslPort(final int bootstrapCarrierSslPort) {
             this.bootstrapCarrierSslPort = bootstrapCarrierSslPort;
             return this;
+        }
+
+        @Override
+        public int ioPoolSize() {
+            return ioPoolSize;
         }
 
         /**
@@ -710,6 +694,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int computationPoolSize() {
+            return computationPoolSize;
+        }
+
         /**
          * Sets the pool size (number of threads to use) for all non blocking operations in the core and clients
          * (default value is the number of CPUs).
@@ -721,6 +710,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int requestBufferSize() {
+            return requestBufferSize;
+        }
+
         /**
          * Sets the size of the RingBuffer structure that queues requests (default value {@value #REQUEST_BUFFER_SIZE}).
          * This is an advanced parameter that usually shouldn't need to be changed.
@@ -728,6 +722,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder requestBufferSize(final int requestBufferSize) {
             this.requestBufferSize = requestBufferSize;
             return this;
+        }
+
+        @Override
+        public int responseBufferSize() {
+            return responseBufferSize;
         }
 
         /**
@@ -740,6 +739,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public int kvEndpoints() {
+            return kvServiceEndpoints;
+        }
+
         /**
          * Sets the number of Key/Value endpoints to open per nodes in the cluster
          * (default value {@value #KEYVALUE_ENDPOINTS}).
@@ -747,9 +751,14 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Only tune to more if IO has been identified as the most probable bottleneck,
          * since it can reduce batching on the tcp/network level.
          */
-        public Builder kvEndpoints(final int kvEndpoints) {
-            this.kvEndpoints = kvEndpoints;
+        public Builder kvEndpoints(final int kvServiceEndpoints) {
+            this.kvServiceEndpoints = kvServiceEndpoints;
             return this;
+        }
+
+        @Override
+        public int viewEndpoints() {
+            return viewServiceEndpoints;
         }
 
         /**
@@ -757,9 +766,14 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          *
          * Setting this to a higher number is advised in heavy view workloads.
          */
-        public Builder viewEndpoints(final int viewEndpoints) {
-            this.viewEndpoints = viewEndpoints;
+        public Builder viewEndpoints(final int viewServiceEndpoints) {
+            this.viewServiceEndpoints = viewServiceEndpoints;
             return this;
+        }
+
+        @Override
+        public int queryEndpoints() {
+            return queryServiceEndpoints;
         }
 
         /**
@@ -768,9 +782,14 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          *
          * Setting this to a higher number is advised in heavy query workloads.
          */
-        public Builder queryEndpoints(final int queryEndpoints) {
-            this.queryEndpoints = queryEndpoints;
+        public Builder queryEndpoints(final int queryServiceEndpoints) {
+            this.queryServiceEndpoints = queryServiceEndpoints;
             return this;
+        }
+
+        @Override
+        public String userAgent() {
+            return userAgent;
         }
 
         /**
@@ -780,6 +799,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder userAgent(final String userAgent) {
             this.userAgent = userAgent;
             return this;
+        }
+
+        @Override
+        public String packageNameAndVersion() {
+            return packageNameAndVersion;
         }
 
         /**
@@ -793,6 +817,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public Delay observeIntervalDelay() {
+            return observeIntervalDelay;
+        }
+
         /**
          * Sets the {@link Delay} for {@link Observe} poll operations (default value
          * is a delay growing exponentially between 10us and 100ms).
@@ -800,6 +829,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder observeIntervalDelay(final Delay observeIntervalDelay) {
             this.observeIntervalDelay = observeIntervalDelay;
             return this;
+        }
+
+        @Override
+        public Delay reconnectDelay() {
+            return reconnectDelay;
         }
 
         /**
@@ -811,13 +845,33 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public Delay retryDelay() {
+            return retryDelay;
+        }
+
         /**
-         * Sets the {@link Delay} for retries of requests (default value is a delay growing exponentially
+         * Sets the {@Delay} for retries of requests (default value is a delay growing exponentially
          * between 100us and 100ms).
          */
         public Builder retryDelay(final Delay retryDelay) {
             this.retryDelay = retryDelay;
             return this;
+        }
+
+        /**
+         * This operation doesn't make sense on the Builder and will throw an {@link UnsupportedOperationException}.
+         * @return never.
+         * @throws UnsupportedOperationException when invoked.
+         */
+        @Override
+        public Observable<Boolean> shutdown() {
+            throw new UnsupportedOperationException("Shutdown should not be called on the Builder.");
+        }
+
+        @Override
+        public EventLoopGroup ioPool() {
+            return ioPool;
         }
 
         /**
@@ -842,6 +896,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public Scheduler scheduler() {
+            return scheduler;
+        }
+
         /**
          * Sets the Scheduler implementation for the underlying computation framework.
          * This is an advanced configuration that should only be used if you know what you are doing.
@@ -864,6 +923,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public RetryStrategy retryStrategy() {
+            return retryStrategy;
+        }
+
         /**
          * Sets the {@link RetryStrategy} to be used during request retries
          * (default value is a {@link BestEffortRetryStrategy}).
@@ -871,6 +935,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder retryStrategy(final RetryStrategy retryStrategy) {
             this.retryStrategy = retryStrategy;
             return this;
+        }
+
+        @Override
+        public long maxRequestLifetime() {
+            return maxRequestLifetime;
         }
 
         /**
@@ -887,6 +956,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public long keepAliveInterval() {
+            return keepAliveInterval;
+        }
+
         /**
          * Sets the time of inactivity, in milliseconds, after which some services
          * will issue a form of keep-alive request to their corresponding server/nodes
@@ -895,6 +969,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder keepAliveInterval(long keepAliveIntervalMilliseconds) {
             this.keepAliveInterval = keepAliveIntervalMilliseconds;
             return this;
+        }
+
+        @Override
+        public long autoreleaseAfter() {
+            return autoreleaseAfter;
         }
 
         /**
@@ -907,6 +986,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        @Override
+        public EventBus eventBus() {
+            return eventBus;
+        }
+
         /**
          * Sets the event bus to an alternative implementation.
          *
@@ -915,6 +999,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder eventBus(final EventBus eventBus) {
             this.eventBus = eventBus;
             return this;
+        }
+
+        @Override
+        public boolean bufferPoolingEnabled() {
+            return bufferPoolingEnabled;
         }
 
         /**
@@ -932,61 +1021,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
-         * If TCP_NODELAY is manually disabled, Nagle'ing will take effect on both the client
-         * and (if supported) the server side.
-         */
-        public Builder tcpNodelayEnabled(boolean tcpNodelayEnabled) {
-            this.tcpNodelayEnabled = tcpNodelayEnabled;
-            return this;
-        }
-
-        /**
-         * If mutation tokens are enabled, they can be used for advanced durability requirements,
-         * as well as optimized RYOW consistency.
-         *
-         * Note that just enabling it here won't help if the server does not support it as well. Use at
-         * least Couchbase Server 4.0. Also, consider the additional overhead of 16 bytes per mutation response
-         * (8 byte for the vbucket uuid and 8 byte for the sequence number).
-         */
-        public Builder mutationTokensEnabled(boolean mutationTokensEnabled) {
-            this.mutationTokensEnabled = mutationTokensEnabled;
-            return this;
-        }
-
-        /**
-         * Sets a custom configuration for the {@link RuntimeMetricsCollector}.
-         *
-         * @param metricsCollectorConfig the custom configuration
-         */
-        public Builder runtimeMetricsCollectorConfig(MetricsCollectorConfig metricsCollectorConfig) {
-            this.runtimeMetricsCollectorConfig = metricsCollectorConfig;
-            return this;
-        }
-
-        /**
-         * Sets a custom configuration for the {@link NetworkLatencyMetricsCollector}.
-         *
-         * @param metricsCollectorConfig the custom configuration for the collector.
-         */
-        public Builder networkLatencyMetricsCollectorConfig(LatencyMetricsCollectorConfig metricsCollectorConfig) {
-            this.networkLatencyMetricsCollectorConfig = metricsCollectorConfig;
-            return this;
-        }
-
-        public Builder defaultMetricsLoggingConsumer(boolean enabled, CouchbaseLogLevel level, LoggingConsumer.OutputFormat format) {
-            if (enabled) {
-                defaultMetricsLoggingConsumer = LoggingConsumer.create(level, format);
-            } else {
-                defaultMetricsLoggingConsumer = null;
-            }
-            return this;
-        }
-
-        public Builder defaultMetricsLoggingConsumer(boolean enabled, CouchbaseLogLevel level) {
-            return defaultMetricsLoggingConsumer(enabled, level, LoggingConsumer.DEFAULT_FORMAT);
-        }
-
-        /**
          * Sets a custom socket connect timeout.
          *
          * @param socketConnectTimeout the socket connect timeout in milliseconds.
@@ -994,6 +1028,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         public Builder socketConnectTimeout(int socketConnectTimeout) {
             this.socketConnectTimeout = socketConnectTimeout;
             return this;
+        }
+
+        @Override
+        public int socketConnectTimeout() {
+            return socketConnectTimeout;
         }
 
         public DefaultCoreEnvironment build() {
@@ -1046,8 +1085,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", keepAliveInterval=").append(keepAliveInterval);
         sb.append(", autoreleaseAfter=").append(autoreleaseAfter);
         sb.append(", bufferPoolingEnabled=").append(bufferPoolingEnabled);
-        sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
-        sb.append(", mutationTokensEnabled=").append(mutationTokensEnabled);
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
         return sb;
     }
