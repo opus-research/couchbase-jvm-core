@@ -39,9 +39,10 @@ import rx.Observable;
 
 import java.net.InetAddress;
 
+import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -88,7 +89,7 @@ public class CarrierLoaderTest {
                 (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.SUCCESS,
                         ResponseStatusConverter.BINARY_SUCCESS, "bucket", content, host)
         );
-        when(cluster.send(isA(GetBucketConfigRequest.class))).thenReturn(response);
+        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(response);
 
         CarrierLoader loader = new CarrierLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);
@@ -102,7 +103,7 @@ public class CarrierLoaderTest {
                 (CouchbaseResponse) new GetBucketConfigResponse(ResponseStatus.FAILURE,
                         ResponseStatusConverter.BINARY_ERR_NOT_FOUND, "bucket", Unpooled.EMPTY_BUFFER, host)
         );
-        when(cluster.send(isA(GetBucketConfigRequest.class))).thenReturn(response);
+        when(cluster.send(argThat(hasRequestFromFactory(GetBucketConfigRequest.class)))).thenReturn(response);
 
         CarrierLoader loader = new CarrierLoader(cluster, environment);
         Observable<String> configObservable = loader.discoverConfig("bucket", "password", host);

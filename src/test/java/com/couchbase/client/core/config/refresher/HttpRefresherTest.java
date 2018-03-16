@@ -36,9 +36,10 @@ import rx.schedulers.Schedulers;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.isA;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +66,7 @@ public class HttpRefresherTest {
         Observable<CouchbaseResponse> response = Observable.just((CouchbaseResponse)
             new BucketStreamingResponse(configStream, "", ResponseStatus.SUCCESS, null)
         );
-        when(cluster.send(isA(BucketStreamingRequest.class))).thenReturn(response);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketStreamingRequest.class)))).thenReturn(response);
 
         HttpRefresher refresher = new HttpRefresher(cluster);
 
@@ -100,7 +101,7 @@ public class HttpRefresherTest {
         Observable<CouchbaseResponse> successResponse = Observable.just((CouchbaseResponse)
                 new BucketStreamingResponse(configStream, "", ResponseStatus.SUCCESS, null)
         );
-        when(cluster.send(isA(BucketStreamingRequest.class))).thenReturn(failingResponse, successResponse);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketStreamingRequest.class)))).thenReturn(failingResponse, successResponse);
 
         HttpRefresher refresher = new HttpRefresher(cluster);
 
@@ -138,7 +139,7 @@ public class HttpRefresherTest {
                 new BucketStreamingResponse(configStream, "", ResponseStatus.SUCCESS, null)
         );
 
-        when(cluster.send(isA(BucketStreamingRequest.class))).thenReturn(failingResponse, successResponse);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketStreamingRequest.class)))).thenReturn(failingResponse, successResponse);
 
         HttpRefresher refresher = new HttpRefresher(cluster);
 
@@ -171,7 +172,7 @@ public class HttpRefresherTest {
         Observable<CouchbaseResponse> response = Observable.just((CouchbaseResponse)
             new BucketStreamingResponse(configStream, "", ResponseStatus.SUCCESS, null)
         );
-        when(cluster.send(isA(BucketStreamingRequest.class))).thenReturn(response);
+        when(cluster.send(argThat(hasRequestFromFactory(BucketStreamingRequest.class)))).thenReturn(response);
 
         HttpRefresher refresher = new HttpRefresher(cluster);
 
@@ -189,7 +190,7 @@ public class HttpRefresherTest {
         assertTrue(latch.await(3, TimeUnit.SECONDS));
 
         refresher.deregisterBucket("default");
-        verify(cluster, atLeast(2)).send(isA(BucketStreamingRequest.class));
+        verify(cluster, atLeast(2)).send(argThat(hasRequestFromFactory(BucketStreamingRequest.class)));
     }
 
 }
