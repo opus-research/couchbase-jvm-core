@@ -36,7 +36,6 @@ import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action1;
-import rx.functions.Func0;
 import rx.functions.Func1;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -212,12 +211,9 @@ public class CarrierRefresher extends AbstractRefresher {
      * @return a raw configuration or an error.
      */
     private Observable<String> refreshAgainstNode(final String bucketName, final InetAddress hostname) {
-        return Buffers.wrapColdWithAutoRelease(Observable.defer(new Func0<Observable<GetBucketConfigResponse>>() {
-            @Override
-            public Observable<GetBucketConfigResponse> call() {
-                return cluster().send(new GetBucketConfigRequest(bucketName, hostname));
-            }
-        }))
+        return Buffers.wrapColdWithAutoRelease(
+            cluster().<GetBucketConfigResponse>send(new GetBucketConfigRequest(bucketName, hostname))
+        )
         .doOnNext(new Action1<GetBucketConfigResponse>() {
             @Override
             public void call(GetBucketConfigResponse response) {
@@ -243,7 +239,7 @@ public class CarrierRefresher extends AbstractRefresher {
             @Override
             public void call(Throwable ex) {
                 LOGGER.debug("Could not fetch config from bucket \"" + bucketName + "\" against \""
-                        + hostname + "\".", ex);
+                    + hostname + "\".", ex);
             }
         });
     }
