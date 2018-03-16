@@ -16,16 +16,9 @@
 package com.couchbase.client.core.message;
 
 import com.couchbase.client.core.time.Delay;
-import io.opentracing.ActiveSpan;
-import io.opentracing.Span;
-import io.opentracing.Tracer;
-import io.opentracing.util.GlobalTracer;
 import rx.Subscriber;
-import rx.functions.Action0;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
-
-import java.util.UUID;
 
 /**
  * Default implementation for a {@link CouchbaseRequest}, should be extended by child messages.
@@ -59,8 +52,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
      * The time when the request was created.
      */
     private final long creationTime;
-
-    private volatile Span span;
 
     /**
      * Additional subscriber information to check if the request has timed out
@@ -130,16 +121,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
         this.observable = observable;
         this.creationTime = System.nanoTime();
         this.retryCount = 0;
-    }
-
-    @Override
-    public void span(final Tracer.SpanBuilder span) {
-        this.span = span
-            .withTag("component", "couchbase-java-sdk")
-            .withTag("db.type", "couchbase")
-            .withTag("db.bucket", bucket == null ? "" : bucket)
-            .ignoreActiveSpan()
-            .startManual();
     }
 
     @Override
@@ -222,11 +203,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
     @Override
     public void dispatchHostname(String hostname) {
         this.dispatchHostname = hostname;
-    }
-
-    @Override
-    public Span span() {
-        return span;
     }
 
     @Override

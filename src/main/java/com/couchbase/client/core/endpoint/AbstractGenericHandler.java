@@ -45,9 +45,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.ScheduledFuture;
-import io.opentracing.ActiveSpan;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import rx.Scheduler;
 import rx.Subscriber;
 import rx.functions.Action0;
@@ -139,8 +136,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private REQUEST currentRequest;
 
     private DecodingState currentDecodingState;
-
-    private ActiveSpan currentSpan;
 
     /**
      * Contains the current round-trip-time for the last completed operation. Used for metrics.
@@ -274,7 +269,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         sentRequestQueue.offer(msg);
         out.add(request);
         sentRequestTimings.offer(System.nanoTime());
-        currentSpan = GlobalTracer.get().buildSpan("wireTime").asChildOf(msg.span()).startActive();
     }
 
     @Override
@@ -360,7 +354,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         currentDecodingState = DecodingState.STARTED;
 
         if (currentRequest != null) {
-            currentSpan.deactivate();
             Long st = sentRequestTimings.poll();
             if (st != null) {
                 currentOpTime = System.nanoTime() - st;
@@ -459,10 +452,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected void finishedDecoding() {
         this.currentDecodingState = DecodingState.FINISHED;
-        Span fullRequestSpan = currentRequest().span();
-        if (fullRequestSpan != null) {
-            fullRequestSpan.finish();
-        }
         if (isTransient) {
             endpoint.disconnect();
         }

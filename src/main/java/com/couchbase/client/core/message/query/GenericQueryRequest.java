@@ -17,7 +17,6 @@ package com.couchbase.client.core.message.query;
 
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.PrelocatedRequest;
-import io.opentracing.Tracer;
 
 import java.net.InetAddress;
 
@@ -38,14 +37,6 @@ public class GenericQueryRequest extends AbstractCouchbaseRequest implements Que
         this.query = query;
         this.jsonFormat = jsonFormat;
         this.targetNode = targetNode;
-    }
-
-    @Override
-    public void span(Tracer.SpanBuilder span) {
-        super.span(span
-                .withTag("db.service", "query")
-                .withTag("db.statement", query)
-        );
     }
 
     public String query() {
