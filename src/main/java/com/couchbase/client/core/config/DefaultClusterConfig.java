@@ -32,12 +32,7 @@ public class DefaultClusterConfig implements ClusterConfig {
     /**
      * Holds all current bucket configurations.
      */
-    private volatile Map<String, BucketConfig> bucketConfigs;
-
-    /**
-     * Lock for ensuring updates aren't lost when replacing bucketConfigs.
-     */
-    private final Object lock = new Object();
+    private final Map<String, BucketConfig> bucketConfigs;
 
     /**
      * Creates a new {@link DefaultClusterConfig}.
@@ -53,20 +48,12 @@ public class DefaultClusterConfig implements ClusterConfig {
 
     @Override
     public void setBucketConfig(final String bucketName, final BucketConfig config) {
-        synchronized (lock) {
-            Map<String, BucketConfig> next = new HashMap<String, BucketConfig>(bucketConfigs);
-            next.put(bucketName, config);
-            bucketConfigs = next;
-        }
+        bucketConfigs.put(bucketName, config);
     }
 
     @Override
     public void deleteBucketConfig(String bucketName) {
-        synchronized (lock) {
-            Map<String, BucketConfig> next = new HashMap<String, BucketConfig>(bucketConfigs);
-            next.remove(bucketName);
-            bucketConfigs = next;
-        }
+        bucketConfigs.remove(bucketName);
     }
 
     @Override
