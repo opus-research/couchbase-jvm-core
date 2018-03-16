@@ -58,7 +58,6 @@ import rx.functions.Func1;
 import rx.functions.Func2;
 import com.couchbase.client.core.utils.Blocking;
 
-import java.security.KeyStore;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -73,7 +72,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
-    public static final KeyStore SSL_KEYSTORE = null;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -178,7 +176,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
     private final String sslKeystorePassword;
-    private final KeyStore sslKeystore;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -268,7 +265,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         socketConnectTimeout = intPropertyOr("socketConnectTimeout", builder.socketConnectTimeout);
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
-        sslKeystore = builder.sslKeystore;
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -505,11 +501,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public KeyStore sslKeystore() {
-        return sslKeystore;
-    }
-
-    @Override
     public boolean bootstrapHttpEnabled() {
         return bootstrapHttpEnabled;
     }
@@ -701,7 +692,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
-        private KeyStore sslKeystore = SSL_KEYSTORE;
         private String userAgent = USER_AGENT;
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
@@ -766,9 +756,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
-         *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
@@ -777,24 +764,10 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         /**
          * Sets the SSL Keystore password to be used with the Keystore file (default value null, none).
-         *
          * @see #sslKeystoreFile(String)
          */
         public Builder sslKeystorePassword(final String sslKeystorePassword) {
             this.sslKeystorePassword = sslKeystorePassword;
-            return this;
-        }
-
-        /**
-         * Sets the SSL Keystore directly and not indirectly via filepath.
-         *
-         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
-         * keystore is used it takes precedence over the file approach.
-         *
-         * @param sslKeystore the keystore to use.
-         */
-        public Builder sslKeystore(final KeyStore sslKeystore) {
-            this.sslKeystore = sslKeystore;
             return this;
         }
 
@@ -1229,8 +1202,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     protected StringBuilder dumpParameters(StringBuilder sb) {
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
-        sb.append(", sslKeystorePassword=").append(sslKeystorePassword != null && !sslKeystorePassword.isEmpty());
-        sb.append(", sslKeystore=").append(sslKeystore);
+        sb.append(", sslKeystorePassword='").append(sslKeystorePassword).append('\'');
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
