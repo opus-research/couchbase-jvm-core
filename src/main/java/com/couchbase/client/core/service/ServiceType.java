@@ -52,12 +52,7 @@ public enum ServiceType {
     /**
      * DCP operations
      */
-    DCP(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Search (CBFT) operations.
-     */
-    SEARCH(BucketServiceMapping.ONE_FOR_ALL);
+    DCP(BucketServiceMapping.ONE_BY_ONE);
 
     private final BucketServiceMapping mapping;
 
