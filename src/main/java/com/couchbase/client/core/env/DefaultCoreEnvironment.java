@@ -38,6 +38,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.Scheduler;
+import rx.functions.Action1;
 import rx.functions.Func2;
 
 import java.util.Properties;
@@ -77,7 +78,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long KEEPALIVEINTERVAL = TimeUnit.SECONDS.toMillis(30);
     public static final long AUTORELEASE_AFTER = TimeUnit.SECONDS.toMillis(2);
     public static final boolean BUFFER_POOLING_ENABLED = true;
-    public static final boolean TCP_NODELAY_ENALED = true;
+
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
 
@@ -162,7 +163,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final long keepAliveInterval;
     private final long autoreleaseAfter;
     private final boolean bufferPoolingEnabled;
-    private final boolean tcpNodelayEnabled;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -208,7 +208,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         keepAliveInterval = longPropertyOr("keepAliveInterval", builder.keepAliveInterval());
         autoreleaseAfter = longPropertyOr("autoreleaseAfter", builder.autoreleaseAfter());
         bufferPoolingEnabled = booleanPropertyOr("bufferPoolingEnabled", builder.bufferPoolingEnabled());
-        tcpNodelayEnabled = booleanPropertyOr("tcpNodelayEnabled", builder.tcpNodelayEnabled());
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -460,11 +459,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return bufferPoolingEnabled;
     }
 
-    @Override
-    public boolean tcpNodelayEnabled() {
-        return tcpNodelayEnabled;
-    }
-
     public static class Builder implements CoreEnvironment {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -501,7 +495,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private long keepAliveInterval = KEEPALIVEINTERVAL;
         private long autoreleaseAfter = AUTORELEASE_AFTER;
         private boolean bufferPoolingEnabled = BUFFER_POOLING_ENABLED;
-        private boolean tcpNodelayEnabled = TCP_NODELAY_ENALED;
 
         protected Builder() {
         }
@@ -1017,20 +1010,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        @Override
-        public boolean tcpNodelayEnabled() {
-            return tcpNodelayEnabled;
-        }
-
-        /**
-         * If TCP_NODELAY is manually disabled, Nagle'ing will take effect on both the client
-         * (and if supported) and the server side.
-         */
-        public Builder tcpNodelayEnabled(boolean tcpNodelayEnabled) {
-            this.tcpNodelayEnabled = tcpNodelayEnabled;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1081,7 +1060,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", keepAliveInterval=").append(keepAliveInterval);
         sb.append(", autoreleaseAfter=").append(autoreleaseAfter);
         sb.append(", bufferPoolingEnabled=").append(bufferPoolingEnabled);
-        sb.append(", tcpNodelayEnabled=").append(tcpNodelayEnabled);
         return sb;
     }
 
