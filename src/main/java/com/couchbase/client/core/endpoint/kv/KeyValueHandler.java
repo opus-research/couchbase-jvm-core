@@ -639,8 +639,7 @@ public class KeyValueHandler
         }
 
         if (evt instanceof ServerFeaturesEvent) {
-            seqOnMutation = env().mutationMetadataEnabled() &&
-                ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
+            seqOnMutation = ((ServerFeaturesEvent) evt).supportedFeatures().contains(ServerFeatures.MUTATION_SEQNO);
         }
 
         super.userEventTriggered(ctx, evt);
