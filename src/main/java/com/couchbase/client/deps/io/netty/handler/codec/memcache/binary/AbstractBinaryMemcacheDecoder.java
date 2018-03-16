@@ -230,7 +230,7 @@ public abstract class AbstractBinaryMemcacheDecoder<M extends BinaryMemcacheMess
      * @param in the incoming buffer.
      * @return the decoded header.
      */
-    protected abstract M decodeHeader(ByteBuf in);
+    protected abstract M decodeHeader(ByteBuf in) throws Exception;
 
     /**
      * Helper method to create a upstream message when the incoming parsing did fail.

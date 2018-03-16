@@ -627,6 +627,14 @@ public class KeyValueHandler
         throws Exception {
         BinaryRequest request = currentRequest();
 
+        //Throw only the malformedmemcachedheaderexception back
+        if (msg.getDecoderResult().isFailure()) {
+            Throwable cause = msg.getDecoderResult().cause();
+            if (cause instanceof MalformedMemcacheHeaderException) {
+                throw (MalformedMemcacheHeaderException)cause;
+            }
+        }
+
         if (request.opaque() != msg.getOpaque()) {
             throw new IllegalStateException("Opaque values for " + msg.getClass() + " do not match.");
         }
