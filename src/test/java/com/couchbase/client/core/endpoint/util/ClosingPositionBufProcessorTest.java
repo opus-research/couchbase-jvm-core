@@ -84,4 +84,9 @@ public class ClosingPositionBufProcessorTest {
         assertEquals(-1, closingPos);
         assertEquals(0, source.readerIndex());
     }
+
+    @Test
+    public void shouldThrowIllegalArgumentWhenSymmetricChars() {
+        new ClosingPositionBufProcessor('"', '"', true);
+    }
 }
