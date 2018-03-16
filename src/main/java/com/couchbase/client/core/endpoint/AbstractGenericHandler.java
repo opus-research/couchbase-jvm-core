@@ -25,6 +25,7 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
+import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.retry.RetryHelper;
@@ -239,7 +240,15 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     @Override
     protected void encode(ChannelHandlerContext ctx, REQUEST msg, List<Object> out) throws Exception {
-        ENCODED request = encodeRequest(ctx, msg);
+        ENCODED request;
+        try {
+            request = encodeRequest(ctx, msg);
+        } catch (Exception ex) {
+            msg.observable().onError(new RequestCancelledException("Error while encoding Request, cancelling.", ex));
+            // we need to re-throw the error because netty expects either an exception
+            // or at least one message encoded. just returning won't work
+            throw ex;
+        }
         sentRequestQueue.offer(msg);
         out.add(request);
         sentRequestTimings.offer(System.nanoTime());
@@ -266,6 +275,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
+            endpoint.notifyResponseDecoded(currentRequest instanceof KeepAlive);
             resetStatesAfterDecode(ctx);
         }
     }

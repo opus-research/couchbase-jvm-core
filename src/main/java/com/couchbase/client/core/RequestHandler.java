@@ -25,6 +25,7 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.BootstrapMessage;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.analytics.AnalyticsRequest;
 import com.couchbase.client.core.message.config.ConfigRequest;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -36,6 +37,7 @@ import com.couchbase.client.core.message.search.SearchRequest;
 import com.couchbase.client.core.message.view.ViewRequest;
 import com.couchbase.client.core.node.CouchbaseNode;
 import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.node.locate.AnalyticsLocator;
 import com.couchbase.client.core.node.locate.ConfigLocator;
 import com.couchbase.client.core.node.locate.DCPLocator;
 import com.couchbase.client.core.node.locate.KeyValueLocator;
@@ -106,6 +108,11 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * The node locator for the query service.
      */
     private final Locator searchLocator = new SearchLocator();
+
+    /**
+     * The node locator for the analytics service.
+     */
+    private final Locator analyticsLocator = new AnalyticsLocator();
 
     /**
      * The list of currently managed nodes against the cluster.
@@ -265,6 +272,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             || config.serviceEnabled(ServiceType.DCP))) {
             throw new ServiceNotAvailableException("The DCP service is not enabled or no node in the cluster "
                 + "supports it.");
+        } else if (request instanceof AnalyticsRequest && !config.serviceEnabled(ServiceType.ANALYTICS)) {
+            throw new ServiceNotAvailableException("The Analytics service is not enabled or no node in the "
+                + "cluster supports it.");
         }
     }
 
@@ -389,6 +399,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             return dcpLocator;
         } else if (request instanceof SearchRequest) {
             return searchLocator;
+        } else if (request instanceof AnalyticsRequest) {
+            return analyticsLocator;
         } else {
             throw new IllegalArgumentException("Unknown Request Type: " + request);
         }
@@ -513,8 +525,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                     public Observable<AddServiceRequest> call(final Map<ServiceType, Integer> services) {
                         List<AddServiceRequest> requests = new ArrayList<AddServiceRequest>(services.size());
                         for (Map.Entry<ServiceType, Integer> service : services.entrySet()) {
-                            requests.add(new AddServiceRequest(service.getKey(), config.name(), config.password(),
-                                    service.getValue(), nodeInfo.hostname()));
+                            requests.add(new AddServiceRequest(service.getKey(), config.name(), config.username(),
+                                    config.password(), service.getValue(), nodeInfo.hostname()));
                         }
                         return Observable.from(requests);
                     }

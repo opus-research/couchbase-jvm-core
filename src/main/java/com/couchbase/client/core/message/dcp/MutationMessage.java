@@ -26,6 +26,7 @@ import io.netty.buffer.ByteBuf;
  * @author Sergey Avseyev
  * @since 1.1.0
  */
+@Deprecated
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
 public class MutationMessage extends AbstractDCPMessage {
@@ -37,6 +38,7 @@ public class MutationMessage extends AbstractDCPMessage {
     private final long bySequenceNumber;
     private final long revisionSequenceNumber;
 
+    @Deprecated
     public MutationMessage(int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
                            long bySequenceNumber, long revisionSequenceNumber,
                            int flags, int lockTime, long cas, String bucket) {
@@ -44,10 +46,18 @@ public class MutationMessage extends AbstractDCPMessage {
                 flags, lockTime, cas, bucket, null);
     }
 
+    @Deprecated
     public MutationMessage(int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
                            long bySequenceNumber, long revisionSequenceNumber,
                            int flags, int lockTime, long cas, String bucket, String password) {
-        super(totalBodyLength, partition, key, bucket, password);
+        this(totalBodyLength, partition, key, content, expiration, bySequenceNumber, revisionSequenceNumber,
+                flags, lockTime, cas, bucket, bucket, password);
+    }
+
+    public MutationMessage(int totalBodyLength, short partition, String key, ByteBuf content, int expiration,
+                           long bySequenceNumber, long revisionSequenceNumber,
+                           int flags, int lockTime, long cas, String bucket, String username, String password) {
+        super(totalBodyLength, partition, key, bucket, username, password);
         this.content = content;
         this.expiration = expiration;
         this.flags = flags;

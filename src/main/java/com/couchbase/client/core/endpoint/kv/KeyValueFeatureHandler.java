@@ -64,6 +64,11 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
     private ChannelPromise originalPromise;
 
     public KeyValueFeatureHandler(CoreEnvironment environment) {
+        // for now, extended errors are disabled by default
+        boolean xerrorEnabled = Boolean.parseBoolean(
+            System.getProperty("com.couchbase.xerrorEnabled", "false")
+        );
+
         userAgent = environment.userAgent();
         boolean tcpNodelay = environment.tcpNodelayEnabled();
 
@@ -72,7 +77,11 @@ public class KeyValueFeatureHandler extends SimpleChannelInboundHandler<FullBina
             features.add(ServerFeatures.MUTATION_SEQNO);
         }
         features.add(tcpNodelay ? ServerFeatures.TCPNODELAY : ServerFeatures.TCPDELAY);
-
+        features.add(ServerFeatures.XATTR);
+        features.add(ServerFeatures.SELECT_BUCKET);
+        if (xerrorEnabled) {
+            features.add(ServerFeatures.XERROR);
+        }
     }
 
     @Override

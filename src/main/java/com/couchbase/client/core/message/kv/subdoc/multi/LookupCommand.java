@@ -18,7 +18,6 @@ package com.couchbase.client.core.message.kv.subdoc.multi;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import io.netty.buffer.ByteBuf;
 
 /**
  * A single lookup description inside a TODO.
@@ -32,6 +31,7 @@ public class LookupCommand {
 
     private final Lookup lookup;
     private final String path;
+    private boolean attributeAccess;
 
     /**
      * Create a multi-lookup command.
@@ -39,9 +39,16 @@ public class LookupCommand {
      * @param lookup the lookup type.
      * @param path the path to look-up inside the document.
      */
+    @Deprecated
     public LookupCommand(Lookup lookup, String path) {
         this.lookup = lookup;
         this.path = path;
+    }
+
+    protected LookupCommand(LookupCommandBuilder builder) {
+        this.lookup = builder.lookup();
+        this.path = builder.path();
+        this.attributeAccess = builder.attributeAccess();
     }
 
     public Lookup lookup() {
@@ -55,4 +62,9 @@ public class LookupCommand {
     public byte opCode() {
         return lookup.opCode();
     }
+
+    public boolean attributeAccess() {
+        return this.attributeAccess;
+    }
+
 }

@@ -88,9 +88,9 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
-    public static final int VIEW_ENDPOINTS = 1;
-    public static final int QUERY_ENDPOINTS = 1;
-    public static final int SEARCH_ENDPOINTS = 1;
+    public static final int VIEW_ENDPOINTS = 12;
+    public static final int QUERY_ENDPOINTS = 12;
+    public static final int SEARCH_ENDPOINTS = 12;
     public static final Delay OBSERVE_INTERVAL_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 10);
     public static final Delay RECONNECT_DELAY = Delay.exponential(TimeUnit.MILLISECONDS, 4096, 32);
     public static final Delay RETRY_DELAY = Delay.exponential(TimeUnit.MICROSECONDS, 100000, 100);
@@ -106,6 +106,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
+    public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
 
     public static String CORE_VERSION;
     public static String CORE_GIT_VERSION;
@@ -215,6 +216,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final long disconnectTimeout;
     private final WaitStrategyFactory requestBufferWaitStrategy;
     private final MemcachedHashingStrategy memcachedHashingStrategy;
+    private final long configPollInterval;
 
     private static final int MAX_ALLOWED_INSTANCES = 1;
     private static volatile int instanceCounter = 0;
@@ -232,6 +234,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final ShutdownHook queryIoPoolShutdownHook;
     private final ShutdownHook viewIoPoolShutdownHook;
     private final ShutdownHook searchIoPoolShutdownHook;
+
+    private final KeyValueServiceConfig keyValueServiceConfig;
+    private final QueryServiceConfig queryServiceConfig;
+    private final ViewServiceConfig viewServiceConfig;
+    private final SearchServiceConfig searchServiceConfig;
 
     private final ShutdownHook nettyShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
@@ -286,6 +293,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
         sslKeystore = builder.sslKeystore;
         memcachedHashingStrategy = builder.memcachedHashingStrategy;
+        configPollInterval = longPropertyOr("configPollInterval", builder.configPollInterval);
 
         if (ioPoolSize < MIN_POOL_SIZE) {
             LOGGER.info("ioPoolSize is less than {} ({}), setting to: {}", MIN_POOL_SIZE, ioPoolSize, MIN_POOL_SIZE);
@@ -404,6 +412,33 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             };
         } else {
             requestBufferWaitStrategy = builder.requestBufferWaitStrategy;
+        }
+
+        if (builder.keyValueServiceConfig != null) {
+            this.keyValueServiceConfig = builder.keyValueServiceConfig;
+        } else {
+            this.keyValueServiceConfig = KeyValueServiceConfig.create(kvEndpoints());
+        }
+
+        if (builder.viewServiceConfig != null) {
+            this.viewServiceConfig = builder.viewServiceConfig;
+        } else {
+            int minEndpoints = viewEndpoints() == VIEW_ENDPOINTS ? 0 : viewEndpoints();
+            this.viewServiceConfig = ViewServiceConfig.create(minEndpoints, viewEndpoints());
+        }
+
+        if (builder.queryServiceConfig != null) {
+            this.queryServiceConfig = builder.queryServiceConfig;
+        } else {
+            int minEndpoints = queryEndpoints() == QUERY_ENDPOINTS ? 0 : queryEndpoints();
+            this.queryServiceConfig = QueryServiceConfig.create(minEndpoints, queryEndpoints());
+        }
+
+        if (builder.searchServiceConfig != null) {
+            this.searchServiceConfig = builder.searchServiceConfig;
+        } else {
+            int minEndpoints = searchEndpoints() == SEARCH_ENDPOINTS ? 0 : searchEndpoints();
+            this.searchServiceConfig = SearchServiceConfig.create(minEndpoints, searchEndpoints());
         }
 
         if (emitEnvWarnMessage) {
@@ -808,6 +843,33 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return instanceCounter;
     }
 
+    @Override
+    public KeyValueServiceConfig kvServiceConfig() {
+        return keyValueServiceConfig;
+    }
+
+    @Override
+    public QueryServiceConfig queryServiceConfig() {
+        return queryServiceConfig;
+    }
+
+    @Override
+    public ViewServiceConfig viewServiceConfig() {
+        return viewServiceConfig;
+    }
+
+    @Override
+    public SearchServiceConfig searchServiceConfig() {
+        return searchServiceConfig;
+    }
+
+    @InterfaceStability.Experimental
+    @InterfaceAudience.Public
+    @Override
+    public long configPollInterval() {
+        return configPollInterval;
+    }
+
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -862,10 +924,17 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private long disconnectTimeout = DISCONNECT_TIMEOUT;
         private WaitStrategyFactory requestBufferWaitStrategy;
         private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
+        private long configPollInterval = CONFIG_POLL_INTERVAL;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
         private LoggingConsumer defaultMetricsLoggingConsumer = LoggingConsumer.create();
+
+        private KeyValueServiceConfig keyValueServiceConfig;
+        private QueryServiceConfig queryServiceConfig;
+        private ViewServiceConfig viewServiceConfig;
+        private SearchServiceConfig searchServiceConfig;
+
 
         protected Builder() {
         }
@@ -873,6 +942,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         /**
          * Set if DCP should be enabled (only makes sense with server versions >= 3.0.0, default {@value #DCP_ENABLED}).
          */
+        @Deprecated
         public Builder dcpEnabled(final boolean dcpEnabled) {
             this.dcpEnabled = dcpEnabled;
             return this;
@@ -1020,6 +1090,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * the current value of the buffer reach this limit. Set it to zero to disable DCP flow control.
          * (default value {@value #DCP_CONNECTION_BUFFER_SIZE}).
          */
+        @Deprecated
         public Builder dcpConnectionBufferSize(final int dcpConnectionBufferSize) {
             this.dcpConnectionBufferSize = dcpConnectionBufferSize;
             return this;
@@ -1030,6 +1101,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * a DCP Buffer Acknowledge message is sent to the server to signal producer how much data has been processed.
          * (default value {@value #DCP_CONNECTION_BUFFER_ACK_THRESHOLD}).
          */
+        @Deprecated
         public Builder dcpConnectionBufferAckThreshold(final double dcpConnectionBufferAckThreshold) {
             this.dcpConnectionBufferAckThreshold = dcpConnectionBufferAckThreshold;
             return this;
@@ -1041,6 +1113,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         @InterfaceStability.Experimental
         @InterfaceAudience.Public
+        @Deprecated
         public Builder dcpConnectionName(final String dcpConnectionName) {
             this.dcpConnectionName = dcpConnectionName;
             return this;
@@ -1052,6 +1125,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          *
          * Only tune to more if IO has been identified as the most probable bottleneck,
          * since it can reduce batching on the tcp/network level.
+         *
+         * @deprecated Please use {@link Builder#keyValueServiceConfig(KeyValueServiceConfig)} going forward.
          */
         public Builder kvEndpoints(final int kvEndpoints) {
             this.kvEndpoints = kvEndpoints;
@@ -1062,6 +1137,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Sets the number of View endpoints to open per node in the cluster (default value {@value #VIEW_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy view workloads.
+         *
+         * @deprecated Please use {@link Builder#viewServiceConfig(ViewServiceConfig)} going forward.
          */
         public Builder viewEndpoints(final int viewEndpoints) {
             this.viewEndpoints = viewEndpoints;
@@ -1073,6 +1150,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * (default value {@value #QUERY_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy query workloads.
+         *
+         * @deprecated Please use {@link Builder#queryServiceConfig(QueryServiceConfig)} going forward.
          */
         public Builder queryEndpoints(final int queryEndpoints) {
             this.queryEndpoints = queryEndpoints;
@@ -1084,6 +1163,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * (default value {@value #SEARCH_ENDPOINTS}).
          *
          * Setting this to a higher number is advised in heavy query workloads.
+         *
+         * @deprecated Please use {@link Builder#searchServiceConfig(SearchServiceConfig)} going forward.
          */
         public Builder searchEndpoints(final int searchEndpoints) {
             this.searchEndpoints = searchEndpoints;
@@ -1403,6 +1484,65 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
+        /**
+         * Allows to set a custom configuration for the KV service.
+         *
+         * @param keyValueServiceConfig the config to apply.
+         */
+        public Builder keyValueServiceConfig(KeyValueServiceConfig keyValueServiceConfig) {
+            this.keyValueServiceConfig = keyValueServiceConfig;
+            return this;
+        }
+
+        /**
+         * Allows to set a custom configuration for the View service.
+         *
+         * @param viewServiceConfig the config to apply.
+         */
+        public Builder viewServiceConfig(ViewServiceConfig viewServiceConfig) {
+            this.viewServiceConfig = viewServiceConfig;
+            return this;
+        }
+
+        /**
+         * Allows to set a custom configuration for the Query service.
+         *
+         * @param queryServiceConfig the config to apply.
+         */
+        public Builder queryServiceConfig(QueryServiceConfig queryServiceConfig) {
+            this.queryServiceConfig = queryServiceConfig;
+            return this;
+        }
+
+        /**
+         * Allows to set a custom configuration for the Search service.
+         *
+         * @param searchServiceConfig the config to apply.
+         */
+        public Builder searchServiceConfig(SearchServiceConfig searchServiceConfig) {
+            this.searchServiceConfig = searchServiceConfig;
+            return this;
+        }
+
+        /**
+         * Allows to set the configuration poll interval which polls the server cluster
+         * configuration proactively.
+         *
+         * Note that the interval cannot be set lower than 2500 millisconds (other than 0
+         * to disable it).
+         * @param configPollInterval the interval in milliseconds, 0 deactivates the polling.
+         */
+        @InterfaceStability.Experimental
+        @InterfaceAudience.Public
+        public Builder configPollInterval(long configPollInterval) {
+            if (configPollInterval < 2500 && configPollInterval != 0) {
+                throw new IllegalArgumentException("The poll interval cannot be lower than " +
+                    "2500 milliseconds");
+            }
+            this.configPollInterval = configPollInterval;
+            return this;
+        }
+
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -1434,6 +1574,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", viewServiceEndpoints=").append(viewServiceEndpoints);
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", searchServiceEndpoints=").append(searchServiceEndpoints);
+        sb.append(", configPollInterval=").append(configPollInterval);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         if (ioPoolShutdownHook == null || ioPoolShutdownHook instanceof  NoOpShutdownHook) {
             sb.append("!unmanaged");

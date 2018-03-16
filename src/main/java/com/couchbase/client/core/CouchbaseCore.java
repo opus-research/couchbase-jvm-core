@@ -225,7 +225,7 @@ public class CouchbaseCore implements ClusterFacade {
             request.observable().onCompleted();
         } else if (request instanceof OpenBucketRequest) {
             configProvider
-                .openBucket(request.bucket(), request.password())
+                .openBucket(request.bucket(), request.username(), request.password())
                 .flatMap(new Func1<ClusterConfig, Observable<ClusterConfig>>() {
                     @Override
                     public Observable<ClusterConfig> call(ClusterConfig clusterConfig) {
@@ -266,6 +266,12 @@ public class CouchbaseCore implements ClusterFacade {
                 .closeBuckets()
                 .flatMap(new Func1<Boolean, Observable<Boolean>>() {
                     @Override
+                    public Observable<Boolean> call(Boolean aBoolean) {
+                        return configProvider.shutdown();
+                    }
+                })
+                .flatMap(new Func1<Boolean, Observable<Boolean>>() {
+                    @Override
                     public Observable<Boolean> call(Boolean done) {
                         return sharedEnvironment ? Observable.just(true) : environment.shutdownAsync();
                     }
@@ -289,7 +295,7 @@ public class CouchbaseCore implements ClusterFacade {
             request.observable().onCompleted();
         } else if (request instanceof OpenConnectionRequest) {
             request.observable().onNext(new OpenConnectionResponse(
-                    new DCPConnection(environment, this, request.bucket(), request.password()), ResponseStatus.SUCCESS));
+                    new DCPConnection(environment, this, request.username(), request.password()), ResponseStatus.SUCCESS));
             request.observable().onCompleted();
         }
     }

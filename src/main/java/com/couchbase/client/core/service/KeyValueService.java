@@ -24,7 +24,7 @@ import com.couchbase.client.core.service.strategies.PartitionSelectionStrategy;
 import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
-public class KeyValueService extends AbstractPoolingService {
+public class KeyValueService extends PooledService {
 
     /**
      * The endpoint selection strategy.
@@ -46,10 +46,26 @@ public class KeyValueService extends AbstractPoolingService {
      * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
+    @Deprecated
     public KeyValueService(final String hostname, final String bucket, final String password, final int port,
+                           final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
+        this(hostname, bucket, bucket, password, port, env, responseBuffer);
+    }
+
+    /**
+     * Creates a new {@link KeyValueService}.
+     *
+     * @param hostname the hostname of the service.
+     * @param bucket the name of the bucket.
+     * @param username the user authorized for bucket access.
+     * @param password the password of the user.
+     * @param port the port of the service.
+     * @param env the shared environment.
+     * @param responseBuffer the shared response buffer.
+     */
+    public KeyValueService(final String hostname, final String bucket, final String username, final String password, final int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.kvEndpoints(), env.kvEndpoints(), STRATEGY, responseBuffer,
-            FACTORY);
+        super(hostname, bucket, username, password, port, env, env.kvServiceConfig(), responseBuffer, FACTORY, STRATEGY);
     }
 
     @Override
@@ -62,9 +78,9 @@ public class KeyValueService extends AbstractPoolingService {
      */
     static class KeyValueEndpointFactory implements EndpointFactory {
         @Override
-        public Endpoint create(String hostname, String bucket, String password, int port, CoreEnvironment env,
+        public Endpoint create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
             RingBuffer<ResponseEvent> responseBuffer) {
-            return new KeyValueEndpoint(hostname, bucket, password, port, env, responseBuffer);
+            return new KeyValueEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
         }
     }
 }

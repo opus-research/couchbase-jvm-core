@@ -74,11 +74,11 @@ public class AbstractLazyServiceTest {
         when(endpoint.states()).thenReturn(endpointStates.states());
         when(endpoint.state()).thenReturn(endpointStates.state());
         when(endpoint.connect()).thenReturn(Observable.just(LifecycleState.CONNECTED));
-        when(factory.create(host, bucket, password, port, env, null)).thenReturn(endpoint);
+        when(factory.create(host, bucket, bucket, password, port, env, null)).thenReturn(endpoint);
 
-        assertEquals(0, service.endpoints().length);
+        assertEquals(0, service.endpoints().size());
         assertEquals(LifecycleState.IDLE, service.connect().toBlocking().single());
-        assertEquals(0, service.endpoints().length);
+        assertEquals(0, service.endpoints().size());
 
         endpointStates.transitionState(LifecycleState.CONNECTING);
         endpointStates.transitionState(LifecycleState.CONNECTED);
@@ -107,7 +107,7 @@ public class AbstractLazyServiceTest {
 
         public InstrumentedService(String hostname, String bucket, String password, int port,
             CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer, EndpointFactory endpointFactory) {
-            super(hostname, bucket, password, port, env, responseBuffer, endpointFactory);
+            super(hostname, bucket, bucket, password, port, env, responseBuffer, endpointFactory);
         }
 
         @Override

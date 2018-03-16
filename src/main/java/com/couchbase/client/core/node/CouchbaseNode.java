@@ -20,8 +20,6 @@ import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.event.system.NodeConnectedEvent;
 import com.couchbase.client.core.event.system.NodeDisconnectedEvent;
-import com.couchbase.client.core.event.system.ServiceConnectedEvent;
-import com.couchbase.client.core.event.system.ServiceDisconnectedEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -210,13 +208,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 @Override
                 public Observable<LifecycleState> call(final Service service) {
                     LOGGER.debug(logIdent(hostname) + "Instructing Service " + service.type() + " to connect.");
-                    return service.connect().doOnNext(new Action1<LifecycleState>(){
-                            public void call(LifecycleState state) {
-                                if (state == LifecycleState.CONNECTED) {
-                                    eventBus.publish(new ServiceConnectedEvent(hostname(), service.type()));
-                                }
-                            }
-                        });
+                    return service.connect();
                 }
             })
             .toList()
@@ -238,12 +230,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 @Override
                 public Observable<LifecycleState> call(final Service service) {
                     LOGGER.debug(logIdent(hostname) + "Instructing Service " + service.type() + " to disconnect.");
-                    return service.disconnect().doOnNext(new Action1<LifecycleState>() {
-                        public void call(LifecycleState state){
-                            if (state == LifecycleState.DISCONNECTED) {
-                                signalServiceDisconnected(service.type());
-                            }
-                        }});
+                    return service.disconnect();
                 }
             })
             .toList()
@@ -267,6 +254,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         final Service service = ServiceFactory.create(
             request.hostname().getHostName(),
             request.bucket(),
+            request.username(),
             request.password(),
             request.port(),
             environment,
@@ -278,15 +266,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         LOGGER.debug(logIdent(hostname) + "Adding Service " + request.type() + " to registry and connecting it.");
         serviceRegistry.addService(service, request.bucket());
         enabledServices |= 1 << service.type().ordinal();
-        return service.connect()
-                .doOnNext(new Action1<LifecycleState>() {
-                    public void call(LifecycleState state) {
-                        if (state == LifecycleState.CONNECTED) {
-                            signalServiceConnected(service.type());
-                        }
-                    }
-                })
-        .map(new Func1<LifecycleState, Service>() {
+        return service.connect().map(new Func1<LifecycleState, Service>() {
             @Override
             public Service call(LifecycleState state) {
                 return service;
@@ -311,24 +291,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
             + "hostname=" + hostname
             + ", services=" + serviceRegistry
             + '}';
-    }
-
-    /**
-     * Publish service connected event to susbcribers on the event bus.
-     */
-    private void signalServiceConnected(ServiceType serviceType) {
-        if (eventBus != null && eventBus.hasSubscribers()) {
-            eventBus.publish(new ServiceConnectedEvent(hostname, serviceType));
-        }
-    }
-
-    /**
-     * Publish service disconnected event to susbcribers on the event bus.
-     */
-    private void signalServiceDisconnected(ServiceType serviceType) {
-        if (eventBus != null && eventBus.hasSubscribers()) {
-            eventBus.publish(new ServiceDisconnectedEvent(hostname, serviceType));
-        }
     }
 
     /**
