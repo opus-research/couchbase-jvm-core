@@ -15,8 +15,7 @@
  */
 package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.utils.NetworkAddress;
-
+import java.net.InetAddress;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,5 +61,5 @@ public interface ClusterConfig {
      * Returns the addresses of all nodes in the cluster, accumulated from all
      * open buckets.
      */
-    Set<NetworkAddress> allNodeAddresses();
+    Set<InetAddress> allNodeAddresses();
 }

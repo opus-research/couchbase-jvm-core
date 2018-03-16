@@ -32,12 +32,12 @@ import com.couchbase.client.core.service.ServiceFactory;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.AbstractStateMachine;
 import com.couchbase.client.core.state.LifecycleState;
-import com.couchbase.client.core.utils.NetworkAddress;
 import com.lmax.disruptor.RingBuffer;
 import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
+import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -68,7 +68,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     /**
      * The hostname or IP address of the node.
      */
-    private final NetworkAddress hostname;
+    private final InetAddress hostname;
 
     /**
      * The environment to use.
@@ -99,12 +99,12 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      */
     private volatile int enabledServices;
 
-    public CouchbaseNode(final NetworkAddress hostname, final CoreEnvironment environment,
+    public CouchbaseNode(final InetAddress hostname, final CoreEnvironment environment,
         final RingBuffer<ResponseEvent> responseBuffer) {
         this(hostname, new DefaultServiceRegistry(), environment, responseBuffer);
     }
 
-    CouchbaseNode(final NetworkAddress hostname, ServiceRegistry registry, final CoreEnvironment environment,
+    CouchbaseNode(final InetAddress hostname, ServiceRegistry registry, final CoreEnvironment environment,
         final RingBuffer<ResponseEvent> responseBuffer) {
         super(LifecycleState.DISCONNECTED);
         this.hostname = hostname;
@@ -114,14 +114,12 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.eventBus = environment.eventBus();
         this.serviceStates = new ServiceStateZipper(LifecycleState.DISCONNECTED);
 
-        if (NetworkAddress.ALLOW_REVERSE_DNS) {
-            //JVMCBC-229: eagerly trigger and time a reverse DNS lookup
-            long lookupStart = System.nanoTime();
-            String lookupResult = hostname.nameAndAddress();
-            long lookupDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lookupStart);
-            if (lookupDurationMs >= DNS_RESOLUTION_THRESHOLD) {
-                LOGGER.warn("DNS Reverse Lookup of " + lookupResult + " is slow, took " + lookupDurationMs + "ms");
-            }
+        //JVMCBC-229: eagerly trigger and time a reverse DNS lookup
+        long lookupStart = System.nanoTime();
+        String lookupResult = hostname.getHostName();
+        long lookupDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lookupStart);
+        if (lookupDurationMs >= DNS_RESOLUTION_THRESHOLD) {
+            LOGGER.warn("DNS Reverse Lookup of " + lookupResult + " is slow, took " + lookupDurationMs + "ms");
         }
 
         serviceStates.states().subscribe(new Action1<LifecycleState>() {
@@ -162,7 +160,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * Log that this node is now connected and also inform all susbcribers on the event bus.
      */
     private void signalConnected() {
-        LOGGER.info("Connected to Node " + hostname.nameAndAddress());
+        LOGGER.info("Connected to Node " + hostname.getHostName());
         if (eventBus != null && eventBus.hasSubscribers()) {
             eventBus.publish(new NodeConnectedEvent(hostname));
         }
@@ -172,7 +170,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * Log that this node is now disconnected and also inform all susbcribers on the event bus.
      */
     private void signalDisconnected() {
-        LOGGER.info("Disconnected from Node " + hostname.nameAndAddress());
+        LOGGER.info("Disconnected from Node " + hostname.getHostName());
         if (eventBus != null && eventBus.hasSubscribers()) {
             eventBus.publish(new NodeDisconnectedEvent(hostname));
         }
@@ -196,7 +194,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     }
 
     @Override
-    public NetworkAddress hostname() {
+    public InetAddress hostname() {
         return hostname;
     }
 
@@ -254,7 +252,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         }
 
         final Service service = ServiceFactory.create(
-            request.hostname().nameOrAddress(),
+            request.hostname().getHostName(),
             request.bucket(),
             request.username(),
             request.password(),
@@ -301,8 +299,8 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * @param hostname the address.
      * @return a prefix string for logs.
      */
-    protected static String logIdent(final NetworkAddress hostname) {
-        return "[" + hostname.nameAndAddress() + "]: ";
+    protected static String logIdent(final InetAddress hostname) {
+        return "[" + hostname.getHostName() + "]: ";
     }
 
     @Override
