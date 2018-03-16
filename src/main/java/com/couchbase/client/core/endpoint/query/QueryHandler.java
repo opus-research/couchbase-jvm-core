@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.endpoint.query;
 
+import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.*;
+
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
@@ -34,7 +36,6 @@ import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
-import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -50,13 +51,9 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import rx.Scheduler;
 import rx.subjects.AsyncSubject;
+import rx.subjects.ReplaySubject;
 
 import java.util.Queue;
-import java.util.concurrent.TimeUnit;
-
-import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findNextChar;
-import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findNextCharNotPrefixedBy;
-import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findSectionClosingPosition;
 
 /**
  * The {@link QueryHandler} is responsible for encoding {@link QueryRequest}s into lower level
@@ -103,19 +100,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private ByteBuf responseContent;
 
     /**
-     * Represents an observable that sends result chunks.
+     * Represents a observable that sends result chunks.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> queryRowObservable;
-
-    /**
-     * Represents an observable that has the signature of the N1QL results if there are any.
-     */
-    private UnicastAutoReleaseSubject<ByteBuf> querySignatureObservable;
+    private ReplaySubject<ByteBuf> queryRowObservable;
 
     /**
      * Represents an observable that sends errors and warnings if any during query execution.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> queryErrorObservable;
+    private ReplaySubject<ByteBuf> queryErrorObservable;
 
     /**
      * Represent an observable that has the final execution status of the query, once all result rows and/or
@@ -124,9 +116,9 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private AsyncSubject<String> queryStatusObservable;
 
     /**
-     * Represents an observable containing metrics on a terminated query.
+     * Represents a observable containing metrics on a terminated query.
      */
-    private UnicastAutoReleaseSubject<ByteBuf> queryInfoObservable;
+    private AsyncSubject<ByteBuf> queryInfoObservable;
 
     /**
      * Represents the current query parsing state.
@@ -176,7 +168,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             request.content().writeBytes(query);
             query.release();
         } else if (msg instanceof KeepAliveRequest) {
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
+            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.HEAD, "/");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
         } else {
             throw new IllegalArgumentException("Unknown incoming QueryRequest type "
@@ -200,12 +192,10 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         if (currentRequest() instanceof KeepAliveRequest) {
-            if (msg instanceof LastHttpContent) {
-                response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
-                responseContent.clear();
-                responseContent.discardReadBytes();
-                finishedDecoding();
-            }
+            response = new KeepAliveResponse(statusFromCode(responseHeader.getStatus().code()), currentRequest());
+            responseContent.clear();
+            responseContent.discardReadBytes();
+            finishedDecoding();
         } else if (msg instanceof HttpContent) {
             responseContent.writeBytes(((HttpContent) msg).content());
             boolean lastChunk = msg instanceof LastHttpContent;
@@ -311,17 +301,13 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         Scheduler scheduler = env().scheduler();
-        long ttl = env().autoreleaseAfter();
-        queryRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        queryErrorObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
+        queryRowObservable = ReplaySubject.create();
+        queryErrorObservable = ReplaySubject.create();
         queryStatusObservable = AsyncSubject.create();
-        queryInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        querySignatureObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-
+        queryInfoObservable = AsyncSubject.create();
         return new GenericQueryResponse(
                 queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
                 queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
-                querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
                 queryStatusObservable.onBackpressureBuffer().observeOn(scheduler),
                 queryInfoObservable.onBackpressureBuffer().observeOn(scheduler),
                 currentRequest(),
@@ -343,7 +329,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
 
         if (queryParsingState == QUERY_STATE_SIGNATURE) {
-            parseQuerySignature(lastChunk);
+            skipQuerySignature(lastChunk);
         }
 
         if (queryParsingState == QUERY_STATE_ROWS) {
@@ -416,24 +402,22 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
-     * Parse the signature section in the N1QL response.
+     * For now skip the signature.
      */
-    private void parseQuerySignature(boolean lastChunk) {
+    private void skipQuerySignature(boolean lastChunk) {
         int openPos = findNextChar(responseContent, '{');
         if (!isEmptySection(openPos)) { //checks for empty signature
             int closePos = findSectionClosingPosition(responseContent, '{', '}');
             if (closePos > 0) {
                 int length = closePos - openPos - responseContent.readerIndex() + 1;
                 responseContent.skipBytes(openPos);
+                //TODO ultimately send the signature back to the client
                 ByteBuf signature = responseContent.readSlice(length);
-                querySignatureObservable.onNext(signature.copy());
             } else {
                 //wait for more data
                 return;
             }
         }
-        //note: the signature section could be absent, so we'll make sure to complete the observable
-        // when receiving status since this is in every well-formed response.
         sectionDone();
         queryParsingState = transitionToNextToken(lastChunk);
     }
@@ -492,8 +476,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
      * (including full execution of the query).
      */
     private void parseQueryStatus(boolean lastChunk) {
-        //some sections don't always come up, unlike status. Take this chance to close said sections' observables here.
-        querySignatureObservable.onCompleted();
         queryRowObservable.onCompleted();
         queryErrorObservable.onCompleted();
 
@@ -550,7 +532,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryRowObservable = null;
         queryErrorObservable = null;
         queryStatusObservable = null;
-        querySignatureObservable = null;
         queryParsingState = QUERY_STATE_INITIAL;
     }
 
@@ -589,9 +570,6 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         }
         if (queryStatusObservable != null) {
             queryStatusObservable.onCompleted();
-        }
-        if (querySignatureObservable != null) {
-            querySignatureObservable.onCompleted();
         }
         cleanupQueryStates();
         if (responseContent != null && responseContent.refCnt() > 0) {
