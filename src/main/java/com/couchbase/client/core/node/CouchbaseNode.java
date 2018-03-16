@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.node;
 
+import com.couchbase.client.core.RetryPolicy;
+import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.env.CoreEnvironment;
@@ -111,10 +113,24 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         } else {
             Service service = serviceRegistry.locate(request);
             if (service == null) {
-                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+                retryOrCancel(request);
             } else {
                 service.send(request);
             }
+        }
+    }
+
+    /**
+     * Depending on the policy set, either retry the operation or cancel it right away.
+     *
+     * @param request the request to retry or cancel.
+     */
+    private void retryOrCancel(final CouchbaseRequest request) {
+        if (environment.retryPolicy() == RetryPolicy.BEST_EFFORT) {
+            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+        } else {
+            request.observable().onError(new RequestCancelledException("Could not dispatch request to a "
+                    + "connected node."));
         }
     }
 

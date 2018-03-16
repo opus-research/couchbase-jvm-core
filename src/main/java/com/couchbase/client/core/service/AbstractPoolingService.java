@@ -21,6 +21,8 @@
  */
 package com.couchbase.client.core.service;
 
+import com.couchbase.client.core.RetryPolicy;
+import com.couchbase.client.core.RequestCancelledException;
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.ResponseHandler;
 import com.couchbase.client.core.endpoint.Endpoint;
@@ -40,6 +42,7 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
     private final int maxEndpoints;
     private final RingBuffer<ResponseEvent> responseBuffer;
     private final SelectionStrategy strategy;
+    private final CoreEnvironment env;
 
     protected AbstractPoolingService(String hostname, String bucket, String password, int port,
         CoreEnvironment env, int minEndpoints, int maxEndpoints, SelectionStrategy strategy,
@@ -48,6 +51,7 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
         this.maxEndpoints = maxEndpoints;
         this.responseBuffer = responseBuffer;
         this.strategy = strategy;
+        this.env = env;
     }
 
     @Override
@@ -55,12 +59,26 @@ public abstract class AbstractPoolingService extends AbstractDynamicService {
         if (endpoints().length == maxEndpoints) {
             Endpoint endpoint = strategy.select(request, endpoints());
             if (endpoint == null) {
-                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+                retryOrCancel(request);
             } else {
                 endpoint.send(request);
             }
         } else {
             throw new UnsupportedOperationException("Dynamic endpoint scaling is currently not supported.");
+        }
+    }
+
+    /**
+     * Depending on the policy set, either retry the operation or cancel it right away.
+     *
+     * @param request the request to retry or cancel.
+     */
+    private void retryOrCancel(final CouchbaseRequest request) {
+        if (env.retryPolicy() == RetryPolicy.BEST_EFFORT) {
+            responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
+        } else {
+            request.observable().onError(new RequestCancelledException("Could not dispatch request to a "
+                    + "connected node."));
         }
     }
 
