@@ -112,11 +112,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private final boolean traceEnabled;
 
     /**
-     * If the response need to be moved out of the event loop.
-     */
-    private final boolean moveResponseOut;
-
-    /**
      * A cache to avoid consistent string conversions for the request simple names.
      */
     private final Map<Class<? extends CouchbaseRequest>, String> classNameCache;
@@ -170,7 +165,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.traceEnabled = LOGGER.isTraceEnabled();
         this.sentRequestTimings = new ArrayDeque<Long>();
         this.classNameCache = new IdentityHashMap<Class<? extends CouchbaseRequest>, String>();
-        this.moveResponseOut = env() == null || !env().callbacksOnIoPool();
     }
 
     /**
@@ -310,35 +304,14 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     protected void publishResponse(final CouchbaseResponse response,
         final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
         if (response.status() != ResponseStatus.RETRY && observable != null) {
-            if (moveResponseOut) {
-                Scheduler scheduler = env().scheduler();
-                if (scheduler instanceof CoreScheduler) {
-                    scheduleDirect((CoreScheduler) scheduler, response, observable);
-                } else {
-                    scheduleWorker(scheduler, response, observable);
-                }
+            Scheduler scheduler = env().scheduler();
+            if (scheduler instanceof CoreScheduler) {
+                scheduleDirect((CoreScheduler) scheduler, response, observable);
             } else {
-                completeResponse(response, observable);
+                scheduleWorker(scheduler, response, observable);
             }
         } else {
             responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, response, observable);
-        }
-    }
-
-    /**
-     * Fulfill and complete the response observable.
-     *
-     * When called directly, this method completes on the event loop, but it can also be used in a callback (see
-     * {@link #scheduleDirect(CoreScheduler, CouchbaseResponse, Subject)} for example.
-     */
-    private static void completeResponse(final CouchbaseResponse response,
-        final Subject<CouchbaseResponse, CouchbaseResponse> observable) {
-        try {
-            observable.onNext(response);
-            observable.onCompleted();
-        } catch (Exception ex) {
-            LOGGER.warn("Caught exception while onNext on observable", ex);
-            observable.onError(ex);
         }
     }
 
@@ -353,7 +326,13 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         scheduler.scheduleDirect(new Action0() {
             @Override
             public void call() {
-                completeResponse(response, observable);
+                try {
+                    observable.onNext(response);
+                    observable.onCompleted();
+                } catch (Exception ex) {
+                    LOGGER.warn("Caught exception while onNext on observable", ex);
+                    observable.onError(ex);
+                }
             }
         });
     }
