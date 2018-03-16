@@ -64,18 +64,4 @@ public interface BinarySubdocMutationRequest extends BinarySubdocRequest {
      * @return the CAS to use for the mutation (if needed) or 0L to ignore
      */
     long cas();
-
-    /**
-     * Access to extended attribute section of the couchbase document
-     *
-     * @return true if accessing extended attribute section
-     */
-    boolean attributeAccess();
-
-    /**
-     * Expand macros on the values set on extended attribute section
-     *
-     * @return true if expanding macros
-     */
-    boolean expandMacros();
 }

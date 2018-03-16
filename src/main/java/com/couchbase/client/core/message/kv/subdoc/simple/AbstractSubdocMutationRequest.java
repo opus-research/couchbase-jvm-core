@@ -40,10 +40,6 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
 
     private boolean createIntermediaryPath;
 
-    private boolean attributeAccess;
-
-    private boolean expandMacros;
-
     private long cas;
 
     /**
@@ -80,8 +76,6 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
         this.expiration = expiration;
         this.fragment = fragment;
         this.createIntermediaryPath = false;
-        this.attributeAccess = false;
-        this.expandMacros = false;
         this.cas = cas;
     }
 
@@ -107,30 +101,6 @@ public abstract class AbstractSubdocMutationRequest extends AbstractSubdocReques
      */
     public void createIntermediaryPath(boolean createIntermediaryPath) {
         this.createIntermediaryPath = createIntermediaryPath;
-    }
-
-    @Override
-    public boolean attributeAccess() {
-        return this.attributeAccess;
-    }
-
-    @Override
-    public boolean expandMacros() {
-        return this.expandMacros;
-    }
-
-    public void attributeAccess(boolean attributeAccess) {
-        if (!attributeAccess && this.expandMacros) {
-            throw new IllegalArgumentException("Macros can be used only with extended attributes");
-        }
-        this.attributeAccess = attributeAccess;
-    }
-
-    public void expandMacros(boolean expandMacros) {
-        if (!this.attributeAccess && expandMacros) {
-            throw new IllegalArgumentException("Macros can be used only with extended attributes");
-        }
-        this.expandMacros = expandMacros;
     }
 
     @Override
