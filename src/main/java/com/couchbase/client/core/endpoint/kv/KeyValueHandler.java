@@ -191,13 +191,10 @@ public class KeyValueHandler
     @Override
     protected BinaryMemcacheRequest encodeRequest(final ChannelHandlerContext ctx, final BinaryRequest msg)
         throws Exception {
-
-        boolean copyContent = env().sslEnabled();
-
-        BinaryMemcacheRequest request = encodeCommonRequest(ctx, msg, copyContent);
+        BinaryMemcacheRequest request = encodeCommonRequest(ctx, msg);
 
         if (request == null) {
-            request = encodeOtherRequest(ctx, msg, copyContent);
+            request = encodeOtherRequest(ctx, msg);
         }
 
         if (msg.partition() >= 0) {
@@ -211,21 +208,18 @@ public class KeyValueHandler
         // Observe has content, but not external, so it should not be retained.
         if (!(msg instanceof ObserveRequest)
             && !(msg instanceof ObserveSeqnoRequest)
-            && (request instanceof FullBinaryMemcacheRequest)
-                && !copyContent) {
+            && (request instanceof FullBinaryMemcacheRequest)) {
             ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
         return request;
     }
 
-    private BinaryMemcacheRequest encodeCommonRequest(final ChannelHandlerContext ctx,
-                                                      final BinaryRequest msg,
-                                                      boolean copyContent) {
+    private BinaryMemcacheRequest encodeCommonRequest(final ChannelHandlerContext ctx, final BinaryRequest msg) {
         if (msg instanceof GetRequest) {
             return handleGetRequest(ctx, (GetRequest) msg);
         } else if (msg instanceof BinaryStoreRequest) {
-            return handleStoreRequest(ctx, (BinaryStoreRequest) msg, copyContent);
+            return handleStoreRequest(ctx, (BinaryStoreRequest) msg);
         } else if (msg instanceof ReplicaGetRequest) {
             return handleReplicaGetRequest((ReplicaGetRequest) msg);
         } else if (msg instanceof RemoveRequest) {
@@ -240,7 +234,7 @@ public class KeyValueHandler
         return null;
     }
 
-    private BinaryMemcacheRequest encodeOtherRequest(final ChannelHandlerContext ctx, final BinaryRequest msg, boolean copyContent) {
+    private BinaryMemcacheRequest encodeOtherRequest(final ChannelHandlerContext ctx, final BinaryRequest msg) {
         if (msg instanceof ObserveRequest) {
             return handleObserveRequest(ctx, (ObserveRequest) msg);
         } else if (msg instanceof ObserveSeqnoRequest) {
@@ -248,9 +242,9 @@ public class KeyValueHandler
         } else if (msg instanceof GetBucketConfigRequest) {
             return handleGetBucketConfigRequest();
         } else if (msg instanceof AppendRequest) {
-            return handleAppendRequest((AppendRequest) msg, copyContent);
+            return handleAppendRequest((AppendRequest) msg);
         } else if (msg instanceof PrependRequest) {
-            return handlePrependRequest((PrependRequest) msg, copyContent);
+            return handlePrependRequest((PrependRequest) msg);
         } else if (msg instanceof KeepAliveRequest) {
             return handleKeepAliveRequest((KeepAliveRequest) msg);
         } else if (msg instanceof StatRequest) {
@@ -258,11 +252,11 @@ public class KeyValueHandler
         } else if (msg instanceof GetAllMutationTokensRequest) {
             return handleGetAllMutationTokensRequest(ctx, (GetAllMutationTokensRequest) msg);
         } else if (msg instanceof BinarySubdocRequest) {
-            return handleSubdocumentRequest(ctx, (BinarySubdocRequest) msg, copyContent);
+            return handleSubdocumentRequest(ctx, (BinarySubdocRequest) msg);
         } else if (msg instanceof BinarySubdocMultiLookupRequest) {
-            return handleSubdocumentMultiLookupRequest(ctx, (BinarySubdocMultiLookupRequest) msg, copyContent);
+            return handleSubdocumentMultiLookupRequest(ctx, (BinarySubdocMultiLookupRequest) msg);
         } else if (msg instanceof BinarySubdocMultiMutationRequest) {
-            return handleSubdocumentMultiMutationRequest(ctx, (BinarySubdocMultiMutationRequest) msg, copyContent);
+            return handleSubdocumentMultiMutationRequest(ctx, (BinarySubdocMultiMutationRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown incoming BinaryRequest type " + msg.getClass());
         }
@@ -346,7 +340,7 @@ public class KeyValueHandler
      * @return a ready {@link BinaryMemcacheRequest}.
      */
     private static BinaryMemcacheRequest handleStoreRequest(final ChannelHandlerContext ctx,
-        final BinaryStoreRequest msg, boolean copyContent) {
+        final BinaryStoreRequest msg) {
         ByteBuf extras = ctx.alloc().buffer(8);
         extras.writeInt(msg.flags());
         extras.writeInt(msg.expiration());
@@ -354,15 +348,7 @@ public class KeyValueHandler
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
         byte extrasLength = (byte) extras.readableBytes();
-
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, content);
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
 
         if (msg instanceof InsertRequest) {
             request.setOpcode(OP_INSERT);
@@ -377,7 +363,7 @@ public class KeyValueHandler
         }
 
         request.setKeyLength(keyLength);
-        request.setTotalBodyLength(keyLength + content.readableBytes() + extrasLength);
+        request.setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength);
         request.setExtrasLength(extrasLength);
         return request;
     }
@@ -493,42 +479,27 @@ public class KeyValueHandler
         return request;
     }
 
-    private static BinaryMemcacheRequest handleAppendRequest(final AppendRequest msg, boolean copyContent) {
+    private static BinaryMemcacheRequest handleAppendRequest(final AppendRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
-
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, content);
+        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_APPEND);
         request.setKeyLength(keyLength);
         request.setCAS(msg.cas());
-        request.setTotalBodyLength(keyLength + content.readableBytes());
+        request.setTotalBodyLength(keyLength + msg.content().readableBytes());
         return request;
     }
 
-    private static BinaryMemcacheRequest handlePrependRequest(final PrependRequest msg, boolean copyContent) {
+    private static BinaryMemcacheRequest handlePrependRequest(final PrependRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        BinaryMemcacheRequest request =new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, content);
+        BinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
 
         request.setOpcode(OP_PREPEND);
         request.setKeyLength(keyLength);
         request.setCAS(msg.cas());
-        request.setTotalBodyLength(keyLength + content.readableBytes());
+        request.setTotalBodyLength(keyLength + msg.content().readableBytes());
         return request;
     }
 
@@ -585,9 +556,7 @@ public class KeyValueHandler
         return request;
     }
 
-    private static BinaryMemcacheRequest handleSubdocumentRequest(ChannelHandlerContext ctx,
-                                                                  BinarySubdocRequest msg,
-                                                                  boolean copyContent) {
+    private static BinaryMemcacheRequest handleSubdocumentRequest(ChannelHandlerContext ctx, BinarySubdocRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
@@ -632,46 +601,32 @@ public class KeyValueHandler
             extras.writeByte(0);
         }
 
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, content);
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
         request.setOpcode(msg.opcode())
                 .setKeyLength(keyLength)
                 .setExtrasLength(extrasLength)
-                .setTotalBodyLength(keyLength + content.readableBytes() + extrasLength)
+                .setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength)
                 .setCAS(cas);
 
         return request;
     }
 
     private static BinaryMemcacheRequest handleSubdocumentMultiLookupRequest(ChannelHandlerContext ctx,
-                                                                             BinarySubdocMultiLookupRequest msg,
-                                                                             boolean copyContent) {
+                                                                             BinarySubdocMultiLookupRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, content);
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, Unpooled.EMPTY_BUFFER, msg.content());
         request.setOpcode(OP_SUB_MULTI_LOOKUP)
                 .setKeyLength(keyLength)
                 .setExtrasLength((byte) 0)
-                .setTotalBodyLength(keyLength + content.readableBytes());
+                .setTotalBodyLength(keyLength + msg.content().readableBytes());
 
         return request;
     }
 
-    private static BinaryMemcacheRequest handleSubdocumentMultiMutationRequest(ChannelHandlerContext ctx, BinarySubdocMultiMutationRequest msg, boolean copyContent) {
+    private static BinaryMemcacheRequest handleSubdocumentMultiMutationRequest(ChannelHandlerContext ctx,
+                                                                             BinarySubdocMultiMutationRequest msg) {
         byte[] key = msg.keyBytes();
         short keyLength = (short) key.length;
 
@@ -683,20 +638,12 @@ public class KeyValueHandler
             extras.writeInt(msg.expiration());
         }
 
-        ByteBuf content;
-        if (copyContent) {
-            content = msg.content().copy();
-        } else {
-            content = msg.content();
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, content);
-
+        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
         request.setOpcode(OP_SUB_MULTI_MUTATION)
                 .setCAS(msg.cas())
                 .setKeyLength(keyLength)
                 .setExtrasLength(extrasLength)
-                .setTotalBodyLength(keyLength + content.readableBytes() + extrasLength);
+                .setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength);
 
         return request;
     }
