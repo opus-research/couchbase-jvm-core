@@ -464,7 +464,8 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
                         }
-                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
+                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()
+                                && services.containsKey(ServiceType.BINARY)) {
                             services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);
