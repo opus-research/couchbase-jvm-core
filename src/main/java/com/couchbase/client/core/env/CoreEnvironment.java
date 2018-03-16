@@ -115,13 +115,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     EventLoopGroup searchIoPool();
 
     /**
-     * Returns the current {@link com.couchbase.client.core.service.KeyValueService} configuration.
-     *
-     * @return the current config for the kv service.
-     */
-    KeyValueServiceConfig kvServiceConfig();
-
-    /**
      * Returns the scheduler which should be used for all core actions that need to happen
      * asynchronously.
      *
