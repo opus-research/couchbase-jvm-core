@@ -19,48 +19,44 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
+
+package com.couchbase.client.core.message.dcp;
+
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
 
 /**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
+ * Type of DCP connection.
  *
- * @author Michael Nitschinger
- * @since 1.0
+ * It specifies which kind of connection the server have to initiate for sender.
+ * For example, if the sender wants to pull the data from server, it need to
+ * choose {@link ConnectionType#PRODUCER}.
+ *
+ * @author Sergey Avseyev
+ * @since 1.1.0
  */
-public enum ServiceType {
-
+@InterfaceStability.Experimental
+@InterfaceAudience.Private
+public enum ConnectionType {
     /**
-     * Views and Design Documents.
+     * The connection initiator going to produce messages, and the receiver
+     * will consume them.
      */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
-
+    CONSUMER(0),
     /**
-     * Key/Value type operations.
+     * The connection initiator going to consume messages, and the receiver
+     * will produce them.
      */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
+    PRODUCER(1);
 
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
+    /* On-wire representation of connection type */
+    private final int flags;
 
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
+    private ConnectionType(int flags) {
+        this.flags = flags;
     }
 
-    public BucketServiceMapping mapping() {
-        return mapping;
+    public int flags() {
+        return flags;
     }
 }

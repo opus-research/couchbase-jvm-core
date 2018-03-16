@@ -47,6 +47,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final String SSL_KEYSTORE_PASSWORD = null;
     public static final boolean QUERY_ENABLED = false;
     public static final int QUERY_PORT = 8093;
+    public static final int DCP_PORT = 11210;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -60,6 +61,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int KEYVALUE_ENDPOINTS = 1;
     public static final int VIEW_ENDPOINTS = 1;
     public static final int QUERY_ENDPOINTS = 1;
+    public static final int DCP_ENDPOINTS = 1;
     public static String PACKAGE_NAME_AND_VERSION = "couchbase-jvm-core";
     public static String USER_AGENT = PACKAGE_NAME_AND_VERSION;
 
@@ -111,6 +113,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final String sslKeystorePassword;
     private final boolean queryEnabled;
     private final int queryPort;
+    private final int dcpPort;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -123,6 +126,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int requestBufferSize;
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
+    private final int dcpServiceEndpoints;
     private final int queryServiceEndpoints;
     private final String userAgent;
     private final String packageNameAndVersion;
@@ -144,6 +148,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword());
         queryEnabled = booleanPropertyOr("queryEnabled", builder.queryEnabled());
         queryPort = intPropertyOr("queryPort", builder.queryPort());
+        dcpPort = intPropertyOr("dcpPort", builder.dcpPort());
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled());
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort());
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort());
@@ -157,6 +162,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints());
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints());
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints());
+        dcpServiceEndpoints = intPropertyOr("dcpEndpoints", builder.dcpEndpoints());
         packageNameAndVersion = stringPropertyOr("packageNameAndVersion", builder.packageNameAndVersion());
         userAgent = stringPropertyOr("userAgent", builder.userAgent());
 
@@ -272,6 +278,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
+    public int dcpPort() {
+        return dcpPort;
+    }
+
+    @Override
     public boolean bootstrapHttpEnabled() {
         return bootstrapHttpEnabled;
     }
@@ -337,6 +348,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
+    public int dcpEndpoints() {
+        return dcpServiceEndpoints;
+    }
+
+    @Override
     public String userAgent() {
         return userAgent;
     }
@@ -355,6 +371,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean queryEnabled = QUERY_ENABLED;
         private int queryPort = QUERY_PORT;
+        private int dcpPort = DCP_PORT;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
         private boolean bootstrapCarrierEnabled = BOOTSTRAP_CARRIER_ENABLED;
         private int bootstrapHttpDirectPort = BOOTSTRAP_HTTP_DIRECT_PORT;
@@ -368,6 +385,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int kvServiceEndpoints = KEYVALUE_ENDPOINTS;
         private int viewServiceEndpoints = VIEW_ENDPOINTS;
         private int queryServiceEndpoints = QUERY_ENDPOINTS;
+        private int dcpServiceEndpoints = DCP_ENDPOINTS;
         private EventLoopGroup ioPool;
         private Scheduler scheduler;
 
@@ -422,6 +440,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         public Builder queryPort(final int queryPort) {
             this.queryPort = queryPort;
+            return this;
+        }
+
+        @Override
+        public int dcpPort() {
+            return dcpPort;
+        }
+
+        public Builder dcpPort(final int dcpPort) {
+            this.dcpPort = dcpPort;
             return this;
         }
 
@@ -552,6 +580,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         public Builder queryEndpoints(final int queryServiceEndpoints) {
             this.queryServiceEndpoints = queryServiceEndpoints;
+            return this;
+        }
+
+        @Override
+        public int dcpEndpoints() {
+            return dcpServiceEndpoints;
+        }
+
+        public Builder dcpEndpoints(final int dcpServiceEndpoints) {
+            this.dcpServiceEndpoints = dcpServiceEndpoints;
             return this;
         }
 

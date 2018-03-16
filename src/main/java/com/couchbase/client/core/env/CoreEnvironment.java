@@ -73,6 +73,8 @@ public interface CoreEnvironment {
 
     int queryPort();
 
+    int dcpPort();
+
     boolean bootstrapHttpEnabled();
 
     boolean bootstrapCarrierEnabled();
@@ -149,6 +151,13 @@ public interface CoreEnvironment {
      * @return amount of endpoints per service.
      */
     int queryEndpoints();
+
+    /**
+     * The number of DCP service endpoints.
+     *
+     * @return amount of endpoints per service.
+     */
+    int dcpEndpoints();
 
     /**
      * Library identification string, which can be used as User-Agent header in HTTP requests.
