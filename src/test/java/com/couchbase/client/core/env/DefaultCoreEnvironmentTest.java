@@ -117,7 +117,6 @@ public class DefaultCoreEnvironmentTest {
             Set<String> afterCreate = dump(threads(mx, ignore, false));
 
             env.shutdown().toBlocking().last();
-            Thread.sleep(100);
             //we only consider threads starting with cb- or containing Rx, minus the ones existing at startup
             Set<String> afterShutdown = threads(mx, ignore, true);
 

@@ -22,10 +22,10 @@
 package com.couchbase.client.core.env.resources;
 
 import io.netty.channel.EventLoopGroup;
-import io.netty.util.ThreadDeathWatcher;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
-
-import java.util.concurrent.TimeUnit;
+import rx.Subscriber;
 
 /**
  * {@link ShutdownHook} hook for an {@link EventLoopGroup}.
@@ -44,13 +44,29 @@ public class IoPoolShutdownHook implements ShutdownHook {
     }
 
     public Observable<Boolean> shutdown() {
-        try {
-            ioPool.shutdownGracefully(0, 10, TimeUnit.MILLISECONDS);
-            ThreadDeathWatcher.awaitInactivity(1, TimeUnit.SECONDS);
-            return Observable.just(true);
-        } catch (Throwable e) {
-            return Observable.error(e);
-        }
+        return Observable.create(new Observable.OnSubscribe<Boolean>() {
+            @Override
+            public void call(final Subscriber<? super Boolean> subscriber) {
+                ioPool.shutdownGracefully().addListener(new GenericFutureListener() {
+                    @Override
+                    public void operationComplete(final Future future) throws Exception {
+                        if (!subscriber.isUnsubscribed()) {
+                            try {
+                                if (future.isSuccess()) {
+                                    subscriber.onNext(true);
+                                    shutdown = true;
+                                    subscriber.onCompleted();
+                                } else {
+                                    subscriber.onError(future.cause());
+                                }
+                            } catch (Exception ex) {
+                                subscriber.onError(ex);
+                            }
+                        }
+                    }
+                });
+            }
+        }).onErrorResumeNext(Observable.just(true));
     }
 
     @Override
