@@ -20,32 +20,33 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.kv.subdoc.multi;
+package com.couchbase.client.core.message.dcp;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.endpoint.kv.KeyValueHandler;
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
+
+import java.util.List;
 
 /**
- * Enumeration of possible mutations inside a sub-document {@link LookupCommand}.
- *
- * @author Simon Baslé
- * @since 1.2
+ * @author Sergey Avseyev
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Public
-public enum Lookup {
+public class GetFailoverLogResponse extends AbstractDCPResponse {
+    private final List<FailoverLogEntry> failoverLog;
 
-    GET(KeyValueHandler.OP_SUB_GET),
-    EXIST(KeyValueHandler.OP_SUB_EXIST);
-
-    private final byte opCode;
-
-    Lookup(byte opCode) {
-        this.opCode = opCode;
+    /**
+     * Creates {@link GetFailoverLogResponse}.
+     *
+     * @param status      the status of the response.
+     * @param failoverLog the list of failover log entries or null if response status is not success
+     * @param request
+     */
+    public GetFailoverLogResponse(final ResponseStatus status, final List<FailoverLogEntry> failoverLog,
+                                  final CouchbaseRequest request) {
+        super(status, request);
+        this.failoverLog = failoverLog;
     }
 
-    public byte opCode() {
-        return opCode;
+    public List<FailoverLogEntry> failoverLog() {
+        return failoverLog;
     }
 }

@@ -20,45 +20,28 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.kv.subdoc.multi;
-
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import io.netty.buffer.ByteBuf;
+package com.couchbase.client.core.message.dcp;
 
 /**
- * A single lookup description inside a TODO.
+ * Get the current failover logs for partition.
  *
- * @author Simon Baslé
- * @since 1.2
+ * Failover log entry is a VBucket UUID and sequence number pair associated with a VBucket.
+ * A failover log entry is assigned to an active VBucket any time there might have been a
+ * history branch. The VBucket UUID is a randomly generated number used to denote a history
+ * branch and the sequence number is the last sequence number processed by the VBucket at
+ * the time the failover log entry was created.
+ *
+ * @author Sergey Avseyev
+ * @since 1.2.3
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Public
-public class LookupCommand {
-
-    private final Lookup lookup;
-    private final String path;
-
-    /**
-     * Create a multi-lookup command.
-     *
-     * @param lookup the lookup type.
-     * @param path the path to look-up inside the document.
-     */
-    public LookupCommand(Lookup lookup, String path) {
-        this.lookup = lookup;
-        this.path = path;
+public class GetFailoverLogRequest extends AbstractDCPRequest {
+    public GetFailoverLogRequest(final short partition, final String bucket) {
+        super(bucket, null);
+        partition(partition);
     }
 
-    public Lookup lookup() {
-        return lookup;
-    }
-
-    public String path() {
-        return path;
-    }
-
-    public byte opCode() {
-        return lookup.opCode();
+    public GetFailoverLogRequest(final short partition, final String bucket, final String password) {
+        super(bucket, password);
+        partition(partition);
     }
 }
