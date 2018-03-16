@@ -147,11 +147,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private volatile long reconnectAttempt = 1;
 
     /**
-     * Set to true once disconnected.
-     */
-    private volatile boolean disconnected;
-
-    /**
      * Preset the stack trace for the static exceptions.
      */
     static {
@@ -178,7 +173,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         this.responseBuffer = null;
         this.env = null;
         this.isTransient = isTransient;
-        this.disconnected = false;
     }
 
     /**
@@ -213,13 +207,12 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         ByteBufAllocator allocator = env.bufferPoolingEnabled()
                 ? PooledByteBufAllocator.DEFAULT : UnpooledByteBufAllocator.DEFAULT;
 
-        boolean tcpNodelay = environment().tcpNodelayEnabled();
         bootstrap = new BootstrapAdapter(new Bootstrap()
             .remoteAddress(hostname, port)
             .group(environment.ioPool())
             .channel(channelClass)
             .option(ChannelOption.ALLOCATOR, allocator)
-            .option(ChannelOption.TCP_NODELAY, tcpNodelay)
+            .option(ChannelOption.TCP_NODELAY, true)
             .handler(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(Channel channel) throws Exception {
@@ -295,36 +288,21 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
                         } else {
-                            if (!disconnected) {
-                                long delay = env.reconnectDelay().calculate(reconnectAttempt++);
-                                TimeUnit delayUnit = env.reconnectDelay().unit();
-                                LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                        + "Could not connect to endpoint, retrying with delay " + delay + " "
-                                        + delayUnit + ": ", future.cause());
-                                if (responseBuffer != null) {
-                                    responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR,
-                                        SignalConfigReload.INSTANCE, null);
-                                }
-                                transitionState(LifecycleState.CONNECTING);
-                                future.channel().eventLoop().schedule(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        // Make sure to avoid a race condition where the reconnect could override
-                                        // the disconnect phase. If this happens, explicitly break the retry loop
-                                        // and re-run the disconnect phase to make sure all is properly freed.
-                                        if (!disconnected) {
-                                            doConnect(observable);
-                                        } else {
-                                            LOGGER.debug("{}Explicitly breaking retry loop because already disconnected.",
-                                                    logIdent(channel, AbstractEndpoint.this));
-                                            disconnect();
-                                        }
-                                    }
-                                }, delay, delayUnit);
-                            } else {
-                                LOGGER.debug("{}Not retrying because already disconnected.",
-                                        logIdent(channel, AbstractEndpoint.this));
+                            long delay = env.reconnectDelay().calculate(reconnectAttempt++);
+                            TimeUnit delayUnit = env.reconnectDelay().unit();
+                            LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
+                                    + "Could not connect to endpoint, retrying with delay " + delay + " "
+                                    + delayUnit + ": ", future.cause());
+                            if (responseBuffer != null) {
+                                responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
                             }
+                            transitionState(LifecycleState.CONNECTING);
+                            future.channel().eventLoop().schedule(new Runnable() {
+                                @Override
+                                public void run() {
+                                    doConnect(observable);
+                                }
+                            }, delay, delayUnit);
                         }
                     }
                 }
@@ -337,8 +315,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
 
     @Override
     public Observable<LifecycleState> disconnect() {
-        disconnected = true;
-
         if (state() == LifecycleState.DISCONNECTED || state() == LifecycleState.DISCONNECTING) {
             return Observable.just(state());
         }

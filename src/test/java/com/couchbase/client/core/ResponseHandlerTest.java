@@ -23,7 +23,6 @@
 package com.couchbase.client.core;
 
 import com.couchbase.client.core.config.ConfigurationProvider;
-import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.ResponseStatus;
@@ -60,8 +59,7 @@ public class ResponseHandlerTest {
         ByteBuf config = Unpooled.copiedBuffer("{\"json\": true}", CharsetUtil.UTF_8);
 
         ResponseEvent retryEvent = new ResponseEvent();
-        retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, ResponseStatusConverter.BINARY_ERR_TEMP_FAIL,
-                0, "bucket", config, null, mock(InsertRequest.class)));
+        retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, 0, "bucket", config, mock(InsertRequest.class)));
         retryEvent.setObservable(mock(Subject.class));
         handler.onEvent(retryEvent, 1, true);
 
@@ -79,8 +77,7 @@ public class ResponseHandlerTest {
         ByteBuf config = Unpooled.copiedBuffer("Not my Vbucket", CharsetUtil.UTF_8);
 
         ResponseEvent retryEvent = new ResponseEvent();
-        retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, ResponseStatusConverter.BINARY_ERR_TEMP_FAIL,
-                0, "bucket", config, null, mock(InsertRequest.class)));
+        retryEvent.setMessage(new InsertResponse(ResponseStatus.RETRY, 0, "bucket", config, mock(InsertRequest.class)));
         retryEvent.setObservable(mock(Subject.class));
         handler.onEvent(retryEvent, 1, true);
 
