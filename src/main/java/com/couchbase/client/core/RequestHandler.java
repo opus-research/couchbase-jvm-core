@@ -65,7 +65,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * The {@link RequestHandler} handles the overall concept of {@link Node}s and manages them concurrently.
@@ -113,7 +113,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     /**
      * The list of currently managed nodes against the cluster.
      */
-    private final CopyOnWriteArrayList<Node> nodes;
+    private final Set<Node> nodes;
 
     /**
      * The shared couchbase environment.
@@ -140,7 +140,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      */
     public RequestHandler(CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
-        this(new CopyOnWriteArrayList<Node>(), environment, configObservable, responseBuffer);
+        this(new CopyOnWriteArraySet<Node>(), environment, configObservable, responseBuffer);
     }
 
     /**
@@ -149,7 +149,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * This constructor should only be used for testing purposes.
      * @param nodes the node list to start with.
      */
-    RequestHandler(CopyOnWriteArrayList<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
+    RequestHandler(Set<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
         this.nodes = nodes;
         this.environment = environment;
@@ -182,15 +182,14 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             ClusterConfig config = configuration;
             //prevent non-bootstrap requests to go through if bucket not part of config
             if (!(request instanceof BootstrapMessage)) {
-                BucketConfig bucketConfig = config == null ? null : config.bucketConfig(request.bucket());
-                if (config == null || (request.bucket() != null  && bucketConfig == null)) {
+                if (config == null || (request.bucket() != null  && !config.hasBucket(request.bucket()))) {
                     request.observable().onError(new BucketClosedException(request.bucket() + " has been closed"));
                     return;
                 }
 
                 //short-circuit some kind of requests for which we know there won't be any handler to respond.
                 try {
-                    checkFeaturesForRequest(request, bucketConfig);
+                    checkFeaturesForRequest(request, config.bucketConfig(request.bucket()));
                 } catch (ServiceNotAvailableException e) {
                     request.observable().onError(e);
                     return;
@@ -277,7 +276,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             @Override
             public LifecycleState call(LifecycleState lifecycleState) {
                 LOGGER.debug("Connect finished, registering for use.");
-                nodes.addIfAbsent(node);
+                nodes.add(node);
                 return lifecycleState;
             }
         });
@@ -382,9 +381,9 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             LOGGER.debug("No open bucket found in config, disconnecting all nodes.");
             //JVMCBC-231: a race condition can happen where the nodes set is seen as
             // not empty, while the subsequent Observable.from is not, failing in calling last()
-            List<Node> snapshotNodes;
+            Set<Node> snapshotNodes;
             synchronized (nodes) {
-                snapshotNodes = new ArrayList<Node>(nodes);
+                snapshotNodes = new HashSet<Node>(nodes);
             }
             if (snapshotNodes.isEmpty()) {
                 return Observable.just(config);
@@ -464,7 +463,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
                         if (!services.containsKey(ServiceType.QUERY) && environment.queryEnabled()) {
                             services.put(ServiceType.QUERY, environment.queryPort());
                         }
-                        if (services.containsKey(ServiceType.BINARY) && environment.dcpEnabled()) {
+                        if (!services.containsKey(ServiceType.DCP) && environment.dcpEnabled()) {
                             services.put(ServiceType.DCP, services.get(ServiceType.BINARY));
                         }
                         return Observable.just(services);

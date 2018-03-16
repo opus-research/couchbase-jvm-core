@@ -76,6 +76,7 @@ import com.couchbase.client.core.message.kv.subdoc.BinarySubdocRequest;
 import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommand;
 import com.couchbase.client.core.message.kv.subdoc.multi.LookupResult;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
+import com.couchbase.client.core.message.kv.subdoc.multi.MultiMutationResponse;
 import com.couchbase.client.core.message.kv.subdoc.simple.SimpleSubdocResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
@@ -626,7 +627,7 @@ public class KeyValueHandler
         }
 
         msg.content().retain();
-        CouchbaseResponse response = handleCommonResponseMessages(request, msg, status, seqOnMutation);
+        CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
 
         if (response == null) {
             response = handleSubdocumentResponseMessages(request, msg, ctx, status, seqOnMutation);
@@ -670,11 +671,12 @@ public class KeyValueHandler
      *
      * @param request the current request.
      * @param msg the current response message.
+     * @param ctx the handler context.
      * @param status the response status code.
      * @return the decoded response or null if none did match.
      */
     private static CouchbaseResponse handleCommonResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-        ResponseStatus status, boolean seqOnMutation) {
+         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
         long cas = msg.getCAS();
@@ -682,7 +684,7 @@ public class KeyValueHandler
         String bucket = request.bucket();
 
         if (request instanceof GetRequest || request instanceof ReplicaGetRequest) {
-            int flags = msg.getExtrasLength() > 0 ? msg.getExtras().getInt(0) : 0;
+            int flags = extractFlagsFromGetResponse(ctx, msg.getExtras(), msg.getExtrasLength());
             response = new GetResponse(status, statusCode, cas, flags, bucket, content, request);
         } else if (request instanceof GetBucketConfigRequest) {
             response = new GetBucketConfigResponse(status, statusCode, bucket, content,
@@ -799,35 +801,31 @@ public class KeyValueHandler
             FullBinaryMemcacheResponse msg, ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
         if (!(request instanceof BinarySubdocMultiMutationRequest))
             return null;
+        BinarySubdocMultiMutationRequest subdocRequest = (BinarySubdocMultiMutationRequest) request;
 
-        //TODO remove and uncomment/modify original code once mutateIn protocol has been stabilized
-        msg.release();
-        return null;
-//        BinarySubdocMultiMutationRequest subdocRequest = (BinarySubdocMultiMutationRequest) request;
-//
-//        long cas = msg.getCAS();
-//        short statusCode = msg.getStatus();
-//        String bucket = request.bucket();
-//
-//        MutationToken mutationToken = null;
-//        if (msg.getExtrasLength() > 0) {
-//            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-//        }
-//
-//        ByteBuf body = msg.content();
-//        MultiMutationResponse response;
-//        if (status.isSuccess()) {
-//            response = new MultiMutationResponse(bucket, subdocRequest, cas, mutationToken);
-//        } else if (ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
-//            short firstErrorCode = body.readShort();
-//            byte firstErrorIndex = body.readByte();
-//            response = new MultiMutationResponse(status, statusCode, bucket, firstErrorIndex, firstErrorCode,
-//                    subdocRequest, cas, mutationToken);
-//        } else {
-//            response = new MultiMutationResponse(status, statusCode, bucket, subdocRequest, cas, mutationToken);
-//        }
-//        body.release();
-//        return response;
+        long cas = msg.getCAS();
+        short statusCode = msg.getStatus();
+        String bucket = request.bucket();
+
+        MutationToken mutationToken = null;
+        if (msg.getExtrasLength() > 0) {
+            mutationToken = extractToken(bucket, seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
+        }
+
+        ByteBuf body = msg.content();
+        MultiMutationResponse response;
+        if (status.isSuccess()) {
+            response = new MultiMutationResponse(bucket, subdocRequest, cas, mutationToken);
+        } else if (ResponseStatus.SUBDOC_MULTI_PATH_FAILURE.equals(status)) {
+            short firstErrorCode = body.readShort();
+            byte firstErrorIndex = body.readByte();
+            response = new MultiMutationResponse(status, statusCode, bucket, firstErrorIndex, firstErrorCode,
+                    subdocRequest, cas, mutationToken);
+        } else {
+            response = new MultiMutationResponse(status, statusCode, bucket, subdocRequest, cas, mutationToken);
+        }
+        body.release();
+        return response;
     }
 
     private static MutationToken extractToken(String bucket, boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
@@ -976,6 +974,26 @@ public class KeyValueHandler
         if (content != null && content.refCnt() > 0) {
             content.release();
         }
+    }
+
+    /**
+     * Helper method to extract the flags from the extras buffer.
+     *
+     * @param ctx the handler context.
+     * @param extrasReleased the extras of the msg.
+     * @param extrasLength the extras length.
+     * @return the extracted flags.
+     */
+    private static int extractFlagsFromGetResponse(ChannelHandlerContext ctx, ByteBuf extrasReleased,
+        int extrasLength) {
+        int flags = 0;
+        if (extrasLength > 0) {
+            final ByteBuf extras = ctx.alloc().buffer(extrasLength);
+            extras.writeBytes(extrasReleased, extrasReleased.readerIndex(), extrasReleased.readableBytes());
+            flags = extras.getInt(0);
+            extras.release();
+        }
+        return flags;
     }
 
     /**

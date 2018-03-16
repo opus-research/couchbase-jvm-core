@@ -35,7 +35,6 @@ import com.couchbase.client.core.message.internal.SignalFlush;
 import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.service.ServiceFactory;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.state.AbstractStateMachine;
 import com.couchbase.client.core.state.LifecycleState;
 import com.lmax.disruptor.RingBuffer;
@@ -100,11 +99,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
     private volatile boolean connected;
 
-    /**
-     * Contains the enabled {@link Service}s on a node level.
-     */
-    private volatile int enabledServices;
-
     public CouchbaseNode(final InetAddress hostname, final CoreEnvironment environment,
         final RingBuffer<ResponseEvent> responseBuffer) {
         this(hostname, new DefaultServiceRegistry(), environment, responseBuffer);
@@ -138,48 +132,27 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
 
                 if (newState == LifecycleState.CONNECTED) {
                     if (!connected) {
-                        signalConnected();
+                        LOGGER.info("Connected to Node " + hostname.getHostName());
+
+                        if (eventBus != null && eventBus.hasSubscribers()) {
+                            eventBus.publish(new NodeConnectedEvent(hostname));
+                        }
                     }
                     connected = true;
                     LOGGER.debug("Connected (" + state() + ") to Node " + hostname);
                 } else if (newState == LifecycleState.DISCONNECTED) {
                     if (connected) {
-                        signalDisconnected();
+                        LOGGER.info("Disconnected from Node " + hostname.getHostName());
+                        if (eventBus != null && eventBus.hasSubscribers()) {
+                            eventBus.publish(new NodeDisconnectedEvent(hostname));
+                        }
                     }
                     connected = false;
                     LOGGER.debug("Disconnected (" + state() + ") from Node " + hostname);
-                } else if (newState == LifecycleState.CONNECTING) {
-                    if (connected) {
-                        // We've already been connected, so this is a reconnect phase for the node following a
-                        // complete disconnect (like a node restart).
-                        signalDisconnected();
-                        connected = false;
-                        LOGGER.debug("Reconnecting (" + state() + ") from Node " + hostname);
-                    }
                 }
                 transitionState(newState);
             }
         });
-    }
-
-    /**
-     * Log that this node is now connected and also inform all susbcribers on the event bus.
-     */
-    private void signalConnected() {
-        LOGGER.info("Connected to Node " + hostname.getHostName());
-        if (eventBus != null && eventBus.hasSubscribers()) {
-            eventBus.publish(new NodeConnectedEvent(hostname));
-        }
-    }
-
-    /**
-     * Log that this node is now disconnected and also inform all susbcribers on the event bus.
-     */
-    private void signalDisconnected() {
-        LOGGER.info("Disconnected from Node " + hostname.getHostName());
-        if (eventBus != null && eventBus.hasSubscribers()) {
-            eventBus.publish(new NodeDisconnectedEvent(hostname));
-        }
     }
 
     @Override
@@ -270,7 +243,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         serviceStates.register(service, service);
         LOGGER.debug(logIdent(hostname) + "Adding Service " + request.type() + " to registry and connecting it.");
         serviceRegistry.addService(service, request.bucket());
-        enabledServices |= 1 << service.type().ordinal();
         return service.connect().map(new Func1<LifecycleState, Service>() {
             @Override
             public Service call(LifecycleState state) {
@@ -286,7 +258,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         Service service = serviceRegistry.serviceBy(request.type(), request.bucket());
         serviceRegistry.removeService(service, request.bucket());
         serviceStates.deregister(service);
-        enabledServices &= ~(1 << service.type().ordinal());
         return Observable.just(service);
     }
 
@@ -323,10 +294,5 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     @Override
     public int hashCode() {
         return hostname.hashCode();
-    }
-
-    @Override
-    public boolean serviceEnabled(ServiceType type) {
-        return (enabledServices & (1 << type.ordinal())) != 0;
     }
 }
