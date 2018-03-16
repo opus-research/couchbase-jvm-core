@@ -57,7 +57,7 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
         //insert
         SubDictAddRequest insertRequest = new SubDictAddRequest(testXAttrKey, subPath, fragment, bucket());
-        insertRequest.xattr(true);
+        insertRequest.attributeAccess(true);
         insertRequest.createIntermediaryPath(true);
         SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
         assertTrue(insertResponse.status().isSuccess());
@@ -67,7 +67,7 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
         //get
         SubGetRequest getRequest = new SubGetRequest(testXAttrKey, "spring.class", bucket());
-        getRequest.xattr(true);
+        getRequest.attributeAccess(true);
         SimpleSubdocResponse lookupResponse = cluster().<SimpleSubdocResponse>send(getRequest).toBlocking().single();
         assertTrue(lookupResponse.status().isSuccess());
         assertEquals(lookupResponse.content().toString(CharsetUtil.UTF_8) , "\"SomeClass\"");
@@ -76,14 +76,14 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
         //delete
         SubDeleteRequest deleteRequest = new SubDeleteRequest(testXAttrKey, subPath, bucket());
-        deleteRequest.xattr(true);
+        deleteRequest.attributeAccess(true);
         SimpleSubdocResponse deleteResponse = cluster().<SimpleSubdocResponse>send(deleteRequest).toBlocking().single();
         assertTrue(deleteResponse.status().isSuccess());
         assertEquals(0, deleteResponse.content().readableBytes());
         deleteResponse.content().release();
 
         getRequest = new SubGetRequest(testXAttrKey, "spring.class", bucket());
-        getRequest.xattr(true);
+        getRequest.attributeAccess(true);
         lookupResponse = cluster().<SimpleSubdocResponse>send(getRequest).toBlocking().single();
         assertTrue(lookupResponse.status() == ResponseStatus.SUBDOC_PATH_NOT_FOUND);
         lookupResponse.content().release();
@@ -97,9 +97,9 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
         SubMultiMutationRequest mutationRequest = new SubMultiMutationRequest(testXAttrKey, bucket(),
                 new MutationCommandBuilder(Mutation.DICT_UPSERT, "spring.class")
-                        .fragment(classFragment).createIntermediaryPath(true).xattr(true).build(),
+                        .fragment(classFragment).createIntermediaryPath(true).attributeAccess(true).build(),
                 new MutationCommandBuilder(Mutation.DICT_UPSERT, "spring.refs")
-                        .fragment(refFragment).createIntermediaryPath(true).xattr(true).build());
+                        .fragment(refFragment).createIntermediaryPath(true).attributeAccess(true).build());
         MultiMutationResponse mutationResponse = cluster().<MultiMutationResponse>send(mutationRequest).toBlocking().single();
         assertTrue(mutationResponse.status().isSuccess());
         mutationResponse.responses().get(0).value().release();
@@ -107,9 +107,9 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
         SubMultiLookupRequest lookupRequest = new SubMultiLookupRequest(testXAttrKey, bucket(),
                 new LookupCommandBuilder(Lookup.GET, "spring.class")
-                        .xattr(true).build(),
+                        .attributeAccess(true).build(),
                 new LookupCommandBuilder(Lookup.GET, "spring.refs")
-                        .xattr(true).build());
+                        .attributeAccess(true).build());
 
         MultiLookupResponse lookupResponse = cluster().<MultiLookupResponse>send(lookupRequest).toBlocking().single();
         assertTrue(lookupResponse.status().isSuccess());
@@ -118,8 +118,8 @@ public class SubdocumentExtendedAttributeAccessTest extends ClusterDependentTest
 
 
         mutationRequest = new SubMultiMutationRequest(testXAttrKey, bucket(),
-                new MutationCommandBuilder(Mutation.DELETE, "spring.class").xattr(true).build(),
-                new MutationCommandBuilder(Mutation.DELETE, "spring.refs").xattr(true).build());
+                new MutationCommandBuilder(Mutation.DELETE, "spring.class").attributeAccess(true).build(),
+                new MutationCommandBuilder(Mutation.DELETE, "spring.refs").attributeAccess(true).build());
         mutationResponse = cluster().<MultiMutationResponse>send(mutationRequest).toBlocking().single();
         assertTrue(mutationResponse.status().isSuccess());
         mutationResponse.responses().get(0).value().release();

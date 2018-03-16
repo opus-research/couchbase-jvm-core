@@ -31,7 +31,7 @@ public class LookupCommandBuilder {
 
     private final Lookup lookup;
     private final String path;
-    private boolean xattr;
+    private boolean attributeAccess;
 
     /**
      * Create a multi-lookup command.
@@ -65,15 +65,15 @@ public class LookupCommandBuilder {
      *
      * @return true if accessing extended attribute section
      */
-    public boolean xattr() { return this.xattr; }
+    public boolean attributeAccess() { return this.attributeAccess; }
 
     /**
      * Access to extended attribute section of the couchbase document
      *
      * @return builder with true set for attribute access
      */
-    public LookupCommandBuilder xattr(boolean xattr) {
-        this.xattr = xattr;
+    public LookupCommandBuilder attributeAccess(boolean attributeAccess) {
+        this.attributeAccess = attributeAccess;
         return this;
     }
 
