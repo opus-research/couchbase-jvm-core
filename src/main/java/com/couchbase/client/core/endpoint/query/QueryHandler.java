@@ -248,7 +248,8 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             if (slice.toString(CHARSET).contains("clientContextID")) {
                 //find the size of the client id
                 responseContent.skipBytes(findNextChar(responseContent, '"') + 1); //opening of clientId
-                int clientIdSize = findNextCharNotPrefixedBy(responseContent, '"', '\\');
+                //TODO this doesn't account for the fact that the id can contain an escaped " !!!
+                int clientIdSize = findNextChar(responseContent, '"');
                 if (clientIdSize < 0) {
                     return null;
                 }
