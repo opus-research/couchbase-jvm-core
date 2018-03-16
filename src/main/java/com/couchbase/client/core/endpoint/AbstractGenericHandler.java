@@ -60,8 +60,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
-import static com.couchbase.client.core.utils.Observable.failSafe;
-
 /**
  * Generic handler which acts as the common base type for all implementing handlers.
  *
@@ -252,9 +250,9 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 }
             }
         } catch (CouchbaseException e) {
-            failSafe(env().scheduler(), moveResponseOut, currentRequest.observable(), e);
+            currentRequest.observable().onError(e);
         } catch (Exception e) {
-            failSafe(env().scheduler(), moveResponseOut, currentRequest.observable(), new CouchbaseException(e));
+            currentRequest.observable().onError(new CouchbaseException(e));
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
@@ -501,8 +499,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             REQUEST req = sentRequestQueue.poll();
             try {
                 sideEffectRequestToCancel(req);
-                failSafe(env().scheduler(), moveResponseOut, req.observable(),
-                        new RequestCancelledException("Request cancelled in-flight."));
+                req.observable().onError(new RequestCancelledException("Request cancelled in-flight."));
             } catch (Exception ex) {
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
