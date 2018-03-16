@@ -42,8 +42,7 @@ public class KeyValueEndpoint extends AbstractEndpoint {
      */
     public KeyValueEndpoint(final String hostname, final String bucket, final String password, int port,
         final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, responseBuffer, false,
-                env.kvIoPool() == null ? env.ioPool() : env.kvIoPool());
+        super(hostname, bucket, password, port, env, responseBuffer, false);
     }
 
 
@@ -57,7 +56,7 @@ public class KeyValueEndpoint extends AbstractEndpoint {
             .addLast(new BinaryMemcacheObjectAggregator(Integer.MAX_VALUE))
             .addLast(new KeyValueAuthHandler(bucket(), password()))
             .addLast(new KeyValueFeatureHandler(environment()))
-            .addLast(new KeyValueHandler(this, responseBuffer(), false, true));
+            .addLast(new KeyValueHandler(this, responseBuffer(), false));
     }
 
 }
