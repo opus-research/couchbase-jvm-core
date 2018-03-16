@@ -61,10 +61,10 @@ import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The common parent implementation for all {@link Endpoint}s.
+ * The default implementation of a {@link Endpoint}.
  *
- * This parent implementation provides common functionality that all {@link Endpoint}s need, most notably
- * bootstrapping, connecting and reconnecting.
+ * This implementation provides all the common functionality across endpoints, including connection management and
+ * writing data into the channel.
  *
  * @author Michael Nitschinger
  * @since 1.0
@@ -106,14 +106,8 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     private final String password;
 
-    /**
-     * The reference to the response buffer to publish response events.
-     */
     private final RingBuffer<ResponseEvent> responseBuffer;
 
-    /**
-     * Reference to the overall {@link CoreEnvironment}.
-     */
     private final CoreEnvironment env;
 
     /**
@@ -235,8 +229,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     /**
      * Helper method to perform the actual connect and reconnect.
      *
-     * @param observable the {@link Subject} which is eventually notified if the connect process
-     *                   succeeded or failed.
+     * @param observable
      */
     protected void doConnect(final Subject<LifecycleState, LifecycleState> observable) {
         bootstrap.connect().addListener(new ChannelFutureListener() {
@@ -261,6 +254,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                         } else if (future.cause() instanceof ClosedChannelException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
                                 + "Generic Failure.");
+                            transitionState(LifecycleState.DISCONNECTED);
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
@@ -390,20 +384,10 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         return password;
     }
 
-    /**
-     * The {@link CoreEnvironment} reference.
-     *
-     * @return the environment.
-     */
     public CoreEnvironment environment() {
         return env;
     }
 
-    /**
-     * The {@link RingBuffer} response buffer reference.
-     *
-     * @return the response buffer.
-     */
     public RingBuffer<ResponseEvent> responseBuffer() {
         return responseBuffer;
     }
