@@ -18,7 +18,6 @@ package com.couchbase.client.core.env;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
 import com.couchbase.client.core.message.observe.Observe;
 import com.couchbase.client.core.metrics.MetricsCollector;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
@@ -152,14 +151,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     Scheduler scheduler();
 
     /**
-     * Identifies if DCP should be enabled.
-     *
-     * @return true if DCP is enabled, false otherwise.
-     */
-    @Deprecated
-    boolean dcpEnabled();
-
-    /**
      * If bootstrapping through HTTP is enabled.
      *
      * @return true if enabled.
@@ -249,19 +240,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      * @return the size of the ringbuffer.
      */
     int responseBufferSize();
-
-    /**
-     * Size of the buffer to control speed of DCP producer.
-     */
-    @Deprecated
-    int dcpConnectionBufferSize();
-
-    /**
-     * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
-     * a DCP Buffer Acknowledge message is sent to the server
-     */
-    @Deprecated
-    double dcpConnectionBufferAckThreshold();
 
     /**
      * The number of key/value service endpoints.
@@ -459,14 +437,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     boolean callbacksOnIoPool();
 
     /**
-     * @return Default DCP connection name.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    @Deprecated
-    String dcpConnectionName();
-
-    /**
      * Waiting strategy used by request {@link com.lmax.disruptor.EventProcessor}s to wait for data from
      * {@link com.lmax.disruptor.RingBuffer}
      *
@@ -491,12 +461,5 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceStability.Uncommitted
     @InterfaceAudience.Public
     boolean certAuthEnabled();
-
-    /**
-     * Returns the {@link CouchbaseCoreSendHook} if set, null otherwise.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    CouchbaseCoreSendHook couchbaseCoreSendHook();
 
 }

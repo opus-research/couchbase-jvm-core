@@ -18,13 +18,9 @@ package com.couchbase.client.core;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultConfigurationProvider;
-import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.env.Diagnostics;
-import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
-import com.couchbase.client.core.lang.Tuple;
-import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -41,8 +37,6 @@ import com.couchbase.client.core.message.cluster.OpenBucketRequest;
 import com.couchbase.client.core.message.cluster.OpenBucketResponse;
 import com.couchbase.client.core.message.cluster.SeedNodesRequest;
 import com.couchbase.client.core.message.cluster.SeedNodesResponse;
-import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
-import com.couchbase.client.core.message.dcp.OpenConnectionResponse;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -64,7 +58,6 @@ import com.lmax.disruptor.dsl.ProducerType;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
-import rx.subjects.Subject;
 
 import java.util.concurrent.ThreadFactory;
 
@@ -97,13 +90,6 @@ public class CouchbaseCore implements ClusterFacade {
      */
     public static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
 
-    private static final CouchbaseCoreSendHook DEFAULT_CORE_HOOK = new CouchbaseCoreSendHook() {
-        @Override
-        public Tuple2<CouchbaseRequest, Observable<CouchbaseResponse>> beforeSend(CouchbaseRequest originalRequest, Observable<CouchbaseResponse> originalResponse) {
-            return Tuple.create(originalRequest, originalResponse);
-        }
-    };
-
     /**
      * The {@link RequestEvent} {@link RingBuffer}.
      */
@@ -125,7 +111,6 @@ public class CouchbaseCore implements ClusterFacade {
     private final Disruptor<ResponseEvent> responseDisruptor;
 
     private volatile boolean sharedEnvironment = true;
-    private final CouchbaseCoreSendHook coreSendHook;
 
     /**
      * Populate the static exceptions with stack trace elements.
@@ -150,8 +135,6 @@ public class CouchbaseCore implements ClusterFacade {
         LOGGER.debug(Diagnostics.collectAndFormat());
 
         this.environment = environment;
-        this.coreSendHook = environment.couchbaseCoreSendHook() == null ?
-            DEFAULT_CORE_HOOK : environment.couchbaseCoreSendHook();
         configProvider = new DefaultConfigurationProvider(this, environment);
         ThreadFactory disruptorThreadFactory = new DefaultThreadFactory("cb-core", true);
         responseDisruptor = new Disruptor<ResponseEvent>(
@@ -218,14 +201,11 @@ public class CouchbaseCore implements ClusterFacade {
             handleClusterRequest(request);
             return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else {
-            Subject<CouchbaseResponse, CouchbaseResponse> response = request.observable();
-            Tuple2<CouchbaseRequest, Observable<CouchbaseResponse>> hook = coreSendHook
-                .beforeSend(request, response);
-            boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, hook.value1());
+            boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
             if (!published) {
-                response.onError(BACKPRESSURE_EXCEPTION);
+                request.observable().onError(BACKPRESSURE_EXCEPTION);
             }
-            return (Observable<R>) hook.value2();
+            return (Observable<R>) request.observable();
         }
     }
 
@@ -309,10 +289,6 @@ public class CouchbaseCore implements ClusterFacade {
                 .subscribe(request.observable());
         } else if (request instanceof GetClusterConfigRequest) {
             request.observable().onNext(new GetClusterConfigResponse(configProvider.config(), ResponseStatus.SUCCESS));
-            request.observable().onCompleted();
-        } else if (request instanceof OpenConnectionRequest) {
-            request.observable().onNext(new OpenConnectionResponse(
-                    new DCPConnection(environment, this, request.username(), request.password()), ResponseStatus.SUCCESS));
             request.observable().onCompleted();
         }
     }
