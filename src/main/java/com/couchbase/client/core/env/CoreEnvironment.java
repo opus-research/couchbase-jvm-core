@@ -221,17 +221,6 @@ public interface CoreEnvironment {
     int responseBufferSize();
 
     /**
-     * Size of the buffer to control speed of DCP producer.
-     */
-    int dcpConnectionBufferSize();
-
-    /**
-     * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
-     * a DCP Buffer Acknowledge message is sent to the server
-     */
-    double dcpConnectionBufferAckThreshold();
-
-    /**
      * The number of key/value service endpoints.
      *
      * @return amount of endpoints per service.

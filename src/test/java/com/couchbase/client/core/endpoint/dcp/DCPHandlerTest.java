@@ -23,7 +23,6 @@
 package com.couchbase.client.core.endpoint.dcp;
 
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
-import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.dcp.ConnectionType;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
@@ -39,7 +38,6 @@ import java.util.Queue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 
 /**
@@ -73,9 +71,7 @@ public class DCPHandlerTest {
     public void setup() {
         eventSink = new CollectingResponseEventSink();
         requestQueue = new ArrayDeque<DCPRequest>();
-        AbstractEndpoint endpoint = mock(AbstractEndpoint.class);
-        when(endpoint.environment()).thenReturn(DefaultCoreEnvironment.builder().dcpEnabled(true).build());
-        channel = new EmbeddedChannel(new DCPHandler(endpoint, eventSink, requestQueue, true));
+        channel = new EmbeddedChannel(new DCPHandler(mock(AbstractEndpoint.class), eventSink, requestQueue, true));
     }
 
     @Test

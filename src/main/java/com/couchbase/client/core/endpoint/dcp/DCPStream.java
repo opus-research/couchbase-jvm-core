@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2014 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,27 +20,40 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.dcp;
+package com.couchbase.client.core.endpoint.dcp;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.dcp.DCPRequest;
+import rx.subjects.PublishSubject;
+import rx.subjects.Subject;
 
 /**
+ * Represents stream of incoming DCP messages.
+ *
  * @author Sergey Avseyev
  * @since 1.1.0
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Private
-public class OpenConnectionResponse extends AbstractDCPResponse {
+public class DCPStream {
+    public final int id;
+    public final String bucket;
+    public final Subject<DCPRequest, DCPRequest> subject;
+
     /**
-     * Sets the required properties for the response.
+     * Creates new {@link DCPStream} instance.
      *
-     * @param status  the status of the response.
-     * @param request
+     * @param id     stream identifier
+     * @param bucket name of the bucket
      */
-    public OpenConnectionResponse(ResponseStatus status, CouchbaseRequest request) {
-        super(status, request);
+    public DCPStream(int id, String bucket) {
+        this.id = id;
+        this.bucket = bucket;
+        subject = PublishSubject.<DCPRequest>create().toSerialized();
+    }
+
+    public Subject<DCPRequest, DCPRequest> subject() {
+        return subject;
+    }
+
+    public String bucket() {
+        return bucket;
     }
 }
