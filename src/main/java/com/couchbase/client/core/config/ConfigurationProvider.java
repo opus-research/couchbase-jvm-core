@@ -58,15 +58,20 @@ public interface ConfigurationProvider {
      */
     Observable<ClusterConfig> openBucket(String name, String password);
 
+    /**
+     * Start to fetch a config for the given bucket and also watch for changes, depending on the mechanism
+     * used.
+     *
+     * @param name the name of the bucket.
+     * @param username the user authorized for bucket access.
+     * @param password the password of the user.
+     * @return an observable with the configuration if success, and failures otherwise.
+     */
+    Observable<ClusterConfig> openBucket(String name, String username, String password);
+
     Observable<ClusterConfig> closeBucket(String name);
 
     Observable<Boolean> closeBuckets();
-
-    /**
-     * Shutdown the {@link ConfigurationProvider} into a terminal state where it cannot
-     * be used anymore and all its non-bucket resources are freed.
-     */
-    Observable<Boolean> shutdown();
 
     void proposeBucketConfig(String bucket, String config);
 
