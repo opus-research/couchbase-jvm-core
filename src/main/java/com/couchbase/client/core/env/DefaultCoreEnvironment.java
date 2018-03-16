@@ -30,10 +30,6 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.observe.Observe;
-import com.couchbase.client.core.metrics.DefaultMetricsCollectorConfig;
-import com.couchbase.client.core.metrics.MetricsCollector;
-import com.couchbase.client.core.metrics.MetricsCollectorConfig;
-import com.couchbase.client.core.metrics.SystemMetricsCollector;
 import com.couchbase.client.core.retry.BestEffortRetryStrategy;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
@@ -181,8 +177,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final ShutdownHook ioPoolShutdownHook;
     private final ShutdownHook coreSchedulerShutdownHook;
 
-    private final MetricsCollector systemMetricsCollector;
-
     protected DefaultCoreEnvironment(final Builder builder) {
         if (++instanceCounter > MAX_ALLOWED_INSTANCES) {
             LOGGER.warn("More than " + MAX_ALLOWED_INSTANCES + " Couchbase Environments found (" + instanceCounter
@@ -257,13 +251,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
                     : builder.schedulerShutdownHook;
         }
         this.eventBus = builder.eventBus == null ? new DefaultEventBus(coreScheduler) : builder.eventBus;
-        this.systemMetricsCollector = new SystemMetricsCollector(
-            eventBus,
-            coreScheduler,
-            builder.systemMetricsCollectorConfig == null
-                ? DefaultMetricsCollectorConfig.create()
-                : builder.systemMetricsCollectorConfig
-        );
     }
 
     public static DefaultCoreEnvironment create() {
@@ -487,11 +474,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return mutationTokensEnabled;
     }
 
-    @Override
-    public MetricsCollector systemMetricsCollector() {
-        return systemMetricsCollector;
-    }
-
     public static class Builder {
 
         private boolean dcpEnabled = DCP_ENABLED;
@@ -530,8 +512,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private boolean bufferPoolingEnabled = BUFFER_POOLING_ENABLED;
         private boolean tcpNodelayEnabled = TCP_NODELAY_ENALED;
         private boolean mutationTokensEnabled = MUTATION_TOKENS_ENABLED;
-
-        private MetricsCollectorConfig systemMetricsCollectorConfig = null;
 
         protected Builder() {
         }
@@ -896,11 +876,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          */
         public Builder mutationTokensEnabled(boolean mutationTokensEnabled) {
             this.mutationTokensEnabled = mutationTokensEnabled;
-            return this;
-        }
-
-        public Builder systemMetricsCollectorConfig(MetricsCollectorConfig metricsCollectorConfig) {
-            this.systemMetricsCollectorConfig = metricsCollectorConfig;
             return this;
         }
 
