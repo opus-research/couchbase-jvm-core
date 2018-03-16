@@ -27,28 +27,22 @@ package com.couchbase.client.core.message.kv;
  * @author Michael Nitschinger
  * @since 1.2.0
  */
-public class MutationToken {
+public class MutationDescriptor {
 
-    private final long vbucketID;
     private final long vbucketUUID;
-    private final long sequenceNumber;
+    private final long seqNo;
 
-    public MutationToken(long vbucketID, long vbucketUUID, long sequenceNumber) {
-        this.vbucketID = vbucketID;
+    public MutationDescriptor(long vbucketUUID, long seqNo) {
         this.vbucketUUID = vbucketUUID;
-        this.sequenceNumber = sequenceNumber;
+        this.seqNo = seqNo;
     }
 
     public long vbucketUUID() {
         return vbucketUUID;
     }
 
-    public long sequenceNumber() {
-        return sequenceNumber;
-    }
-
-    public long vbucketID() {
-        return vbucketID;
+    public long seqNo() {
+        return seqNo;
     }
 
     @Override
@@ -56,27 +50,25 @@ public class MutationToken {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        MutationToken that = (MutationToken) o;
+        MutationDescriptor that = (MutationDescriptor) o;
 
-        if (vbucketID != that.vbucketID) return false;
         if (vbucketUUID != that.vbucketUUID) return false;
-        return sequenceNumber == that.sequenceNumber;
+        return seqNo == that.seqNo;
+
     }
 
     @Override
     public int hashCode() {
-        int result = (int) (vbucketID ^ (vbucketID >>> 32));
-        result = 31 * result + (int) (vbucketUUID ^ (vbucketUUID >>> 32));
-        result = 31 * result + (int) (sequenceNumber ^ (sequenceNumber >>> 32));
+        int result = (int) (vbucketUUID ^ (vbucketUUID >>> 32));
+        result = 31 * result + (int) (seqNo ^ (seqNo >>> 32));
         return result;
     }
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder("mt{");
-        sb.append("vbID=").append(vbucketID);
-        sb.append(", vbUUID=").append(vbucketUUID);
-        sb.append(", seqno=").append(sequenceNumber);
+        final StringBuilder sb = new StringBuilder("md{");
+        sb.append("vbuuid=").append(vbucketUUID);
+        sb.append(", seqno=").append(seqNo);
         sb.append('}');
         return sb.toString();
     }
