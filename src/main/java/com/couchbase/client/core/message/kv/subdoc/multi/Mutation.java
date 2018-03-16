@@ -43,8 +43,7 @@ public enum Mutation {
     ARRAY_PUSH_FIRST(KeyValueHandler.OP_SUB_ARRAY_PUSH_FIRST),
     ARRAY_PUSH_LAST(KeyValueHandler.OP_SUB_ARRAY_PUSH_LAST),
     ARRAY_ADD_UNIQUE(KeyValueHandler.OP_SUB_ARRAY_ADD_UNIQUE),
-    ARRAY_INSERT(KeyValueHandler.OP_SUB_ARRAY_INSERT),
-    DELETE(KeyValueHandler.OP_SUB_DELETE);
+    ARRAY_INSERT(KeyValueHandler.OP_SUB_ARRAY_INSERT);
 
     private final byte opCode;
 

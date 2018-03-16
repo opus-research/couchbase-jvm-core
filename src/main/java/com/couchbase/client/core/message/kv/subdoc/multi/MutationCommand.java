@@ -26,7 +26,6 @@ import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMultiMutationRequest;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 /**
  * A single mutation description inside a {@link BinarySubdocMultiMutationRequest}.
@@ -54,7 +53,7 @@ public class MutationCommand {
     public MutationCommand(Mutation mutation, String path, ByteBuf fragment, boolean createIntermediaryPath) {
         this.mutation = mutation;
         this.path = path;
-        this.fragment = (fragment == null) ? Unpooled.EMPTY_BUFFER : fragment;
+        this.fragment = fragment;
         this.createIntermediaryPath = createIntermediaryPath;
     }
 
@@ -67,17 +66,6 @@ public class MutationCommand {
      */
     public MutationCommand(Mutation mutation, String path, ByteBuf fragment) {
         this(mutation, path, fragment, false);
-    }
-
-    /**
-     * Create a multi-mutation without a fragment (should be restricted to DELETE, not to be confused with
-     * an empty string fragment where ByteBuf contains "<code>""</code>", or the null fragment where
-     * ByteBuf contains "<code>NULL</code>").
-     *
-     * @param path the path to delete inside the document.
-     */
-    public MutationCommand(Mutation mutation, String path) {
-        this(mutation, path, Unpooled.EMPTY_BUFFER, false);
     }
 
     public Mutation mutation() {
