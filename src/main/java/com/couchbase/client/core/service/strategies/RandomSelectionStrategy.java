@@ -23,9 +23,8 @@ package com.couchbase.client.core.service.strategies;
 
 import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.state.LifecycleState;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -34,27 +33,33 @@ import java.util.Random;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class RandomSelectionStrategy extends AbstractSelectionStrategy {
+public class RandomSelectionStrategy implements SelectionStrategy {
 
     /**
      * Random number generator, statically initialized and designed to be reused.
      */
     private static final Random RANDOM = new Random();
 
-    @Override
-    public Endpoint selectOne(final CouchbaseRequest request, final Endpoint[] endpoints) {
-        List<Endpoint> selected = selectAllConnected(endpoints);
-        if (selected.size() > 0) {
-            Collections.shuffle(selected, RANDOM);
-            return selected.get(0);
-        } else {
-            return null;
-        }
-    }
+    /**
+     * The number of times to try to find a suitable endpoint before returning without success.
+     */
+    private static final int MAX_TRIES = 100;
 
     @Override
-    public Endpoint[] selectAll(CouchbaseRequest request, Endpoint[] endpoints) {
-        List<Endpoint> endpointList = selectAllConnected(endpoints);
-        return endpointList.toArray(new Endpoint[endpointList.size()]);
+    public Endpoint select(final CouchbaseRequest request, final Endpoint[] endpoints) {
+        int numEndpoints = endpoints.length;
+        if (numEndpoints == 0) {
+            return null;
+        }
+
+        for (int i = 0; i < MAX_TRIES; i++) {
+            int rand = RANDOM.nextInt(endpoints.length);
+            Endpoint endpoint = endpoints[rand];
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
+                return endpoint;
+            }
+        }
+
+        return null;
     }
 }

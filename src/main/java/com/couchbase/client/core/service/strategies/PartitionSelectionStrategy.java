@@ -37,10 +37,10 @@ import com.couchbase.client.core.state.LifecycleState;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class PartitionSelectionStrategy extends AbstractSelectionStrategy {
+public class PartitionSelectionStrategy implements SelectionStrategy {
 
     @Override
-    public Endpoint selectOne(final CouchbaseRequest request, final Endpoint[] endpoints) {
+    public Endpoint select(final CouchbaseRequest request, final Endpoint[] endpoints) {
         int numEndpoints = endpoints.length;
         if (numEndpoints == 0) {
             return null;
@@ -69,8 +69,18 @@ public class PartitionSelectionStrategy extends AbstractSelectionStrategy {
         return null;
     }
 
-    @Override
-    public Endpoint[] selectAll(CouchbaseRequest request, Endpoint[] endpoints) {
-        return selectAllConnected(endpoints).toArray(new Endpoint[0]);
+    /**
+     * Helper method to select the first connected endpoint if no particular pinning is needed.
+     *
+     * @param endpoints the list of endpoints.
+     * @return the first connected or null if none found.
+     */
+    private static final Endpoint selectFirstConnected(final Endpoint[] endpoints) {
+        for (Endpoint endpoint : endpoints) {
+            if (endpoint.isState(LifecycleState.CONNECTED)) {
+                return endpoint;
+            }
+        }
+        return null;
     }
 }

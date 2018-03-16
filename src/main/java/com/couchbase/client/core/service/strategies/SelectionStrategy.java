@@ -25,7 +25,7 @@ import com.couchbase.client.core.endpoint.Endpoint;
 import com.couchbase.client.core.message.CouchbaseRequest;
 
 /**
- * Interface which defines a generic selection strategy to selectOne an {@link Endpoint}.
+ * Interface which defines a generic selection strategy to select a {@link Endpoint}.
  *
  * @author Michael Nitschinger
  * @since 1.0
@@ -42,17 +42,6 @@ public interface SelectionStrategy {
      * @param endpoints all the available endpoints.
      * @return the selected endpoint.
      */
-    Endpoint selectOne(CouchbaseRequest request, Endpoint[] endpoints);
+    Endpoint select(CouchbaseRequest request, Endpoint[] endpoints);
 
-    /**
-     * Selects list of {@link Endpoint} for the given {@link CouchbaseRequest}.
-     * <p/>
-     * If empty list is returned, it means that no endpoint could be selected and it is up to the calling
-     * party to decide what to do next.
-     *
-     * @param request   the input request.
-     * @param endpoints all the available endpoints.
-     * @return the selected endpoints.
-     */
-    Endpoint[] selectAll(CouchbaseRequest request, Endpoint[] endpoints);
 }
