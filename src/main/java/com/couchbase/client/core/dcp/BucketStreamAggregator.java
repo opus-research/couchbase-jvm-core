@@ -42,8 +42,6 @@ import rx.functions.Func1;
  * @author Michael Nitschinger
  * @since 1.2.0
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Public
 public class BucketStreamAggregator {
 
     private final ClusterFacade core;
