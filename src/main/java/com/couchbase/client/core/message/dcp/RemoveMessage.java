@@ -27,24 +27,17 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public class RemoveMessage extends AbstractDCPMessage {
     private final long cas;
     private final long bySequenceNumber;
     private final long revisionSequenceNumber;
 
-    @Deprecated
     public RemoveMessage(int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket) {
         this(totalBodyLength, partition, key, cas, bySequenceNumber, revisionSequenceNumber, bucket, null);
     }
 
-    @Deprecated
     public RemoveMessage(int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket, String password) {
-        this(totalBodyLength, partition, key, cas, bySequenceNumber, revisionSequenceNumber, bucket, bucket, password);
-    }
-
-    public RemoveMessage(int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket, String username, String password) {
-        super(totalBodyLength, partition, key, bucket, username, password);
+        super(totalBodyLength, partition, key, bucket, password);
         this.cas = cas;
         this.bySequenceNumber = bySequenceNumber;
         this.revisionSequenceNumber = revisionSequenceNumber;

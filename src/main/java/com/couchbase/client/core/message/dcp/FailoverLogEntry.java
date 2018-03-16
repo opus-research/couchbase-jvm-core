@@ -29,7 +29,6 @@ import com.couchbase.client.core.annotations.InterfaceStability;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-@Deprecated
 public class FailoverLogEntry {
     /**
      * A unique identifier that is generated that is assigned to each vBucket.

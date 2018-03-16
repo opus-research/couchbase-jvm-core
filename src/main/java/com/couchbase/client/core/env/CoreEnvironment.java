@@ -155,7 +155,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      *
      * @return true if DCP is enabled, false otherwise.
      */
-    @Deprecated
     boolean dcpEnabled();
 
     /**
@@ -252,14 +251,12 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     /**
      * Size of the buffer to control speed of DCP producer.
      */
-    @Deprecated
     int dcpConnectionBufferSize();
 
     /**
      * When a DCP connection read bytes reaches this percentage of the {@link #dcpConnectionBufferSize},
      * a DCP Buffer Acknowledge message is sent to the server
      */
-    @Deprecated
     double dcpConnectionBufferAckThreshold();
 
     /**
@@ -433,7 +430,6 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
      */
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
-    @Deprecated
     String dcpConnectionName();
 
     /**
@@ -445,15 +441,4 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     WaitStrategyFactory requestBufferWaitStrategy();
-
-    /**
-     * Returns the proactive polling interval for cluster configurations.
-     *
-     * @return the polling interval in milliseconds.
-     */
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    long configPollInterval();
-
-
 }

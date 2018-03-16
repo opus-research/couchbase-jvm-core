@@ -80,11 +80,6 @@ public class YasjlQueryResponseParser {
     protected UnicastAutoReleaseSubject<ByteBuf> queryInfoObservable;
 
     /**
-     * Represents an observable containing profile info on a terminated query.
-     */
-    protected UnicastAutoReleaseSubject<ByteBuf> queryProfileInfoObservable;
-
-    /**
      * Represents the current request
      */
     protected CouchbaseRequest currentRequest;
@@ -98,11 +93,6 @@ public class YasjlQueryResponseParser {
      * TTL for response observables
      */
     protected long ttl;
-
-    /**
-     * Should complete callback on Io thread
-     */
-    protected boolean callbacksOnIoPool;
 
     /**
      * Response status
@@ -119,11 +109,10 @@ public class YasjlQueryResponseParser {
      */
     protected GenericQueryResponse response;
 
-    public YasjlQueryResponseParser(Scheduler scheduler, long ttl, boolean callbacksOnIoPool) {
+    public YasjlQueryResponseParser(Scheduler scheduler, long ttl) {
         this.scheduler = scheduler;
         this.ttl = ttl;
         this.response = null;
-        this.callbacksOnIoPool = callbacksOnIoPool;
 
         JsonPointer[] jsonPointers = {
                 new JsonPointer("/requestID", new JsonPointerCB1() {
@@ -142,9 +131,6 @@ public class YasjlQueryResponseParser {
                         }
                         if (querySignatureObservable != null) {
                             querySignatureObservable.withTraceIdentifier("querySignature." + requestID);
-                        }
-                        if (queryProfileInfoObservable != null) {
-                            queryProfileInfoObservable.withTraceIdentifier("queryProfileInfo." + requestID);
                         }
                     }
                 }),
@@ -223,13 +209,6 @@ public class YasjlQueryResponseParser {
                         }
                     }
                 }),
-                new JsonPointer("/profile", new JsonPointerCB1() {
-                    public void call(ByteBuf buf) {
-                        if (queryProfileInfoObservable != null) {
-                            queryProfileInfoObservable.onNext(buf);
-                        }
-                    }
-                }),
         };
         this.parser = new ByteBufJsonParser(jsonPointers);
     }
@@ -251,22 +230,6 @@ public class YasjlQueryResponseParser {
         queryStatusObservable = AsyncSubject.create();
         queryInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         querySignatureObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        queryProfileInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        queryErrorObservable.onBackpressureBuffer();
-        queryRowObservable.onBackpressureBuffer();
-        querySignatureObservable.onBackpressureBuffer();
-        queryStatusObservable.onBackpressureBuffer();
-        queryInfoObservable.onBackpressureBuffer();
-        queryProfileInfoObservable.onBackpressureBuffer();
-
-        if (!this.callbacksOnIoPool) {
-            queryErrorObservable.observeOn(scheduler);
-            queryRowObservable.observeOn(scheduler);
-            querySignatureObservable.observeOn(scheduler);
-            queryStatusObservable.observeOn(scheduler);
-            queryInfoObservable.observeOn(scheduler);
-            queryProfileInfoObservable.observeOn(scheduler);
-        }
 
         parser.initialize(responseContent);
         initialized = true;
@@ -275,12 +238,11 @@ public class YasjlQueryResponseParser {
     private void createResponse() {
         //when streaming results/errors/status starts, build out the response
         response = new GenericQueryResponse(
-                queryErrorObservable,
-                queryRowObservable,
-                querySignatureObservable,
-                queryStatusObservable,
-                queryInfoObservable,
-                queryProfileInfoObservable,
+                queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
+                querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryStatusObservable.onBackpressureBuffer().observeOn(scheduler),
+                queryInfoObservable.onBackpressureBuffer().observeOn(scheduler),
                 currentRequest,
                 status, requestID, clientContextID);
     }
@@ -321,15 +283,11 @@ public class YasjlQueryResponseParser {
         if (querySignatureObservable != null) {
             querySignatureObservable.onCompleted();
         }
-        if (queryProfileInfoObservable != null) {
-            queryProfileInfoObservable.onCompleted();
-        }
         queryInfoObservable = null;
         queryRowObservable = null;
         queryErrorObservable = null;
         queryStatusObservable = null;
         querySignatureObservable = null;
-        queryProfileInfoObservable = null;
         this.initialized = false;
     }
 }
