@@ -35,6 +35,7 @@ import com.couchbase.client.core.message.dcp.StreamRequestRequest;
 import com.couchbase.client.core.message.dcp.StreamRequestResponse;
 import rx.Observable;
 import rx.functions.Func1;
+import rx.internal.util.RxRingBuffer;
 
 /**
  * Provides a higher level abstraction over a DCP stream.
@@ -72,14 +73,16 @@ public class BucketStreamAggregator {
      * @return the feed with {@link DCPRequest}s.
      */
     public Observable<DCPRequest> feed(final BucketStreamAggregatorState aggregatorState) {
-        return open(aggregatorState)
-                .flatMap(new Func1<StreamRequestResponse, Observable<DCPRequest>>() {
-                             @Override
-                             public Observable<DCPRequest> call(StreamRequestResponse response) {
-                                 return response.stream();
-                             }
+        Observable<Observable<Observable<DCPRequest>>> streamWindows = open(aggregatorState)
+                .map(new Func1<StreamRequestResponse, Observable<DCPRequest>>() {
+                         @Override
+                         public Observable<DCPRequest> call(StreamRequestResponse response) {
+                             return response.stream();
                          }
-                );
+                     }
+                )
+                .window(RxRingBuffer.SIZE / 2);
+        return Observable.merge(Observable.merge(streamWindows));
     }
 
     /**
