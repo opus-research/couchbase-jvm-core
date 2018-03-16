@@ -63,15 +63,15 @@ public class SearchLocatorTest {
         when(node2Mock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
         nodes.addAll(Arrays.asList(node1Mock, node2Mock));
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, never()).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, times(1)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(2)).send(request);
         verify(node2Mock, times(1)).send(request);
     }
@@ -96,22 +96,22 @@ public class SearchLocatorTest {
         when(node3Mock.serviceEnabled(ServiceType.SEARCH)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock, node3Mock));
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(1)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(2)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(3)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(4)).send(request);

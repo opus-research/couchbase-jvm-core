@@ -38,7 +38,7 @@ public class ConfigLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public void locateAndDispatch(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig config,
+    public void locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig config,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         if (request instanceof BucketConfigRequest) {
             BucketConfigRequest req = (BucketConfigRequest) request;

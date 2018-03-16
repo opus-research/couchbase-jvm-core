@@ -43,7 +43,7 @@ public class ViewLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public void locateAndDispatch(CouchbaseRequest request, List<Node> nodes, ClusterConfig config,
+    public void locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         BucketConfig bucketConfig = config.bucketConfig(request.bucket());
         if (!(bucketConfig instanceof CouchbaseBucketConfig)) {

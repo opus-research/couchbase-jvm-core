@@ -222,7 +222,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             }
         }
 
-        locator(request).locateAndDispatch(request, nodes, config, environment, responseBuffer);
+        locator(request).locate(request, nodes, config, environment, responseBuffer);
     }
 
     /**

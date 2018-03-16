@@ -78,15 +78,15 @@ public class ViewLocatorTest {
         when(node2Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock));
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, never()).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, times(1)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(2)).send(request);
         verify(node2Mock, times(1)).send(request);
     }
@@ -112,15 +112,15 @@ public class ViewLocatorTest {
         when(node2Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock));
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, times(1)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, times(2)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, never()).send(request);
         verify(node2Mock, times(3)).send(request);
     }
@@ -150,22 +150,22 @@ public class ViewLocatorTest {
         when(node3Mock.serviceEnabled(ServiceType.VIEW)).thenReturn(true);
         nodes.addAll(Arrays.asList(node1Mock, node2Mock, node3Mock));
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, never()).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(1)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(2)).send(request);
 
-        locator.locateAndDispatch(request, nodes, configMock, null, null);
+        locator.locate(request, nodes, configMock, null, null);
         verify(node1Mock, times(2)).send(request);
         verify(node2Mock, never()).send(request);
         verify(node3Mock, times(2)).send(request);
@@ -186,7 +186,7 @@ public class ViewLocatorTest {
         TestSubscriber<CouchbaseResponse> subscriber = new TestSubscriber<CouchbaseResponse>();
         response.subscribe(subscriber);
 
-        locator.locateAndDispatch(request, Collections.<Node>emptyList(), config, null, null);
+        locator.locate(request, Collections.<Node>emptyList(), config, null, null);
 
         subscriber.awaitTerminalEvent(1, TimeUnit.SECONDS);
         List<Throwable> errors = subscriber.getOnErrorEvents();

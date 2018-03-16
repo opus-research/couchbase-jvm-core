@@ -364,7 +364,7 @@ public class RequestHandlerTest {
 
         class DummyLocator implements Locator {
             @Override
-            public void locateAndDispatch(CouchbaseRequest request, List<Node> nodes, ClusterConfig config,
+            public void locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config,
                 CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
                 for (Node node : nodes) {
                     if (node.state() == LifecycleState.CONNECTED) {

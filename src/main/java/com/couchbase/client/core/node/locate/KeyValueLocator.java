@@ -70,7 +70,7 @@ public class KeyValueLocator implements Locator {
     private static final int MAX_KEY_BYTES = 250;
 
     @Override
-    public void locateAndDispatch(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster,
+    public void locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         if (request instanceof GetBucketConfigRequest) {
             locateByHostname(request, ((GetBucketConfigRequest) request).hostname(), nodes, env, responseBuffer);
@@ -158,8 +158,7 @@ public class KeyValueLocator implements Locator {
             }
         }
 
-        if(handleNotEqualNodeSizes(config.nodes().size(), nodes.size())) {
-            RetryHelper.retryOrCancel(env, request, responseBuffer);
+        if(handleNotEqualNodeSizes(config.nodes().size(), nodes.size(), request, env, responseBuffer)) {
             return;
         }
 
@@ -275,8 +274,7 @@ public class KeyValueLocator implements Locator {
             }
         }
 
-        if(handleNotEqualNodeSizes(config.nodes().size(), nodes.size())) {
-            RetryHelper.retryOrCancel(env, request, responseBuffer);
+        if(handleNotEqualNodeSizes(config.nodes().size(), nodes.size(), request, env, responseBuffer)) {
             return;
         }
 
@@ -288,12 +286,14 @@ public class KeyValueLocator implements Locator {
      *
      * @return true if they are not equal, false if they are.
      */
-    private static boolean handleNotEqualNodeSizes(int configNodeSize, int actualNodeSize) {
+    private static boolean handleNotEqualNodeSizes(int configNodeSize, int actualNodeSize, final BinaryRequest request,
+        CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         if (configNodeSize != actualNodeSize) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Node list and configuration's partition hosts sizes : {} <> {}, rescheduling",
                         actualNodeSize, configNodeSize);
             }
+            RetryHelper.retryOrCancel(env, request, responseBuffer);
             return true;
         }
         return false;

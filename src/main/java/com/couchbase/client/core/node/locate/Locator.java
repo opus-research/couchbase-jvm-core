@@ -32,16 +32,6 @@ import java.util.List;
 
 public interface Locator {
 
-    /**
-     * Given with the environment and node information, the implementation locates the right set of nodes and
-     * dispatches the request into them.
-     *
-     * @param request the request to dispatch.
-     * @param nodes the current list of active nodes.
-     * @param config the current cluster configuration.
-     * @param env the core environment.
-     * @param responseBuffer the response buffer for potential redistribution.
-     */
-    void locateAndDispatch(CouchbaseRequest request, List<Node> nodes, ClusterConfig config, CoreEnvironment env,
+    void locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config, CoreEnvironment env,
                 RingBuffer<ResponseEvent> responseBuffer);
 }

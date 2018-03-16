@@ -54,7 +54,7 @@ public class DCPLocator implements Locator {
 
 
     @Override
-    public void locateAndDispatch(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster,
+    public void locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
         BucketConfig bucket = cluster.bucketConfig(request.bucket());
         if (!(bucket instanceof CouchbaseBucketConfig && request instanceof DCPRequest)) {

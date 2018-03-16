@@ -78,7 +78,7 @@ public class KeyValueLocatorTest {
         when(bucketMock.nodeIndexForMaster(656)).thenReturn((short) 0);
         when(bucketMock.nodeAtIndex(0)).thenReturn(nodeInfo1);
 
-        locator.locateAndDispatch(getRequestMock, nodes, configMock, null, null);
+        locator.locate(getRequestMock, nodes, configMock, null, null);
         verify(node1Mock, times(1)).send(getRequestMock);
         verify(node2Mock, never()).send(getRequestMock);
     }
@@ -99,7 +99,7 @@ public class KeyValueLocatorTest {
         GetBucketConfigRequest requestMock = mock(GetBucketConfigRequest.class);
         when(requestMock.hostname()).thenReturn(InetAddress.getByName("192.168.56.102"));
 
-        locator.locateAndDispatch(requestMock, nodes, mock(ClusterConfig.class), null, null);
+        locator.locate(requestMock, nodes, mock(ClusterConfig.class), null, null);
         verify(node1Mock, never()).send(requestMock);
         verify(node2Mock, times(1)).send(requestMock);
     }

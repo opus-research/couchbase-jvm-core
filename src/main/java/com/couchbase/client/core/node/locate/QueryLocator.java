@@ -37,7 +37,7 @@ public class QueryLocator implements Locator {
     private long counter = 0;
 
     @Override
-    public void locateAndDispatch(CouchbaseRequest request, List<Node> nodes, ClusterConfig config, CoreEnvironment env,
+    public void locate(CouchbaseRequest request, List<Node> nodes, ClusterConfig config, CoreEnvironment env,
         RingBuffer<ResponseEvent> responseBuffer) {
         int nodeSize = nodes.size();
         int offset = (int) counter++ % nodeSize;
