@@ -161,8 +161,7 @@ public abstract class AbstractLoader implements Loader {
                     config.password(password);
                     return Tuple.create(loaderType, config);
                 }
-            })
-            .take(1);
+            });
     }
 
     /**

@@ -117,7 +117,6 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
         if (message instanceof CouchbaseRequest) {
             scheduleForRetry((CouchbaseRequest) message);
         } else {
-
             CouchbaseRequest request = ((CouchbaseResponse) message).request();
             if (request != null) {
                 scheduleForRetry(request);
@@ -128,14 +127,8 @@ public class ResponseHandler implements EventHandler<ResponseEvent> {
             if (message instanceof BinaryResponse) {
                 BinaryResponse response = (BinaryResponse) message;
                 if (response.content() != null && response.content().readableBytes() > 0) {
-                    try {
-                        String config = response.content().toString(CharsetUtil.UTF_8).trim();
-                        if (config.startsWith("{")) {
-                            configurationProvider.proposeBucketConfig(response.bucket(), config);
-                        }
-                    } finally {
-                        response.content().release();
-                    }
+                    configurationProvider.proposeBucketConfig(response.bucket(),
+                        response.content().toString(CharsetUtil.UTF_8));
                 }
             }
         }

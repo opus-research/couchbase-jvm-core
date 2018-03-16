@@ -29,7 +29,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
-import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
 import rx.Subscriber;
@@ -37,6 +36,7 @@ import rx.Subscription;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -104,19 +104,9 @@ public class CarrierRefresher extends AbstractRefresher {
 
                                 @Override
                                 public void onNext(GetBucketConfigResponse res) {
-                                    ByteBuf content = res.content();
-                                    if (res.status().isSuccess() && content!= null && content.readableBytes() > 0) {
-                                        String rawConfig = content
-                                            .toString(CharsetUtil.UTF_8)
-                                            .replace("$HOST", hostname.getHostName())
-                                            .trim();
-                                        if (rawConfig.startsWith("{")) {
-                                            provider().proposeBucketConfig(res.bucket(), rawConfig);
-                                        }
-                                    }
-                                    if (content != null && content.refCnt() > 0) {
-                                        content.release();
-                                    }
+                                    String rawConfig = res.content().toString(CharsetUtil.UTF_8).replace("$HOST",
+                                        hostname.getHostName());
+                                    provider().proposeBucketConfig(res.bucket(), rawConfig);
                                 }
                             });
                     }
@@ -155,23 +145,10 @@ public class CarrierRefresher extends AbstractRefresher {
 
                     cluster()
                         .<GetBucketConfigResponse>send(new GetBucketConfigRequest(config.name(), hostname))
-                        .filter(new Func1<GetBucketConfigResponse, Boolean>() {
-                            @Override
-                            public Boolean call(GetBucketConfigResponse response) {
-                                boolean good = response.status().isSuccess() && response.content() != null;
-                                if (!good) {
-                                    if (response.content() != null) {
-                                        response.content().release();
-                                    }
-                                }
-                                return good;
-                            }
-                        })
                         .map(new Func1<GetBucketConfigResponse, String>() {
                             @Override
                             public String call(GetBucketConfigResponse response) {
-                                String raw = response.content().toString(CharsetUtil.UTF_8).trim();
-                                response.content().release();
+                                String raw = response.content().toString(CharsetUtil.UTF_8);
                                 return raw.replace("$HOST", response.hostname().getHostName());
                             }
                         })
@@ -188,9 +165,7 @@ public class CarrierRefresher extends AbstractRefresher {
 
                             @Override
                             public void onNext(String rawConfig) {
-                                if (rawConfig.startsWith("{")) {
-                                    provider().proposeBucketConfig(config.name(), rawConfig);
-                                }
+                                provider().proposeBucketConfig(config.name(), rawConfig);
                             }
                         });
                 }
