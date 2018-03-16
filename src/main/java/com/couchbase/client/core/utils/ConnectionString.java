@@ -27,7 +27,7 @@ import java.util.Map;
  * Implements a {@link ConnectionString}.
  *
  * @author Michael Nitschinger
- * @since 2.4.0
+ * @since 2.0
  */
 public class ConnectionString {
 

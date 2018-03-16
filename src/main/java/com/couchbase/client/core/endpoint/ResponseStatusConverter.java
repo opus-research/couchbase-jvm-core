@@ -73,8 +73,6 @@ public class ResponseStatusConverter {
                 return ResponseStatus.COMMAND_UNAVAILABLE;
             case ERR_NOT_SUPPORTED:
                 return ResponseStatus.COMMAND_UNAVAILABLE;
-            case ERR_ACCESS:
-                return ResponseStatus.ACCESS_ERROR;
             case ERR_INTERNAL:
                 return ResponseStatus.INTERNAL_ERROR;
             case ERR_INVALID:
