@@ -69,9 +69,6 @@ import com.couchbase.client.core.message.kv.UnlockRequest;
 import com.couchbase.client.core.message.kv.UnlockResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocMutationRequest;
-import com.couchbase.client.core.message.kv.subdoc.BinarySubdocRequest;
-import com.couchbase.client.core.message.kv.subdoc.SimpleSubdocResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheOpcodes;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheRequest;
@@ -125,13 +122,6 @@ public class KeyValueHandler
     public static final byte OP_NOOP = BinaryMemcacheOpcodes.NOOP;
     public static final byte OP_STAT = BinaryMemcacheOpcodes.STAT;
     public static final byte OP_GET_ALL_MUTATION_TOKENS = (byte) 0x48;
-
-    public static final byte OP_SUB_GET = (byte) 0xc5;
-    public static final byte OP_SUB_EXIST = (byte) 0xc6;
-    public static final byte OP_SUB_DICT_ADD = (byte) 0xc7;
-    public static final byte OP_SUB_DICT_UPSERT = (byte) 0xc8;
-    public static final byte OP_SUB_DELETE = (byte) 0xc9;
-    public static final byte OP_SUB_REPLACE = (byte) 0xca;
 
     boolean seqOnMutation = false;
 
@@ -192,8 +182,6 @@ public class KeyValueHandler
             request = handleStatRequest((StatRequest) msg);
         } else if (msg instanceof GetAllMutationTokensRequest) {
             request = handleGetAllMutationTokensRequest(ctx, (GetAllMutationTokensRequest) msg);
-        } else if (msg instanceof BinarySubdocRequest) {
-            request = handleSubdocumentRequest(ctx, (BinarySubdocRequest) msg);
         } else {
             throw new IllegalArgumentException("Unknown incoming BinaryRequest type "
                 + msg.getClass());
@@ -511,46 +499,6 @@ public class KeyValueHandler
         return request;
     }
 
-    /**
-     * The bitmask for sub-document extras "command" section (third byte of the extras) that activates the
-     * creation of missing intermediate nodes in the JSON path.
-     */
-    private static final byte SUBDOC_BITMASK_MKDIR_P = 1;
-
-    private static BinaryMemcacheRequest handleSubdocumentRequest(ChannelHandlerContext ctx, BinarySubdocRequest msg) {
-        String key = msg.key();
-        short keyLength = (short) msg.keyBytes().length;
-
-        ByteBuf extras = ctx.alloc().buffer(3, 7); //extras can be 7 bytes if there is an expiry
-        byte extrasLength = 3; //by default 2 bytes for pathLength + 1 byte for "command" flags
-        extras.writeShort(msg.pathLength());
-
-        long cas = 0L;
-
-        if (msg instanceof BinarySubdocMutationRequest) {
-            BinarySubdocMutationRequest mut = (BinarySubdocMutationRequest) msg;
-            //for now only possible command flag is MKDIR_P (and it makes sense in mutations only)
-            extras.writeByte(mut.createIntermediaryPath() ? SUBDOC_BITMASK_MKDIR_P : 0);
-            if (mut.expiration() != 0L) {
-                extrasLength = 7;
-                extras.writeInt(mut.expiration());
-            }
-
-            cas = mut.cas();
-        } else {
-            extras.writeByte(0);
-        }
-
-        FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());
-        request.setOpcode(msg.opcode())
-                .setKeyLength(keyLength)
-                .setExtrasLength(extrasLength)
-                .setTotalBodyLength(keyLength + msg.content().readableBytes() + extrasLength)
-                .setCAS(cas);
-
-        return request;
-    }
-
     @Override
     protected CouchbaseResponse decodeResponse(final ChannelHandlerContext ctx, final FullBinaryMemcacheResponse msg)
         throws Exception {
@@ -567,10 +515,6 @@ public class KeyValueHandler
 
         msg.content().retain();
         CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
-
-        if (response == null) {
-            response = handleSubdocumentResponseMessages(request, msg, ctx, status, seqOnMutation);
-        }
 
         if (response == null) {
             response = handleOtherResponseMessages(request, msg, status, seqOnMutation, remoteHostname());
@@ -635,42 +579,6 @@ public class KeyValueHandler
         }
 
         return response;
-    }
-
-    /**
-     * Helper method to decode all simple subdocument response messages.
-     *
-     * @param request the current request.
-     * @param msg the current response message.
-     * @param ctx the handler context.
-     * @param status the response status code.
-     * @return the decoded response or null if none did match.
-     */
-    private static CouchbaseResponse handleSubdocumentResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-         ChannelHandlerContext ctx, ResponseStatus status, boolean seqOnMutation) {
-        if (!(request instanceof BinarySubdocRequest))
-            return null;
-        BinarySubdocRequest subdocRequest = (BinarySubdocRequest) request;
-        long cas = msg.getCAS();
-        short statusCode = msg.getStatus();
-        String bucket = request.bucket();
-
-        MutationToken mutationToken = null;
-        if (msg.getExtrasLength() > 0) {
-            mutationToken = extractToken(seqOnMutation, status.isSuccess(), msg.getExtras(), request.partition());
-        }
-
-        ByteBuf fragment;
-        if (msg.content() != null && msg.content().readableBytes() > 0) {
-            fragment = msg.content();
-        } else if (msg.content() != null) {
-            msg.content().release();
-            fragment = Unpooled.EMPTY_BUFFER;
-        } else {
-            fragment = Unpooled.EMPTY_BUFFER;
-        }
-
-        return new SimpleSubdocResponse(status, statusCode, bucket, fragment, subdocRequest, cas, mutationToken);
     }
 
     private static MutationToken extractToken(boolean seqOnMutation, boolean success, ByteBuf extras, long vbid) {
@@ -800,8 +708,6 @@ public class KeyValueHandler
             content = ((AppendRequest) request).content();
         } else if (request instanceof PrependRequest) {
             content = ((PrependRequest) request).content();
-        } else if (request instanceof BinarySubdocRequest) {
-            content = ((BinarySubdocRequest) request).content();
         }
         releaseContent(content);
     }
