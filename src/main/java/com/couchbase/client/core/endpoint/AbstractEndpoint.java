@@ -51,7 +51,6 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.handler.timeout.IdleStateHandler;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
@@ -189,7 +188,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 @Override
                 protected void initChannel(Channel channel) throws Exception {
                     ChannelPipeline pipeline = channel.pipeline();
-                    pipeline.addLast(new IdleStateHandler(0, 0, env.maxIdleTime()));
                     if (environment.sslEnabled()) {
                         pipeline.addLast(new SslHandler(sslEngineFactory.get()));
                     }

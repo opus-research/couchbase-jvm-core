@@ -51,7 +51,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int BINARY_ENDPOINTS = 1;
     public static final int VIEW_ENDPOINTS = 1;
     public static final int QUERY_ENDPOINTS = 1;
-    public static final int MAX_IDLE_TIME = 0;
 
     private static final String NAMESPACE = "com.couchbase.";
 
@@ -73,7 +72,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int binaryServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
-    private final int maxIdleTime;
 
     /**
      * The logger used.
@@ -109,7 +107,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         binaryServiceEndpoints = intPropertyOr("binaryEndpoints", builder.binaryEndpoints());
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints());
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints());
-        maxIdleTime = intPropertyOr("maxIdleTime", builder.maxIdleTime());
 
         this.ioPool = builder.ioPool() == null ? new NioEventLoopGroup(ioPoolSize()) : builder.ioPool();
         this.coreScheduler = builder.scheduler() == null ? new CoreScheduler(computationPoolSize()) : builder.scheduler();
@@ -277,11 +274,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return queryServiceEndpoints;
     }
 
-    @Override
-    public int maxIdleTime() {
-        return maxIdleTime;
-    }
-
     public static class Builder implements CoreEnvironment {
 
         private boolean sslEnabled = SSL_ENABLED;
@@ -302,7 +294,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int binaryServiceEndpoints = BINARY_ENDPOINTS;
         private int viewServiceEndpoints = VIEW_ENDPOINTS;
         private int queryServiceEndpoints = QUERY_ENDPOINTS;
-        private int maxIdleTime = MAX_IDLE_TIME;
         private EventLoopGroup ioPool;
         private Scheduler scheduler;
 
@@ -516,16 +507,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
             return this;
         }
 
-        @Override
-        public int maxIdleTime() {
-            return maxIdleTime;
-        }
-
-        public Builder maxIdleTime(final int maxIdleTime) {
-            this.maxIdleTime = maxIdleTime;
-            return this;
-        }
-
         public DefaultCoreEnvironment build() {
             return new DefaultCoreEnvironment(this);
         }
@@ -554,7 +535,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", queryServiceEndpoints=").append(queryServiceEndpoints);
         sb.append(", ioPool=").append(ioPool.getClass().getSimpleName());
         sb.append(", coreScheduler=").append(coreScheduler.getClass().getSimpleName());
-        sb.append(", maxIdleTime=").append(maxIdleTime);
         sb.append('}');
         return sb.toString();
     }
