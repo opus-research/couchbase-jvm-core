@@ -27,7 +27,7 @@ import com.lmax.disruptor.RingBuffer;
 /**
  * @author Sergey Avseyev
  */
-public class SearchService extends PooledService {
+public class OldSearchService extends AbstractPoolingService {
     /**
      * The endpoint selection strategy.
      */
@@ -47,10 +47,10 @@ public class SearchService extends PooledService {
      * @param env            the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public SearchService(final String hostname, final String bucket, final String password, final int port,
+    public OldSearchService(final String hostname, final String bucket, final String password, final int port,
                          final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.searchServiceConfig(), responseBuffer, FACTORY, STRATEGY);
-
+        super(hostname, bucket, password, port, env, env.searchEndpoints(), env.searchEndpoints(), STRATEGY,
+                responseBuffer, FACTORY);
     }
 
     @Override

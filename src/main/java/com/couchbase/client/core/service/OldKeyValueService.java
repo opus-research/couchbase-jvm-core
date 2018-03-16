@@ -24,7 +24,7 @@ import com.couchbase.client.core.service.strategies.PartitionSelectionStrategy;
 import com.couchbase.client.core.service.strategies.SelectionStrategy;
 import com.lmax.disruptor.RingBuffer;
 
-public class KeyValueService extends PooledService {
+public class OldKeyValueService extends AbstractPoolingService {
 
     /**
      * The endpoint selection strategy.
@@ -46,9 +46,10 @@ public class KeyValueService extends PooledService {
      * @param env the shared environment.
      * @param responseBuffer the shared response buffer.
      */
-    public KeyValueService(final String hostname, final String bucket, final String password, final int port,
-        final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, env.kvServiceConfig(), responseBuffer, FACTORY, STRATEGY);
+    public OldKeyValueService(final String hostname, final String bucket, final String password, final int port,
+                           final CoreEnvironment env, final RingBuffer<ResponseEvent> responseBuffer) {
+        super(hostname, bucket, password, port, env, env.kvEndpoints(), env.kvEndpoints(), STRATEGY, responseBuffer,
+                FACTORY);
     }
 
     @Override
@@ -62,7 +63,7 @@ public class KeyValueService extends PooledService {
     static class KeyValueEndpointFactory implements EndpointFactory {
         @Override
         public Endpoint create(String hostname, String bucket, String password, int port, CoreEnvironment env,
-            RingBuffer<ResponseEvent> responseBuffer) {
+                               RingBuffer<ResponseEvent> responseBuffer) {
             return new KeyValueEndpoint(hostname, bucket, password, port, env, responseBuffer);
         }
     }
