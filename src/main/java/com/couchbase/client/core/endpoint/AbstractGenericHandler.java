@@ -31,8 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.kv.StatRequest;
-import com.couchbase.client.core.message.kv.StatResponse;
 import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
@@ -219,9 +217,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         try {
             CouchbaseResponse response = decodeResponse(ctx, msg);
             if (response != null) {
-                if (response instanceof StatResponse) {
-                    ((StatRequest)currentRequest).add((StatResponse)response);
-                }
                 publishResponse(response, currentRequest.observable());
 
                 if (currentDecodingState == DecodingState.FINISHED) {
@@ -267,10 +262,7 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 public void call() {
                     try {
                         observable.onNext(response);
-                        if (currentDecodingState == DecodingState.FINISHED) {
-                            System.out.println("Observable has been completed from AbstractGenericHandler");
-                            observable.onCompleted();
-                        }
+                        observable.onCompleted();
                     } catch(Exception ex) {
                         LOGGER.warn("Caught exception while onNext on observable", ex);
                         observable.onError(ex);
@@ -467,13 +459,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     protected void currentRequest(REQUEST request) {
         currentRequest = request;
-    }
-
-    /**
-     * @return stringified version of the remote node's hostname
-     */
-    protected String remoteHostname() {
-        return remoteHostname;
     }
 
     /**
