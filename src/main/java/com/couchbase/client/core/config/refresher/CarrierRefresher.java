@@ -31,7 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.kv.GetBucketConfigRequest;
 import com.couchbase.client.core.message.kv.GetBucketConfigResponse;
-import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.Buffers;
 import io.netty.util.CharsetUtil;
 import rx.Observable;
@@ -39,7 +38,6 @@ import rx.Subscriber;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
-
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -74,15 +72,6 @@ public class CarrierRefresher extends AbstractRefresher {
         super(cluster);
         subscriptions = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
         this.environment = environment;
-
-        Observable
-            .interval(10, TimeUnit.SECONDS, environment.scheduler())
-            .subscribe(new Action1<Long>() {
-                @Override
-                public void call(Long aLong) {
-                    provider().signalOutdated();
-                }
-            });
     }
 
     @Override
@@ -113,10 +102,6 @@ public class CarrierRefresher extends AbstractRefresher {
         List<NodeInfo> nodeInfos = new ArrayList<NodeInfo>(config.nodes());
         Collections.shuffle(nodeInfos);
         for (final NodeInfo nodeInfo : nodeInfos) {
-            if (!isValidCarrierNode(environment.sslEnabled(), nodeInfo)) {
-                continue;
-            }
-
             if (refreshSequence == null) {
                 refreshSequence = pollSequence.flatMap(new Func1<Long, Observable<String>>() {
                     @Override
@@ -183,12 +168,7 @@ public class CarrierRefresher extends AbstractRefresher {
 
                     List<NodeInfo> nodeInfos = new ArrayList<NodeInfo>(config.nodes());
                     Collections.shuffle(nodeInfos);
-
                     for (NodeInfo nodeInfo : nodeInfos) {
-                        if (!isValidCarrierNode(environment.sslEnabled(), nodeInfo)) {
-                            continue;
-                        }
-
                         if (refreshSequence == null) {
                             refreshSequence = refreshAgainstNode(bucketName, nodeInfo.hostname());
                         } else {
@@ -222,22 +202,6 @@ public class CarrierRefresher extends AbstractRefresher {
                     });
                 }
             });
-    }
-
-    /**
-     * Helper method to detect if the given node can actually perform carrier refresh.
-     *
-     * @param sslEnabled true if ssl enabled, false otherwise.
-     * @param nodeInfo the node info for the given node.
-     * @return true if it is a valid carrier node, false otherwise.
-     */
-    private static boolean isValidCarrierNode(final boolean sslEnabled, final NodeInfo nodeInfo) {
-        if (sslEnabled && nodeInfo.sslServices().containsKey(ServiceType.BINARY)) {
-            return true;
-        } else if (nodeInfo.services().containsKey(ServiceType.BINARY)) {
-            return true;
-        }
-        return false;
     }
 
     /**

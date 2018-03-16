@@ -54,8 +54,4 @@ public class DefaultEventBus implements EventBus {
         }
     }
 
-    @Override
-    public boolean hasSubscribers() {
-        return bus.hasObservers();
-    }
 }

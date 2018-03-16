@@ -72,6 +72,6 @@ public abstract class AbstractCouchbaseResponse implements CouchbaseResponse {
 
     @Override
     public String toString() {
-        return this.getClass().getSimpleName() + "{" + "status=" + status + ", request=" + request + '}';
+        return "CouchbaseResponse{" + "status=" + status + ", request=" + request + '}';
     }
 }
