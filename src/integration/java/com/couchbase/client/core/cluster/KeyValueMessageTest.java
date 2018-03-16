@@ -21,6 +21,7 @@
  */
 package com.couchbase.client.core.cluster;
 
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 import com.couchbase.client.core.message.kv.CounterRequest;
 import com.couchbase.client.core.message.kv.CounterResponse;
@@ -44,6 +45,7 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.Test;
 import rx.Observable;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 import static org.junit.Assert.assertEquals;
@@ -61,8 +63,13 @@ public class KeyValueMessageTest extends ClusterDependentTest {
     public void shouldUpsertAndGetDocument() throws Exception {
         String key = "upsert-key";
         String content = "Hello World!";
-        UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
-        UpsertResponse response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
+        final UpsertRequest upsert = new UpsertRequest(key, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8), bucket());
+        final UpsertResponse response = cluster().<UpsertResponse>send(new Func0<CouchbaseRequest>() {
+            @Override
+            public CouchbaseRequest call() {
+                return upsert;
+            }
+        }).toBlocking().single();
         ReferenceCountUtil.releaseLater(response.content());
 
         GetRequest request = new GetRequest(key, bucket());
