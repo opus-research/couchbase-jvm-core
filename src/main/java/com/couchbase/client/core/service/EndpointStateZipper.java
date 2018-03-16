@@ -19,6 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+
 package com.couchbase.client.core.service;
 
 import com.couchbase.client.core.endpoint.Endpoint;
@@ -27,12 +28,6 @@ import com.couchbase.client.core.state.LifecycleState;
 
 import java.util.Collection;
 
-/**
- * Calculates a merged state for all registered endpoints.
- *
- * @author Michael Nitschinger
- * @since 1.1.0
- */
 public class EndpointStateZipper extends AbstractStateZipper<Endpoint, LifecycleState> {
 
     private final LifecycleState initialState;
