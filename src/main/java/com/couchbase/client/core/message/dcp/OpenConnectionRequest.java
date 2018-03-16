@@ -41,12 +41,6 @@ public class OpenConnectionRequest extends AbstractDCPRequest {
      */
     private final ConnectionType type;
 
-    /**
-     * The connection name can be used to get statistics about the connection state
-     * as well as other useful debugging information. If a connection already exists
-     * on the Producer with the same name then the old connection is closed and
-     * a new one is opened.
-     */
     private final String connectionName;
     private final int sequenceNumber;
 
@@ -67,7 +61,7 @@ public class OpenConnectionRequest extends AbstractDCPRequest {
     }
 
     public OpenConnectionRequest(String connectionName, ConnectionType type, int sequenceNumber, String bucket, String password) {
-        super(bucket, password);
+        super(connectionName, bucket, password);
         this.type = type;
         this.sequenceNumber = sequenceNumber;
         this.connectionName = connectionName;

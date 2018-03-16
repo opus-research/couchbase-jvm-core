@@ -37,12 +37,12 @@ public class RemoveMessage extends AbstractDCPRequest {
     private final String key;
     private final long cas;
 
-    public RemoveMessage(short partition, String key, long cas, String bucket) {
-        this(partition, key, cas, bucket, null);
+    public RemoveMessage(final String connectionName, short partition, String key, long cas, String bucket) {
+        this(connectionName, partition, key, cas, bucket, null);
     }
 
-    public RemoveMessage(short partition, String key, long cas, String bucket, String password) {
-        super(bucket, password);
+    public RemoveMessage(final String connectionName, short partition, String key, long cas, String bucket, String password) {
+        super(connectionName, bucket, password);
         this.partition(partition);
         this.key = key;
         this.cas = cas;

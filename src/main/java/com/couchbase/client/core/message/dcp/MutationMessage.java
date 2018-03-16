@@ -42,14 +42,14 @@ public class MutationMessage extends AbstractDCPRequest {
     private final int lockTime;
     private final long cas;
 
-    public MutationMessage(short partition, String key, ByteBuf content, int expiration,
+    public MutationMessage(final String connectionName, short partition, String key, ByteBuf content, int expiration,
                            int flags, int lockTime, long cas, String bucket) {
-        this(partition, key, content, expiration, flags, lockTime, cas, bucket, null);
+        this(connectionName, partition, key, content, expiration, flags, lockTime, cas, bucket, null);
     }
 
-    public MutationMessage(short partition, String key, ByteBuf content, int expiration,
+    public MutationMessage(final String connectionName, short partition, String key, ByteBuf content, int expiration,
                            int flags, int lockTime, long cas, String bucket, String password) {
-        super(bucket, password);
+        super(connectionName, bucket, password);
         this.partition(partition);
         this.key = key;
         this.content = content;

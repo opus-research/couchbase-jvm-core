@@ -77,7 +77,7 @@ public class DCPMessageTest extends ClusterDependentTest {
             assertEquals(ResponseStatus.SUCCESS, response.status());
         }
         StreamRequestResponse addStream = cluster()
-                .<StreamRequestResponse>send(new StreamRequestRequest(calculateVBucketForKey("foo"), bucket()))
+                .<StreamRequestResponse>send(new StreamRequestRequest("hello", calculateVBucketForKey("foo"), bucket()))
                 .toBlocking()
                 .single();
         assertEquals(ResponseStatus.SUCCESS, addStream.status());

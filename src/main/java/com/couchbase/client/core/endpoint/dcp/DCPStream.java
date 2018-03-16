@@ -33,20 +33,23 @@ import rx.subjects.Subject;
  * @since 1.1.0
  */
 public class DCPStream {
-    public final int id;
-    public final String bucket;
-    public final Subject<DCPRequest, DCPRequest> subject;
+    private final int id;
+    private final String bucket;
+    private final Subject<DCPRequest, DCPRequest> subject;
+    private final String connectionName;
 
     /**
      * Creates new {@link DCPStream} instance.
      *
-     * @param id     stream identifier
-     * @param bucket name of the bucket
-     * @param size   size of the subject
+     * @param id             stream identifier
+     * @param connectionName name of DCP connection
+     * @param bucket         name of the bucket
+     * @param size           size of the subject
      */
-    public DCPStream(final int id, final String bucket, final int size) {
+    public DCPStream(final int id, final String connectionName, final String bucket, final int size) {
         this.id = id;
         this.bucket = bucket;
+        this.connectionName = connectionName;
         subject = ReplaySubject.<DCPRequest>createWithSize(size).toSerialized();
     }
 
@@ -56,5 +59,13 @@ public class DCPStream {
 
     public String bucket() {
         return bucket;
+    }
+
+    public int id() {
+        return id;
+    }
+
+    public String connectionName() {
+        return connectionName;
     }
 }

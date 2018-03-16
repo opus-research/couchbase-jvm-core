@@ -68,21 +68,21 @@ public class StreamRequestRequest extends AbstractDCPRequest {
     private final long snapshotEndSequenceNumber;
 
 
-    public StreamRequestRequest(short partition, String bucket) {
-        this(partition, 0, 0, 0xffffffff, 0, 0, bucket, null);
+    public StreamRequestRequest(final String connectionName, short partition, String bucket) {
+        this(connectionName, partition, 0, 0, 0xffffffff, 0, 0, bucket, null);
     }
 
-    public StreamRequestRequest(short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
+    public StreamRequestRequest(final String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
                                 long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
                                 String bucket) {
-        this(partition, vbucketUUID, startSequenceNumber, endSequenceNumber,
+        this(connectionName, partition, vbucketUUID, startSequenceNumber, endSequenceNumber,
                 snapshotStartSequenceNumber, snapshotEndSequenceNumber, bucket, null);
     }
 
-    public StreamRequestRequest(short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
+    public StreamRequestRequest(final String connectionName, short partition, long vbucketUUID, long startSequenceNumber, long endSequenceNumber,
                                 long snapshotStartSequenceNumber, long snapshotEndSequenceNumber,
                                 String bucket, String password) {
-        super(bucket, password);
+        super(connectionName, bucket, password);
         this.partition(partition);
         this.vbucketUUID = vbucketUUID;
         this.startSequenceNumber = startSequenceNumber;

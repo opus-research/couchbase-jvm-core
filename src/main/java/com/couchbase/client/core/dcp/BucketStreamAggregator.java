@@ -101,18 +101,19 @@ public class BucketStreamAggregator {
                     "Consider either increasing rx.ring-buffer.size, or setting limits for the buckets",
                     aggregatorState.numberOfInfiniteStreams(), RxRingBuffer.SIZE);
         }
+        final String connectionName = aggregatorState.name();
         return core
-                .<OpenConnectionResponse>send(new OpenConnectionRequest(aggregatorState.name(), bucket))
+                .<OpenConnectionResponse>send(new OpenConnectionRequest(connectionName, bucket))
                 .flatMap(new Func1<OpenConnectionResponse, Observable<StreamRequestResponse>>() {
                     @Override
-                    public Observable<StreamRequestResponse> call(OpenConnectionResponse reponse) {
+                    public Observable<StreamRequestResponse> call(final OpenConnectionResponse response) {
                         return Observable
                                 .from(aggregatorState)
                                 .flatMap(new Func1<BucketStreamState, Observable<StreamRequestResponse>>() {
                                     @Override
                                     public Observable<StreamRequestResponse> call(final BucketStreamState feed) {
                                         Observable<StreamRequestResponse> res =
-                                                core.send(new StreamRequestRequest(
+                                                core.send(new StreamRequestRequest(connectionName,
                                                         feed.partition(), feed.vbucketUUID(),
                                                         feed.startSequenceNumber(), feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),
@@ -131,7 +132,7 @@ public class BucketStreamAggregator {
                                                     default:
                                                         return Observable.just(response);
                                                 }
-                                                return core.send(new StreamRequestRequest(
+                                                return core.send(new StreamRequestRequest(connectionName,
                                                         feed.partition(), feed.vbucketUUID(),
                                                         rollbackSequenceNumber, feed.endSequenceNumber(),
                                                         feed.snapshotStartSequenceNumber(), feed.snapshotEndSequenceNumber(),

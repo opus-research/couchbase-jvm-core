@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,38 +20,33 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.dcp;
-
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.message.CouchbaseRequest;
+package com.couchbase.client.core.endpoint.dcp;
 
 /**
- * Common interface for all DCP requests.
- *
- * Note that they can flow in both directions. For example, {@link ConnectionType#CONSUMER}
- * connection, means that messages will flow from server to client.
- *
  * @author Sergey Avseyev
- * @since 1.1.0
  */
-@InterfaceStability.Experimental
-@InterfaceAudience.Private
-public interface DCPRequest extends CouchbaseRequest {
-    String connectionName();
+public class DCPConnection {
+    private final String name;
+    private volatile int totalReceivedBytes;
 
-    /**
-     * The partition (vBucket) to use for this request.
-     *
-     * @return the partition to use.
-     */
-    short partition();
+    public DCPConnection(String name) {
+        this.name = name;
+        this.totalReceivedBytes = 0;
+    }
 
-    /**
-     * Set the partition ID.
-     *
-     * @param id the id of the partition.
-     * @return the {@link DCPRequest} for proper chaining.
-     */
-    DCPRequest partition(short id);
+    public String name() {
+        return name;
+    }
+
+    public int totalReceivedBytes() {
+        return totalReceivedBytes;
+    }
+
+    public void inc(int delta) {
+        totalReceivedBytes += delta;
+    }
+
+    public void reset() {
+        totalReceivedBytes = 0;
+    }
 }
