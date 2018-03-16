@@ -139,6 +139,7 @@ public class QueryHandlerTest {
         CoreEnvironment environment = mock(CoreEnvironment.class);
         when(environment.scheduler()).thenReturn(Schedulers.computation());
         when(environment.queryEnabled()).thenReturn(Boolean.TRUE);
+        when(environment.maxRequestLifetime()).thenReturn(10000L);
         endpoint = mock(AbstractEndpoint.class);
         when(endpoint.environment()).thenReturn(environment);
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
