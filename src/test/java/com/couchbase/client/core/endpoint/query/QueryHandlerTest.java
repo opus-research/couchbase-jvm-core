@@ -34,7 +34,6 @@ import com.couchbase.client.core.message.query.GenericQueryRequest;
 import com.couchbase.client.core.message.query.GenericQueryResponse;
 import com.couchbase.client.core.message.query.QueryRequest;
 import com.couchbase.client.core.util.Resources;
-import com.couchbase.client.core.utils.Buffers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
@@ -59,7 +58,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
-import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -103,7 +101,6 @@ public class QueryHandlerTest {
 
     private static final String FAKE_REQUESTID = "1234test-7802-4fc2-acd6-dfcd1c05a288";
     private static final String FAKE_CLIENTID = "1234567890123456789012345678901234567890123456789012345678901234";
-    private static final String FAKE_SIGNATURE = "{\"*\":\"*\"}";
 
     private ObjectMapper mapper = new ObjectMapper();
     private Queue<QueryRequest> queue;
@@ -138,7 +135,6 @@ public class QueryHandlerTest {
 
         CoreEnvironment environment = mock(CoreEnvironment.class);
         when(environment.scheduler()).thenReturn(Schedulers.computation());
-        when(environment.queryEnabled()).thenReturn(Boolean.TRUE);
         endpoint = mock(AbstractEndpoint.class);
         when(endpoint.environment()).thenReturn(environment);
         when(environment.userAgent()).thenReturn("Couchbase Client Mock");
@@ -186,7 +182,7 @@ public class QueryHandlerTest {
     private void assertResponse(GenericQueryResponse inbound,
             boolean expectedSuccess, ResponseStatus expectedStatus,
             String expectedRequestId, String expectedClientId,
-            String expectedFinalStatus, String expectedSignature,
+            String expectedFinalStatus,
             Action1<ByteBuf> assertRows,
             Action1<ByteBuf> assertErrors,
             Map<String, Object> metricsToCheck) {
@@ -203,7 +199,6 @@ public class QueryHandlerTest {
         List<ByteBuf> metricList = inbound.info().timeout(1, TimeUnit.SECONDS).toList().toBlocking().single();
         assertEquals(1, metricList.size());
         String metricsJson = metricList.get(0).toString(CharsetUtil.UTF_8);
-        metricList.get(0).release();
         try {
             Map metrics = mapper.readValue(metricsJson, Map.class);
             assertEquals(7, metrics.size());
@@ -218,17 +213,6 @@ public class QueryHandlerTest {
 
         inbound.errors().timeout(1, TimeUnit.SECONDS).toBlocking()
                .forEach(assertErrors);
-
-        List<ByteBuf> signatureList = inbound.signature().timeout(1, TimeUnit.SECONDS).toList().toBlocking().single();
-        if (expectedSignature != null) {
-            assertEquals(1, signatureList.size());
-            String signatureJson = signatureList.get(0).toString(CharsetUtil.UTF_8);
-            assertNotNull(signatureJson);
-            assertEquals(expectedSignature, signatureJson.replaceAll("\\s", ""));
-            ReferenceCountUtil.releaseLater(signatureList.get(0));
-        } else {
-            assertEquals(0, signatureList.size());
-        }
     }
 
     private static Map<String, Object> expectedMetricsCounts(int expectedErrors, int expectedResults) {
@@ -251,7 +235,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -291,7 +275,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -330,7 +314,7 @@ public class QueryHandlerTest {
         assertEquals(1, firedEvents.size());
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -361,7 +345,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -406,13 +390,12 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger found = new AtomicInteger(0);
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf row) {
                         found.incrementAndGet();
                         String content = row.toString(CharsetUtil.UTF_8);
-                        row.release();
                         assertNotNull(content);
                         assertTrue(!content.isEmpty());
                         try {
@@ -459,13 +442,12 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger found = new AtomicInteger(0);
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
                         found.incrementAndGet();
                         String content = byteBuf.toString(CharsetUtil.UTF_8);
-                        byteBuf.release();
                         assertNotNull(content);
                         assertTrue(!content.isEmpty());
                         try {
@@ -505,7 +487,6 @@ public class QueryHandlerTest {
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
         assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, expectedClientIdWithQuotes, "success",
-                FAKE_SIGNATURE,
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -551,7 +532,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456789", "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456789", "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -596,7 +577,7 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "", "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "", "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
@@ -641,13 +622,12 @@ public class QueryHandlerTest {
         GenericQueryResponse inbound = (GenericQueryResponse) firedEvents.get(0);
 
         final AtomicInteger invokeCounter1 = new AtomicInteger();
-        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success", FAKE_SIGNATURE,
+        assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, FAKE_CLIENTID, "success",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
                         invokeCounter1.incrementAndGet();
                         String response = buf.toString(CharsetUtil.UTF_8);
-                        buf.release();
                         try {
                             Map found = mapper.readValue(response, Map.class);
                             assertEquals(12, found.size());
@@ -690,7 +670,7 @@ public class QueryHandlerTest {
         expectedMetrics.put("warningCount", 1);
 
         final AtomicInteger count = new AtomicInteger(0);
-        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal", null,
+        assertResponse(inbound, false, ResponseStatus.FAILURE, FAKE_REQUESTID, FAKE_CLIENTID, "fatal",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
@@ -702,7 +682,6 @@ public class QueryHandlerTest {
                     public void call(ByteBuf buf) {
                         count.incrementAndGet();
                         String response = buf.toString(CharsetUtil.UTF_8);
-                        buf.release();
                         try {
                             Map error = mapper.readValue(response, Map.class);
                             assertEquals(5, error.size());
@@ -765,9 +744,6 @@ public class QueryHandlerTest {
         QueryHandler.KeepAliveResponse keepAliveResponse = keepAliveRequest.observable()
                 .cast(QueryHandler.KeepAliveResponse.class)
                 .timeout(1, TimeUnit.SECONDS).toBlocking().single();
-
-        ReferenceCountUtil.releaseLater(response);
-        ReferenceCountUtil.releaseLater(responseEnd);
 
         assertEquals(2, keepAliveEventCounter.get());
         assertEquals(ResponseStatus.NOT_EXISTS, keepAliveResponse.status());
@@ -832,13 +808,11 @@ public class QueryHandlerTest {
         final AtomicInteger found = new AtomicInteger(0);
         final AtomicInteger errors = new AtomicInteger(0);
         assertResponse(inbound, true, ResponseStatus.SUCCESS, FAKE_REQUESTID, "123456\\\"78901234567890", "success",
-                "{\"horseName\":\"json\"}",
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf byteBuf) {
                         found.incrementAndGet();
                         String content = byteBuf.toString(CharsetUtil.UTF_8);
-                        byteBuf.release();
                         assertNotNull(content);
                         assertTrue(!content.isEmpty());
                         try {
@@ -853,7 +827,6 @@ public class QueryHandlerTest {
                 new Action1<ByteBuf>() {
                     @Override
                     public void call(ByteBuf buf) {
-                        buf.release();
                         errors.incrementAndGet();
                     }
                 },
