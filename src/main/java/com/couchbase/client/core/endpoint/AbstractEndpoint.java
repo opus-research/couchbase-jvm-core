@@ -39,7 +39,9 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.ConnectTimeoutException;
+import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.oio.OioEventLoopGroup;
@@ -48,8 +50,15 @@ import io.netty.channel.socket.oio.OioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.EventExecutor;
 import rx.Observable;
+import rx.Observer;
+import rx.Single;
+import rx.SingleSubscriber;
 import rx.Subscriber;
+import rx.functions.Action1;
+import rx.functions.Func1;
+import rx.observables.AsyncOnSubscribe;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -59,6 +68,7 @@ import java.net.ConnectException;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The common parent implementation for all {@link Endpoint}s.
@@ -160,13 +170,13 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param adapter the bootstrap adapter.
      */
     protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient) {
+        final boolean isTransient, CoreEnvironment env) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = null;
-        this.env = null;
+        this.env = env;
         this.isTransient = isTransient;
         this.disconnected = false;
     }
@@ -269,9 +279,37 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      *                      some errors (like socket connect timeout).
      */
     protected void doConnect(final Subject<LifecycleState, LifecycleState> observable, final boolean bootstrapping) {
-        bootstrap.connect().addListener(new ChannelFutureListener() {
+        Single.create(new Single.OnSubscribe<ChannelFuture>() {
             @Override
-            public void operationComplete(final ChannelFuture future) throws Exception {
+            public void call(final SingleSubscriber<? super ChannelFuture> ss) {
+                bootstrap.connect().addListener(new ChannelFutureListener() {
+                    @Override
+                    public void operationComplete(ChannelFuture cf) throws Exception {
+                        ss.onSuccess(cf);
+                    }
+                });
+            }
+        })
+        // Safeguard if the callback doesn't return after the socket timeout + a grace period of one second.
+        .timeout(env.socketConnectTimeout() - 500, TimeUnit.MILLISECONDS)
+        .onErrorResumeNext(new Func1<Throwable, Single<? extends ChannelFuture>>() {
+            @Override
+            public Single<? extends ChannelFuture> call(Throwable throwable) {
+                ChannelPromise promise = new DefaultChannelPromise(null, env.ioPool().next());
+                if (throwable instanceof TimeoutException) {
+                    // Explicitly convert our timeout safeguard into a ConnectTimeoutException to simulate
+                    // a socket connect timeout.
+                    promise.setFailure(new ConnectTimeoutException("Connect callback did not return, "
+                        + "hit safeguarding timeout."));
+                } else {
+                    promise.setFailure(throwable);
+                }
+                return Single.just(promise);
+            }
+        })
+        .subscribe(new SingleSubscriber<ChannelFuture>() {
+            @Override
+            public void onSuccess(ChannelFuture future) {
                 if (state() == LifecycleState.DISCONNECTING || state() == LifecycleState.DISCONNECTED) {
                     LOGGER.debug(logIdent(channel, AbstractEndpoint.this) + "Endpoint connect completed, "
                             + "but got instructed to disconnect in the meantime.");
@@ -285,17 +323,17 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     } else {
                         if (future.cause() instanceof AuthenticationException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Authentication Failure.");
+                                    + "Authentication Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof SSLHandshakeException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "SSL Handshake Failure during connect.");
+                                    + "SSL Handshake Failure during connect.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof ClosedChannelException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Generic Failure.");
+                                    + "Generic Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
                             observable.onError(future.cause());
@@ -344,21 +382,41 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                                         SignalConfigReload.INSTANCE, null);
                             }
                             transitionState(LifecycleState.CONNECTING);
-                            future.channel().eventLoop().schedule(new Runnable() {
-                                @Override
-                                public void run() {
-                                    // Make sure to avoid a race condition where the reconnect could override
-                                    // the disconnect phase. If this happens, explicitly break the retry loop
-                                    // and re-run the disconnect phase to make sure all is properly freed.
-                                    if (!disconnected) {
-                                        doConnect(observable, bootstrapping);
-                                    } else {
-                                        LOGGER.debug("{}Explicitly breaking retry loop because already disconnected.",
+                            if (future.channel() == null) {
+                                // Our timeout edge case does not have a channel set, so we need to schedule the
+                                // retry attempt via rxjava. Maybe in the future we can think about only doing it
+                                // with rx?
+                                Observable.timer(delay, delayUnit).subscribe(new Action1<Long>() {
+                                    @Override
+                                    public void call(Long ignored) {
+                                        LOGGER.debug("Firing reconnect timer from RX because the connect future"
+                                            + "timeout hit and no channel is available to scheudle on.");
+                                        if (!disconnected) {
+                                            doConnect(observable, bootstrapping);
+                                        } else {
+                                            LOGGER.debug("{}Explicitly breaking retry loop because already disconnected.",
                                                 logIdent(channel, AbstractEndpoint.this));
-                                        disconnect();
+                                            disconnect();
+                                        }
                                     }
-                                }
-                            }, delay, delayUnit);
+                                });
+                            } else {
+                                future.channel().eventLoop().schedule(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        // Make sure to avoid a race condition where the reconnect could override
+                                        // the disconnect phase. If this happens, explicitly break the retry loop
+                                        // and re-run the disconnect phase to make sure all is properly freed.
+                                        if (!disconnected) {
+                                            doConnect(observable, bootstrapping);
+                                        } else {
+                                            LOGGER.debug("{}Explicitly breaking retry loop because already disconnected.",
+                                                    logIdent(channel, AbstractEndpoint.this));
+                                            disconnect();
+                                        }
+                                    }
+                                }, delay, delayUnit);
+                            }
                         } else {
                             LOGGER.debug("{}Not retrying because already disconnected or transient.",
                                     logIdent(channel, AbstractEndpoint.this));
@@ -367,6 +425,13 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
                 observable.onNext(state());
                 observable.onCompleted();
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                // All errors are converted to failed ChannelFutures before, so this observable
+                // should never fail.
+                LOGGER.warn("Unexpected error on connect callback wrapper, this is a bug.", error);
             }
         });
     }
