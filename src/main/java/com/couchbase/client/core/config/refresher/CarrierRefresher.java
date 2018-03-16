@@ -341,7 +341,7 @@ public class CarrierRefresher extends AbstractRefresher {
                 if (response.content().refCnt() > 0) {
                     response.content().release();
                 }
-                return raw.replace("$HOST", response.hostname().getHostAddress());
+                return raw.replace("$HOST", response.hostname().getHostName());
             }
         })
         .doOnError(new Action1<Throwable>() {
