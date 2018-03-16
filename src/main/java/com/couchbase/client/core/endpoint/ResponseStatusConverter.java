@@ -21,8 +21,6 @@
  */
 package com.couchbase.client.core.endpoint;
 
-import com.couchbase.client.core.logging.CouchbaseLogger;
-import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.ResponseStatus;
 
 /**
@@ -32,11 +30,6 @@ import com.couchbase.client.core.message.ResponseStatus;
  * @since 1.1.2
  */
 public class ResponseStatusConverter {
-
-    /**
-     * The logger used.
-     */
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(ResponseStatusConverter.class);
 
     public static final int HTTP_OK = 200;
     public static final int HTTP_CREATED = 201;
@@ -95,7 +88,6 @@ public class ResponseStatusConverter {
             case BINARY_ERR_DELTA_BADVAL:
                 return ResponseStatus.INVALID_ARGUMENTS;
             default:
-                LOGGER.warn("The server returned an unknown response status: {}", Integer.toHexString(status));
                 return ResponseStatus.FAILURE;
         }
     }
@@ -118,7 +110,6 @@ public class ResponseStatusConverter {
                 status = ResponseStatus.NOT_EXISTS;
                 break;
             default:
-                LOGGER.warn("The server returned an unknown response status: {}", code);
                 status = ResponseStatus.FAILURE;
         }
         return status;
