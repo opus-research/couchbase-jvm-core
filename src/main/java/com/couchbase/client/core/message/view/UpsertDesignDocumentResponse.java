@@ -25,9 +25,8 @@ import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
 import io.netty.buffer.ByteBuf;
-import io.netty.util.ReferenceCounted;
 
-public class UpsertDesignDocumentResponse extends AbstractCouchbaseResponse implements ReferenceCounted {
+public class UpsertDesignDocumentResponse extends AbstractCouchbaseResponse {
 
     private final ByteBuf content;
 
@@ -38,32 +37,5 @@ public class UpsertDesignDocumentResponse extends AbstractCouchbaseResponse impl
 
     public ByteBuf content() {
         return content;
-    }
-
-    @Override
-    public int refCnt() {
-        return content.refCnt();
-    }
-
-    @Override
-    public UpsertDesignDocumentResponse retain() {
-        content.retain();
-        return this;
-    }
-
-    @Override
-    public UpsertDesignDocumentResponse retain(int increment) {
-        content.retain(increment);
-        return this;
-    }
-
-    @Override
-    public boolean release() {
-        return content.release();
-    }
-
-    @Override
-    public boolean release(int decrement) {
-        return content.release(decrement);
     }
 }
