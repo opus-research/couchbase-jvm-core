@@ -22,8 +22,6 @@
 package com.couchbase.client.core.env;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.env.resources.IoPoolShutdownHook;
 import com.couchbase.client.core.env.resources.NettyShutdownHook;
 import com.couchbase.client.core.env.resources.NoOpShutdownHook;
@@ -83,7 +81,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final int RESPONSE_BUFFER_SIZE = 16384;
     public static final int DCP_CONNECTION_BUFFER_SIZE = 20971520; // 20MiB
     public static final double DCP_CONNECTION_BUFFER_ACK_THRESHOLD = 0.2; // for 20Mib it is 4MiB
-    public static final String DCP_CONNECTION_NAME = "dcp/core-io";
     public static final int IO_POOL_SIZE = Runtime.getRuntime().availableProcessors();
     public static final int COMPUTATION_POOL_SIZE =  Runtime.getRuntime().availableProcessors();
     public static final int KEYVALUE_ENDPOINTS = 1;
@@ -156,14 +153,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         } catch (Exception ex) {
             LOGGER.info("Could not set up user agent and packages, defaulting.", ex);
         }
-
-        try {
-            if (System.getProperty("com.couchbase.client.deps.io.netty.packagePrefix") == null) {
-                System.setProperty("com.couchbase.client.deps.io.netty.packagePrefix", "com.couchbase.client.deps.");
-            }
-        } catch (Exception ex) {
-            LOGGER.warn("Could not configure bundled netty's package prefix", ex);
-        }
     }
 
     private final boolean dcpEnabled;
@@ -184,7 +173,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final int requestBufferSize;
     private final int dcpConnectionBufferSize;
     private final double dcpConnectionBufferAckThreshold;
-    private final String dcpConnectionName;
     private final int kvServiceEndpoints;
     private final int viewServiceEndpoints;
     private final int queryServiceEndpoints;
@@ -242,7 +230,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         requestBufferSize = intPropertyOr("requestBufferSize", builder.requestBufferSize);
         dcpConnectionBufferSize = intPropertyOr("dcpConnectionBufferSize", builder.dcpConnectionBufferSize);
         dcpConnectionBufferAckThreshold = doublePropertyOr("dcpConnectionBufferAckThreshold", builder.dcpConnectionBufferAckThreshold);
-        dcpConnectionName = stringPropertyOr("dcpConnectionName", builder.dcpConnectionName);
         kvServiceEndpoints = intPropertyOr("kvEndpoints", builder.kvEndpoints);
         viewServiceEndpoints = intPropertyOr("viewEndpoints", builder.viewEndpoints);
         queryServiceEndpoints = intPropertyOr("queryEndpoints", builder.queryEndpoints);
@@ -562,13 +549,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    @InterfaceStability.Experimental
-    @InterfaceAudience.Public
-    public String dcpConnectionName() {
-        return dcpConnectionName;
-    }
-
-    @Override
     public int kvEndpoints() {
         return kvServiceEndpoints;
     }
@@ -695,7 +675,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private int requestBufferSize = REQUEST_BUFFER_SIZE;
         private int dcpConnectionBufferSize = DCP_CONNECTION_BUFFER_SIZE;
         private double dcpConnectionBufferAckThreshold = DCP_CONNECTION_BUFFER_ACK_THRESHOLD;
-        private String dcpConnectionName = DCP_CONNECTION_NAME;
         private int kvEndpoints = KEYVALUE_ENDPOINTS;
         private int viewEndpoints = VIEW_ENDPOINTS;
         private int queryEndpoints = QUERY_ENDPOINTS;
@@ -890,19 +869,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * a DCP Buffer Acknowledge message is sent to the server to signal producer how much data has been processed.
          * (default value {@value #DCP_CONNECTION_BUFFER_ACK_THRESHOLD}).
          */
-        public Builder dcpConnectionBufferAckThreshold(final double dcpConnectionBufferAckThreshold) {
+        public Builder dcpConnectionBufferAckThreshold(final int dcpConnectionBufferAckThreshold) {
             this.dcpConnectionBufferAckThreshold = dcpConnectionBufferAckThreshold;
-            return this;
-        }
-
-        /**
-         * Sets default name for DCP connection. It is used to identify streams on the server.
-         * (default value {@value #DCP_CONNECTION_NAME}).
-         */
-        @InterfaceStability.Experimental
-        @InterfaceAudience.Public
-        public Builder dcpConnectionName(final String dcpConnectionName) {
-            this.dcpConnectionName = dcpConnectionName;
             return this;
         }
 
@@ -1243,7 +1211,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", socketConnectTimeout=").append(socketConnectTimeout);
         sb.append(", dcpConnectionBufferSize=").append(dcpConnectionBufferSize);
         sb.append(", dcpConnectionBufferAckThreshold=").append(dcpConnectionBufferAckThreshold);
-        sb.append(", dcpConnectionName=").append(dcpConnectionName);
         sb.append(", callbacksOnIoPool=").append(callbacksOnIoPool);
 
         return sb;
