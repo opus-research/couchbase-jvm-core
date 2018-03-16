@@ -19,48 +19,41 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
+
+package com.couchbase.client.core.message.dcp;
+
+import com.couchbase.client.core.message.CouchbaseRequest;
+import com.couchbase.client.core.message.ResponseStatus;
+import rx.Observable;
+
+import java.util.List;
 
 /**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
- *
- * @author Michael Nitschinger
- * @since 1.0
+ * @author Sergey Avseyev
+ * @since 1.0.2
  */
-public enum ServiceType {
+public class StreamRequestResponse extends AbstractDCPResponse {
+    private final Observable<DCPRequest> stream;
+    private final List<FailoverLogEntry> failoverLog;
 
     /**
-     * Views and Design Documents.
+     * Sets the required properties for the response.
+     *
+     * @param status  the status of the response.
+     * @param request
      */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * Key/Value type operations.
-     */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
-
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
+    public StreamRequestResponse(ResponseStatus status, Observable<DCPRequest> stream,
+                                 List<FailoverLogEntry> failoverLog, CouchbaseRequest request) {
+        super(status, request);
+        this.stream = stream;
+        this.failoverLog = failoverLog;
     }
 
-    public BucketServiceMapping mapping() {
-        return mapping;
+    public Observable<DCPRequest> stream() {
+        return stream;
+    }
+
+    public List<FailoverLogEntry> failoverLog() {
+        return failoverLog;
     }
 }
