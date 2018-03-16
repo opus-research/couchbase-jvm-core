@@ -35,7 +35,6 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -412,7 +411,9 @@ public abstract class PooledService extends AbstractStateMachine<LifecycleState>
      * @param signalFlush the flush signal to propagate.
      */
     private void sendFlush(final SignalFlush signalFlush) {
-        for (Endpoint endpoint : endpoints) {
+        int length = endpoints.size();
+        for (int i = 0; i < length; i++) {
+            Endpoint endpoint = endpoints.get(i);
             if (endpoint != null) {
                 endpoint.send(signalFlush);
             }
