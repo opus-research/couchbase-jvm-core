@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.couchbase.client.core.utils.yasjl;
 
 import java.util.ArrayList;
@@ -21,8 +22,6 @@ import java.util.List;
 import com.couchbase.client.core.utils.yasjl.Callbacks.JsonPointerCB;
 
 /**
- * Represents a tree structure of stored {@link JsonPointer}.
- *
  * @author Subhashni Balakrishnan
  */
 public class JsonPointerTree {
@@ -30,31 +29,25 @@ public class JsonPointerTree {
     private final Node root;
     private boolean isRootAPointer;
 
-    /**
-     * Creates a new {@link JsonPointerTree}.
-     */
-    JsonPointerTree() {
+    public JsonPointerTree() {
         this.root = new Node("", null);
         this.isRootAPointer = false;
     }
 
     /**
-     * Adds a {@link JsonPointer} to this tree.
-     *
-     * @return true if the {@link JsonPointer} is valid to be inserted, false otherwise.
+     * Add json pointer, returns true if the json pointer is valid to be inserted
      */
-    boolean addJsonPointer(final JsonPointer jp) {
+    public boolean addJsonPointer(JsonPointer jp) {
         if (isRootAPointer) {
             return false;
         }
-
-        List<String> jpRefTokens = jp.tokens();
+        List<String> jpRefTokens = jp.refTokens();
         int jpSize = jpRefTokens.size();
+
         if (jpSize == 1) {
             isRootAPointer = true;
             return true;
         }
-
         Node parent = root;
         boolean pathDoesNotExist = false;
         for (int i = 1; i < jpSize; i++) {
@@ -66,23 +59,15 @@ public class JsonPointerTree {
                 parent = childMatch;
             }
         }
-
         return pathDoesNotExist;
     }
 
-    /**
-     * Checks if the given {@link JsonPointer} represents an intermediary path in the tree.
-     *
-     * @param jp the pointer to check.
-     * @return true if its intermediary, false otherwise (like if terminal).
-     */
-    boolean isIntermediaryPath(final JsonPointer jp) {
-        List<String> jpRefTokens = jp.tokens();
+    public boolean isIntermediaryPath(JsonPointer jp) {
+        List<String> jpRefTokens = jp.refTokens();
         int jpSize = jpRefTokens.size();
         if (jpSize == 1) {
             return false;
         }
-
         Node node = root;
         for (int i = 1; i < jpSize; i++) {
             Node childMatch = node.match(jpRefTokens.get(i));
@@ -92,18 +77,11 @@ public class JsonPointerTree {
                 node = childMatch;
             }
         }
-
         return node.children != null;
     }
 
-    /**
-     * Checks if the given {@link JsonPointer} is a terminal path in this tree.
-     *
-     * @param jp the pointer to check.
-     * @return true if its terminal, false otherwise (like if intermediary).
-     */
-    boolean isTerminalPath(final JsonPointer jp) {
-        List<String> jpRefTokens = jp.tokens();
+    public boolean isTerminalPath(JsonPointer jp) {
+        List<String> jpRefTokens = jp.refTokens();
         int jpSize = jpRefTokens.size();
 
         Node node = root;
@@ -112,7 +90,6 @@ public class JsonPointerTree {
                 return false;
             }
         }
-
         for (int i = 1; i < jpSize; i++) {
             Node childMatch = node.match(jpRefTokens.get(i));
             if (childMatch == null) {
@@ -121,7 +98,6 @@ public class JsonPointerTree {
                 node = childMatch;
             }
         }
-
         if (node != null && node.children == null) {
             jp.jsonPointerCB(node.jsonPointerCB);
             return true;
@@ -130,37 +106,22 @@ public class JsonPointerTree {
         }
     }
 
-    @Override
-    public String toString() {
-        return "JsonPointerTree{" +
-            "root=" + root +
-            ", isRootAPointer=" + isRootAPointer +
-            '}';
-    }
-
     /**
-     * Represents a logical Node in this JsonPointerTree.
+     * Node in the JP tree contains a reference token in Json pointer
      */
     class Node {
 
         private final String value;
-        private final JsonPointerCB jsonPointerCB;
         private List<Node> children;
+        private final JsonPointerCB jsonPointerCB;
 
-        Node(final String value, final JsonPointerCB jsonPointerCB) {
+        public Node(String value, JsonPointerCB jsonPointerCB) {
             this.value = value;
             this.children = null;
             this.jsonPointerCB = jsonPointerCB;
         }
 
-        /**
-         * Adds a child to this node and returns it.
-         *
-         * @param value the path for the node.
-         * @param jsonPointerCB the callback to store.
-         * @return the child instance created.
-         */
-        Node addChild(final String value, final JsonPointerCB jsonPointerCB) {
+        public Node addChild(String value, JsonPointerCB jsonPointerCB) {
             if (children == null) {
                 children = new ArrayList<Node>();
             }
@@ -169,7 +130,7 @@ public class JsonPointerTree {
             return child;
         }
 
-        boolean isIndex(final String s) {
+        boolean isIndex(String s) {
             int len = s.length();
             for (int a = 0; a < len; a++) {
                 if (a == 0 && s.charAt(a) == '-') continue;
@@ -178,17 +139,10 @@ public class JsonPointerTree {
             return true;
         }
 
-        /**
-         * Returns the node which matches the given input.
-         *
-         * @param value the value to match against.
-         * @return the node if found, null otherwise.
-         */
-        public Node match(final String value) {
+        public Node match(String value) {
             if (this.children == null) {
                 return null;
             }
-
             for (Node child : children) {
                 if (child.value.equals(value)) {
                     return child;
@@ -197,15 +151,6 @@ public class JsonPointerTree {
                 }
             }
             return null;
-        }
-
-        @Override
-        public String toString() {
-            return "Node{" +
-                "value='" + value + '\'' +
-                ", jsonPointerCB=" + jsonPointerCB +
-                ", children=" + children +
-                '}';
         }
     }
 }

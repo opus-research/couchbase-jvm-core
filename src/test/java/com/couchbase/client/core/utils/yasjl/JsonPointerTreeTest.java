@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.couchbase.client.core.utils.yasjl;
 
 import org.junit.Test;
@@ -21,8 +22,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Verifies the functionality of the {@link JsonPointerTree}.
- *
  * @author Subhashni Balakrishnan
  */
 public class JsonPointerTreeTest {
