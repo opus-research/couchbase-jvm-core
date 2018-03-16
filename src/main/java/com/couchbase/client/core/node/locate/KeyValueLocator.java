@@ -21,7 +21,6 @@
  */
 package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.ReplicaNotAvailableException;
 import com.couchbase.client.core.ReplicaNotConfiguredException;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
@@ -186,12 +185,8 @@ public class KeyValueLocator implements Locator {
 
         if (nodeId == -1) {
             if (request instanceof ObserveRequest) {
-                request.observable().onError(new ReplicaNotAvailableException("Replica number "
+                request.observable().onError(new ReplicaNotConfiguredException("Replica number "
                         + ((ObserveRequest) request).replica() + " not available for bucket " + name));
-                return null;
-            } else if (request instanceof ReplicaGetRequest) {
-                request.observable().onError(new ReplicaNotAvailableException("Replica number "
-                        + ((ReplicaGetRequest) request).replica() + " not available for bucket " + name));
                 return null;
             }
 
