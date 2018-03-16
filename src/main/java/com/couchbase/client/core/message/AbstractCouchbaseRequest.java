@@ -21,8 +21,10 @@
  */
 package com.couchbase.client.core.message;
 
-import rx.subjects.AsyncSubject;
+import com.couchbase.client.core.utils.UnicastContentSubject;
 import rx.subjects.Subject;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Default implementation for a {@link CouchbaseRequest}, should be extended by child messages.
@@ -61,7 +63,7 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
      * @param password the password of the bucket.
      */
     protected AbstractCouchbaseRequest(String bucket, String password) {
-        this(bucket, password, AsyncSubject.<CouchbaseResponse>create());
+        this(bucket, password, UnicastContentSubject.<CouchbaseResponse>create(50, TimeUnit.SECONDS));
     }
 
     /**
