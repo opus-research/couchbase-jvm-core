@@ -32,7 +32,7 @@ public class DefaultFullBinaryMemcacheResponse extends DefaultBinaryMemcacheResp
      * @param key    the key to use.
      * @param extras the extras to use.
      */
-    public DefaultFullBinaryMemcacheResponse(byte[] key, ByteBuf extras) {
+    public DefaultFullBinaryMemcacheResponse(String key, ByteBuf extras) {
         this(key, extras, Unpooled.buffer(0));
     }
 
@@ -43,7 +43,7 @@ public class DefaultFullBinaryMemcacheResponse extends DefaultBinaryMemcacheResp
      * @param extras  the extras to use.
      * @param content the content of the full request.
      */
-    public DefaultFullBinaryMemcacheResponse(byte[] key, ByteBuf extras,
+    public DefaultFullBinaryMemcacheResponse(String key, ByteBuf extras,
         ByteBuf content) {
         super(key, extras);
         if (content == null) {
