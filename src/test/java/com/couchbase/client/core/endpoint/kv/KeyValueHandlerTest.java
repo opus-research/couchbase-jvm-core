@@ -680,17 +680,13 @@ public class KeyValueHandlerTest {
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
         UpsertRequest requestMock = mock(UpsertRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
-        when(requestMock.content()).thenReturn(requestContent);
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
         assertEquals(0, content.refCnt());
-        assertEquals(0, requestContent.refCnt());
     }
 
     @Test
@@ -701,17 +697,13 @@ public class KeyValueHandlerTest {
         response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
 
         UpsertRequest requestMock = mock(UpsertRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
-        when(requestMock.content()).thenReturn(requestContent);
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
+        assertEquals(1, content.refCnt());
     }
 
     @Test
@@ -722,17 +714,13 @@ public class KeyValueHandlerTest {
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
         AppendRequest requestMock = mock(AppendRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
-        when(requestMock.content()).thenReturn(requestContent);
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
         assertEquals(0, content.refCnt());
-        assertEquals(0, requestContent.refCnt());
     }
 
     @Test
@@ -743,16 +731,13 @@ public class KeyValueHandlerTest {
         response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
 
         AppendRequest requestMock = mock(AppendRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
+        assertEquals(1, content.refCnt());
     }
 
     @Test
@@ -763,17 +748,13 @@ public class KeyValueHandlerTest {
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
         PrependRequest requestMock = mock(PrependRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
-        when(requestMock.content()).thenReturn(requestContent);
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
         assertEquals(0, content.refCnt());
-        assertEquals(0, requestContent.refCnt());
     }
 
     @Test
@@ -784,17 +765,12 @@ public class KeyValueHandlerTest {
         response.setStatus(KeyValueHandler.STATUS_NOT_MY_VBUCKET);
 
         PrependRequest requestMock = mock(PrependRequest.class);
-        ByteBuf requestContent = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
         when(requestMock.bucket()).thenReturn("bucket");
         when(requestMock.observable()).thenReturn(AsyncSubject.<CouchbaseResponse>create());
-        when(requestMock.content()).thenReturn(requestContent);
         requestQueue.add(requestMock);
 
         assertEquals(1, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
         channel.writeInbound(response);
-        assertEquals(0, content.refCnt());
-        assertEquals(1, requestContent.refCnt());
-
+        assertEquals(1, content.refCnt());
     }
 }
