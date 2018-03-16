@@ -44,4 +44,6 @@ public interface DCPMessage {
     String key();
 
     DCPConnection connection();
+
+    int streamId();
 }

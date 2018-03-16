@@ -58,6 +58,7 @@ import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import rx.functions.Action1;
 
@@ -65,6 +66,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @author Sergey Avseyev
@@ -83,6 +86,12 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
     public static final byte OP_BUFFER_ACK = 0x5d;
     public static final byte OP_GET_FAILOVER_LOG = 0x54;
     public static final byte OP_GET_LAST_CHECKPOINT = (byte) 0x97;
+
+    static final AttributeKey<Integer> RECEIVED_BYTES = AttributeKey.newInstance("RECEIVED_BYTES");
+
+    public static final ConcurrentMap<String, DCPConnection> connections =
+            new ConcurrentHashMap<String, DCPConnection>();
+
     /**
      * The Logger used in this handler.
      */
@@ -117,7 +126,12 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         if (msg instanceof OpenConnectionRequest) {
             OpenConnectionRequest openConnection = (OpenConnectionRequest) msg;
             request = handleOpenConnectionRequest(ctx, openConnection);
-            connection = new DCPConnection(env(), openConnection.connectionName(), openConnection.bucket());
+            DCPConnection newConnection = new DCPConnection(env(), openConnection.connectionName(), openConnection.bucket());
+            connection = connections.putIfAbsent(openConnection.connectionName(), newConnection);
+            if (connection == null) {
+                connection = newConnection;
+            }
+
         } else if (msg instanceof StreamRequestRequest) {
             request = handleStreamRequestRequest(ctx, (StreamRequestRequest) msg);
         } else if (msg instanceof GetFailoverLogRequest) {
@@ -141,15 +155,12 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         DCPRequest request = currentRequest();
         DCPResponse response = null;
 
-        if (connection != null) {
-            // FIXME: preserve context to allow consumer to signal about progress.
-            connection.setLastContext(ctx);
-        }
         if (msg.getOpcode() == OP_OPEN_CONNECTION && request instanceof OpenConnectionRequest) {
             response = new OpenConnectionResponse(ResponseStatusConverter.fromBinary(msg.getStatus()), connection, request);
             if (env().dcpConnectionBufferSize() > 0) {
                 ctx.writeAndFlush(controlRequest(ctx, ControlParameter.CONNECTION_BUFFER_SIZE, env().dcpConnectionBufferSize()));
             }
+            ctx.attr(RECEIVED_BYTES).set(0);
         } else if (msg.getOpcode() == OP_STREAM_REQUEST && request instanceof StreamRequestRequest) {
             ByteBuf content = msg.content();
             List<FailoverLogEntry> failoverLog = null;
@@ -247,7 +258,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     endSequenceNumber = extras.readLong();
                     flags = extras.readInt();
                 }
-                request = new SnapshotMarkerMessage(connection, msg.getTotalBodyLength(), msg.getStatus(),
+                request = new SnapshotMarkerMessage(connection, msg.getOpaque(), msg.getTotalBodyLength(), msg.getStatus(),
                         startSequenceNumber, endSequenceNumber, flags, connection.bucket());
                 break;
 
@@ -263,7 +274,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     expiration = extras.readInt();
                     lockTime = extras.readInt();
                 }
-                request = new MutationMessage(connection, msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
+                request = new MutationMessage(connection, msg.getOpaque(), msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
                         msg.content().retain(), expiration, bySeqno, revSeqno, flags, lockTime,
                         msg.getCAS(), connection.bucket());
                 break;
@@ -274,7 +285,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     bySeqno = extras.readLong();
                     revSeqno = extras.readLong();
                 }
-                request = new RemoveMessage(connection, msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
+                request = new RemoveMessage(connection, msg.getOpaque(), msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
                         msg.getCAS(), bySeqno, revSeqno, connection.bucket());
                 break;
 
@@ -284,14 +295,14 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
                     bySeqno = extras.readLong();
                     revSeqno = extras.readLong();
                 }
-                request = new ExpirationMessage(connection, msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
+                request = new ExpirationMessage(connection, msg.getOpaque(), msg.getTotalBodyLength(), msg.getStatus(), new String(msg.getKey(), CHARSET),
                         msg.getCAS(), bySeqno, revSeqno, connection.bucket());
                 break;
 
             case OP_STREAM_END:
                 final ByteBuf extras = msg.getExtras();
                 flags = extras.readInt();
-                request = new StreamEndMessage(connection, msg.getTotalBodyLength(), msg.getStatus(),
+                request = new StreamEndMessage(connection, msg.getOpaque(), msg.getTotalBodyLength(), msg.getStatus(),
                         StreamEndMessage.Reason.valueOf(flags), connection.bucket());
                 connection.removeStream(msg.getOpaque());
                 break;
@@ -303,9 +314,11 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             connection.subject().onNext(request);
         }
 
-        if (connection.streamsCount() == 0) {
-            connection.subject().onCompleted();
-        }
+//        if (msg.getOpcode() == OP_STREAM_END && connection.streamsCount() == 0) {
+//            connection.subject().onCompleted();
+//            connections.remove(connection.name());
+//            connection = null;
+//        }
     }
 
     @Override
@@ -393,7 +406,7 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
         request.setOpcode(OP_STREAM_REQUEST);
         request.setExtrasLength(extrasLength);
         request.setTotalBodyLength(extrasLength);
-        request.setOpaque(connection.addStream(connection.name()));
+        request.setOpaque(connection.addStream(ctx));
 
         return request;
     }

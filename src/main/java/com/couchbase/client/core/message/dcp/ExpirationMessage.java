@@ -39,12 +39,12 @@ public class ExpirationMessage extends AbstractDCPMessage {
     private final long bySequenceNumber;
     private final long revisionSequenceNumber;
 
-    public ExpirationMessage(DCPConnection connection, int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket) {
-        this(connection, totalBodyLength, partition, key, cas, bySequenceNumber, revisionSequenceNumber, bucket, null);
+    public ExpirationMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket) {
+        this(connection, streamId, totalBodyLength, partition, key, cas, bySequenceNumber, revisionSequenceNumber, bucket, null);
     }
 
-    public ExpirationMessage(DCPConnection connection, int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket, String password) {
-        super(connection, totalBodyLength, partition, key, bucket, password);
+    public ExpirationMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, String key, long cas, long bySequenceNumber, long revisionSequenceNumber, String bucket, String password) {
+        super(connection, streamId, totalBodyLength, partition, key, bucket, password);
         this.cas = cas;
         this.bySequenceNumber = bySequenceNumber;
         this.revisionSequenceNumber = revisionSequenceNumber;

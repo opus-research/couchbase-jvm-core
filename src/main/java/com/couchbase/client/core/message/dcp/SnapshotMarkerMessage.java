@@ -73,14 +73,14 @@ public class SnapshotMarkerMessage extends AbstractDCPMessage {
      */
     private final boolean ack;
 
-    public SnapshotMarkerMessage(DCPConnection connection, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket) {
-        this(connection, totalBodyLength, partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
+        this(connection, streamId, totalBodyLength, partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
     }
 
-    public SnapshotMarkerMessage(DCPConnection connection, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(DCPConnection connection, int streamId, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket, String password) {
-        super(connection, totalBodyLength, partition, null, bucket, password);
+        super(connection, streamId, totalBodyLength, partition, null, bucket, password);
         partition(partition);
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;
