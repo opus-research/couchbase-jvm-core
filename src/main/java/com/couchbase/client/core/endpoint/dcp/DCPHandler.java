@@ -26,7 +26,6 @@ import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
 import com.couchbase.client.core.endpoint.AbstractGenericHandler;
 import com.couchbase.client.core.endpoint.ResponseStatusConverter;
-import com.couchbase.client.core.endpoint.kv.KeyValueStatus;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseResponse;
@@ -141,28 +140,13 @@ public class DCPHandler extends AbstractGenericHandler<FullBinaryMemcacheRespons
             ByteBuf content = msg.content();
             Scheduler scheduler = env().scheduler();
             DCPStream stream = streams.get(msg.getOpaque());
-            List<FailoverLogEntry> failoverLog = null;
-            long rollbackToSequenceNumber = 0;
-            KeyValueStatus status = KeyValueStatus.valueOf(msg.getStatus());
-            switch (status) {
-                case SUCCESS:
-                    failoverLog = new ArrayList<FailoverLogEntry>(content.readableBytes() / 16);
-                    while (content.readableBytes() >= 16) {
-                        FailoverLogEntry entry = new FailoverLogEntry(content.readLong(), content.readLong());
-                        failoverLog.add(entry);
-                    }
-                    break;
-                case ERR_ROLLBACK:
-                    rollbackToSequenceNumber = content.readLong();
-                    break;
-                default:
-                    LOGGER.warn("Unexpected status of StreamRequestResponse: {} (0x{}, {})",
-                            status, Integer.toHexString(status.code()), status.description());
-
+            List<FailoverLogEntry> failoverLog = new ArrayList<FailoverLogEntry>(content.readableBytes() / 16);
+            while (content.readableBytes() >= 16) {
+                FailoverLogEntry entry = new FailoverLogEntry(content.readLong(), content.readLong());
+                failoverLog.add(entry);
             }
             response = new StreamRequestResponse(ResponseStatusConverter.fromBinary(msg.getStatus()),
-                    stream.subject().onBackpressureBuffer().observeOn(scheduler), failoverLog, request,
-                    rollbackToSequenceNumber);
+                    stream.subject().onBackpressureBuffer().observeOn(scheduler), failoverLog, request);
         } else {
             /**
              * FIXME
