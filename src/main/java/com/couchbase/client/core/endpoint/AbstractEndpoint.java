@@ -56,7 +56,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import rx.Observable;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
-
 import javax.net.ssl.SSLEngine;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -77,6 +76,11 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * The maximum reconnect delay in milliseconds, so it does not grow out of bounds.
      */
     public static final int MAX_RECONNECT_DELAY = 4096;
+
+    /**
+     * The minimum reconnect delay in milliseconds, so it does not retry immediately.
+     */
+    public static final int MIN_RECONNECT_DELAY = 128;
 
     /**
      * The logger used.
@@ -333,7 +337,7 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     hasWritten = false;
                 }
             } else {
-                if (channel.isWritable()) {
+                if (channel.isActive() && channel.isWritable()) {
                     channel.write(request).addListener(WRITE_LOG_LISTENER);
                     hasWritten = true;
                 } else {
@@ -370,12 +374,16 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * Returns the reconnect retry delay in  milliseconds.
      *
      * It uses an exponential back-off algorithm (2^attempt) until a fixed
-     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}).
+     * ceiling is reached ({@link #MAX_RECONNECT_DELAY}). If the computed delay is below
+     * {@link #MIN_RECONNECT_DELAY}, then this one is returned instead.
      *
      * @return the retry delay.
      */
     private long reconnectDelay() {
         int delay = 1 << (reconnectAttempt++);
+        if (delay <= MIN_RECONNECT_DELAY) {
+            return MIN_RECONNECT_DELAY;
+        }
         return delay >= MAX_RECONNECT_DELAY ? MAX_RECONNECT_DELAY : delay;
     }
 
@@ -429,12 +437,15 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
 
     /**
      * A generic future listener which logs unsuccessful writes.
+     *
+     * Note that {@link ClosedChannelException}s are ignored because they are handled
+     * gracefully by the {@link AbstractGenericHandler}.
      */
     static class WriteLogListener implements GenericFutureListener<Future<Void>> {
 
         @Override
         public void operationComplete(Future<Void> future) throws Exception {
-            if (!future.isSuccess()) {
+            if (!future.isSuccess() && !(future.cause() instanceof ClosedChannelException)) {
                 LOGGER.warn("Error during IO write phase.", future.cause());
             }
         }

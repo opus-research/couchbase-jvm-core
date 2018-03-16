@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,25 +19,28 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
+package com.couchbase.client.core.utils;
 
-package com.couchbase.client.core.message.dcp;
-
-import com.couchbase.client.core.message.AbstractCouchbaseResponse;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.message.ResponseStatus;
+import io.netty.buffer.ByteBuf;
+import rx.functions.Action1;
 
 /**
- * @author Sergey Avseyev
- * @since 1.1.0
+ * Collection of utilities around {@link ByteBuf}.
+ *
+ * @author Simon Baslé
+ * @since 1.1
  */
-public abstract class AbstractDCPResponse extends AbstractCouchbaseResponse implements DCPResponse {
+public class Buffers {
+
     /**
-     * Sets the required properties for the response.
-     *
-     * @param status  the status of the response.
-     * @param request
+     * An rx {@link Action1} that releases (once) a non-null {@link ByteBuf} provided its refCnt is > 0.
      */
-    public AbstractDCPResponse(ResponseStatus status, CouchbaseRequest request) {
-        super(status, request);
-    }
+    public static final Action1 BYTE_BUF_RELEASER = new Action1<ByteBuf>() {
+        @Override
+        public void call(ByteBuf byteBuf) {
+            if (byteBuf != null && byteBuf.refCnt() > 0) {
+                byteBuf.release();
+            }
+        }
+    };
 }

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,28 +20,26 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.service.strategies;
+package com.couchbase.client.core.config;
 
-import com.couchbase.client.core.endpoint.Endpoint;
-import com.couchbase.client.core.message.CouchbaseRequest;
-import com.couchbase.client.core.state.LifecycleState;
+import com.couchbase.client.core.util.Resources;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.Test;
+import java.net.InetAddress;
 
-/**
- * @author Sergey Avseyev
- * @since 1.1.0
- */
-public class FirstConnectedSelectionStrategy implements SelectionStrategy {
-    @Override
-    public Endpoint select(CouchbaseRequest request, Endpoint[] endpoints) {
-        int numEndpoints = endpoints.length;
-        if (numEndpoints == 0) {
-            return null;
-        }
-        for (Endpoint endpoint : endpoints) {
-            if (endpoint.isState(LifecycleState.CONNECTED)) {
-                return endpoint;
-            }
-        }
-        return null;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+public class DefaultCouchbaseBucketConfigTest {
+
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+
+    @Test
+    public void shouldHavePrimaryPartitionsOnNode() throws Exception {
+        String raw = Resources.read("config_with_mixed_partitions.json", getClass());
+        CouchbaseBucketConfig config = JSON_MAPPER.readValue(raw, CouchbaseBucketConfig.class);
+
+        assertTrue(config.hasPrimaryPartitionsOnNode(InetAddress.getByName("1.2.3.4")));
+        assertFalse(config.hasPrimaryPartitionsOnNode(InetAddress.getByName("2.3.4.5")));
     }
 }

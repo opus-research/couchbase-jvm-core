@@ -158,16 +158,13 @@ public class KeyValueHandler
             request.setReserved(msg.partition());
         }
 
-        if (request.getExtras() != null) {
-            request.getExtras().retain();
+        // Retain just the content, since a response could be "Not my Vbucket".
+        // The response handler checks the status and then releases if needed.
+        // Observe has content, but not external, so it should not be retained.
+        if (!(msg instanceof ObserveRequest) && (request instanceof FullBinaryMemcacheRequest)) {
+            ((FullBinaryMemcacheRequest) request).content().retain();
         }
 
-        if (request instanceof FullBinaryMemcacheRequest) {
-            ByteBuf content = ((FullBinaryMemcacheRequest) request).content();
-            if (content != null) {
-                content.retain();
-            }
-        }
         return request;
     }
 
@@ -406,6 +403,21 @@ public class KeyValueHandler
         BinaryRequest request = currentRequest();
         ResponseStatus status = convertStatus(msg.getStatus());
 
+        // Release request content from external resources if not retried again.
+        if (!status.equals(ResponseStatus.RETRY)) {
+            ByteBuf content = null;
+            if (request instanceof BinaryStoreRequest) {
+                content = ((BinaryStoreRequest) request).content();
+            } else if (request instanceof AppendRequest) {
+                content = ((AppendRequest) request).content();
+            } else if (request instanceof PrependRequest) {
+                content = ((PrependRequest) request).content();
+            }
+            if (content != null && content.refCnt() > 0) {
+                content.release();
+            }
+        }
+
         CouchbaseResponse response;
         ByteBuf content = msg.content().retain();
         long cas = msg.getCAS();
@@ -457,6 +469,24 @@ public class KeyValueHandler
 
         finishedDecoding();
         return response;
+    }
+
+    /**
+     * Releasing the content of requests that are to be cancelled.
+     *
+     * @param request the request to side effect on.
+     */
+    @Override
+    protected void sideEffectRequestToCancel(final BinaryRequest request) {
+        super.sideEffectRequestToCancel(request);
+
+        if (request instanceof BinaryStoreRequest) {
+            ((BinaryStoreRequest) request).content().release();
+        } else if (request instanceof AppendRequest) {
+            ((AppendRequest) request).content().release();
+        } else if (request instanceof PrependRequest) {
+            ((PrependRequest) request).content().release();
+        }
     }
 
     /**

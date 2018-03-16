@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Couchbase, Inc.
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,26 +20,28 @@
  * IN THE SOFTWARE.
  */
 
-package com.couchbase.client.core.message.dcp;
+package com.couchbase.client.core;
 
 /**
- * @author Sergey Avseyev
- * @since 1.1.0
+ * Exception which states that the service is not available for the bucket.
+ *
+ * @author Michael Nitschinger
+ * @since 2.0.3
  */
-public class FailoverLogEntry {
-    private final long vbucketUUID;
-    private final long sequenceNumber;
+public class ServiceNotAvailableException extends CouchbaseException {
 
-    public FailoverLogEntry(final long vbucketUUID, final long sequenceNumber) {
-        this.vbucketUUID = vbucketUUID;
-        this.sequenceNumber = sequenceNumber;
+    public ServiceNotAvailableException() {
     }
 
-    public long sequenceNumber() {
-        return sequenceNumber;
+    public ServiceNotAvailableException(String message) {
+        super(message);
     }
 
-    public long vbucketUUID() {
-        return vbucketUUID;
+    public ServiceNotAvailableException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public ServiceNotAvailableException(Throwable cause) {
+        super(cause);
     }
 }

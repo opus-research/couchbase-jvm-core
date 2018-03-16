@@ -22,7 +22,7 @@
 package com.couchbase.client.core.config;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-
+import java.net.InetAddress;
 import java.util.List;
 
 /**
@@ -51,4 +51,12 @@ public interface CouchbaseBucketConfig extends BucketConfig {
      * @return number of replicas.
      */
     int numberOfReplicas();
+
+    /**
+     * Checks if the given hostname has active primary partitions assigned to it.
+     *
+     * @param hostname the hostname of the node to check against.
+     * @return true if it has, false otherwise.
+     */
+    boolean hasPrimaryPartitionsOnNode(InetAddress hostname);
 }
