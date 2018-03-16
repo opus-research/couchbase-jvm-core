@@ -19,19 +19,26 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.message.kv;
 
-import com.couchbase.client.core.message.CouchbaseResponse;
-import rx.subjects.ReplaySubject;
+package com.couchbase.client.core.dcp;
 
-public class StatRequest extends AbstractKeyValueRequest {
+import org.junit.Test;
 
-    public StatRequest(String key, String bucket) {
-        super(key, bucket, null, ReplaySubject.<CouchbaseResponse>create(2048));
+import static org.junit.Assert.assertEquals;
+
+public class BucketStreamAggregatorStateTest {
+
+    @Test(expected = IndexOutOfBoundsException.class)
+    public void shouldCheckStreamListBoundsOnSet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        aggregator.set(3, new BucketStreamState(0, 0, 0, 0, 0));
     }
 
-    @Override
-    public short partition() {
-        return DEFAULT_PARTITION;
+    @Test
+    public void shouldNotCheckStreamListBoundsOnGet() throws Exception {
+        BucketStreamAggregatorState aggregator = new BucketStreamAggregatorState(3);
+        BucketStreamState state = aggregator.get(3);
+        assertEquals(0, state.vbucketUUID());
     }
+
 }

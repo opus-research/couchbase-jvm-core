@@ -40,9 +40,10 @@ import com.couchbase.client.core.message.kv.StatRequest;
 import com.couchbase.client.core.node.Node;
 import com.couchbase.client.core.state.LifecycleState;
 
-import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.zip.CRC32;
@@ -100,23 +101,25 @@ public class KeyValueLocator implements Locator {
      * @return either the found node or an empty list indicating to retry later.
      */
     private static Node[] handleBucketConfigRequest(GetBucketConfigRequest request, Set<Node> nodes) {
-        return locateByHostname(request.hostname(), nodes);
-    }
-
-    private static Node[] handleStatRequest(StatRequest request, Set<Node> nodes) {
-        return locateByHostname(request.hostname(), nodes);
-    }
-
-    private static Node[] locateByHostname(final InetAddress hostname, Set<Node> nodes) {
         for (Node node : nodes) {
             if (node.isState(LifecycleState.CONNECTED)) {
-                if (!hostname.equals(node.hostname())) {
+                if (!request.hostname().equals(node.hostname())) {
                     continue;
                 }
                 return new Node[] { node };
             }
         }
         return EMPTY_NODES;
+    }
+
+    private static Node[] handleStatRequest(StatRequest request, Set<Node> nodes) {
+        List<Node> connectedNodes = new ArrayList<Node>(nodes.size());
+        for (Node node : nodes) {
+            if (node.isState(LifecycleState.CONNECTED)) {
+                connectedNodes.add(node);
+            }
+        }
+        return connectedNodes.toArray(new Node[connectedNodes.size()]);
     }
 
     /**

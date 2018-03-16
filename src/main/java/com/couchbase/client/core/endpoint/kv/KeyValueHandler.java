@@ -458,13 +458,15 @@ public class KeyValueHandler
         return request;
     }
 
-    private static BinaryMemcacheRequest handleStatRequest(StatRequest msg) {
+    private BinaryMemcacheRequest handleStatRequest(StatRequest msg) {
         String key = msg.key();
         BinaryMemcacheRequest request = new DefaultBinaryMemcacheRequest(key);
         short keyLength = (short) msg.keyBytes().length;
         request
                 .setOpcode(OP_STAT)
                 .setKeyLength(keyLength)
+                .setExtras(Unpooled.EMPTY_BUFFER)
+                .setExtrasLength((byte) 0)
                 .setTotalBodyLength(keyLength);
         return request;
     }
@@ -487,7 +489,7 @@ public class KeyValueHandler
         CouchbaseResponse response = handleCommonResponseMessages(request, msg, ctx, status, seqOnMutation);
 
         if (response == null) {
-            response = handleOtherResponseMessages(request, msg, status, seqOnMutation, remoteHostname());
+            response = handleOtherResponseMessages(request, msg, status, seqOnMutation);
         }
 
         if (response == null) {
@@ -495,16 +497,10 @@ public class KeyValueHandler
                     + msg.getClass());
         }
 
-        // STAT request produces multiple responses followed by response with NULL key,
-        // therefore it should be finished manually
         if (request instanceof StatRequest) {
-            ((StatRequest)request).add((StatResponse) response);
-            if (((StatResponse) response).key() == null) {
+            if (((StatResponse)response).key() == null) {
                 finishedDecoding();
             }
-            // Do not use default publish mechanism for STAT responses, instead accumulate
-            // them into List and publish all at once in {@link StatRequest#add()}
-            return null;
         } else {
             finishedDecoding();
         }
@@ -567,7 +563,7 @@ public class KeyValueHandler
      * @return the decoded response or null if none did match.
      */
     private static CouchbaseResponse handleOtherResponseMessages(BinaryRequest request, FullBinaryMemcacheResponse msg,
-        ResponseStatus status, boolean seqOnMutation, String remoteHostname) {
+        ResponseStatus status, boolean seqOnMutation) {
         CouchbaseResponse response = null;
         ByteBuf content = msg.content();
         long cas = msg.getCAS();
@@ -598,7 +594,7 @@ public class KeyValueHandler
             String value = content.toString(CHARSET);
             releaseContent(content);
 
-            response = new StatResponse(status, statusCode, remoteHostname, key, value, bucket, request);
+            response = new StatResponse(status, statusCode, key, value, bucket, request);
         } else if (request instanceof ObserveRequest) {
             byte observed = ObserveResponse.ObserveStatus.UNKNOWN.value();
             long observedCas = 0;
