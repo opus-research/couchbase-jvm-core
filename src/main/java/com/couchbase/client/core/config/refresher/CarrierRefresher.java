@@ -52,9 +52,9 @@ import java.util.concurrent.TimeUnit;
 public class CarrierRefresher extends AbstractRefresher {
 
     /**
-     * Don't poll more often than 50ms.
+     * Don't poll more often than 10ms.
      */
-    static final long POLL_FLOOR_NS = TimeUnit.MILLISECONDS.toNanos(50);
+    static final long POLL_FLOOR_NS = TimeUnit.MILLISECONDS.toNanos(10);
 
     /**
      * The logger used.

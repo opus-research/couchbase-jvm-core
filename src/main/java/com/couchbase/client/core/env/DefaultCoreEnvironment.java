@@ -28,7 +28,6 @@ import com.couchbase.client.core.event.EventBus;
 import com.couchbase.client.core.event.EventType;
 import com.couchbase.client.core.event.consumers.LoggingConsumer;
 import com.couchbase.client.core.event.system.TooManyEnvironmentsEvent;
-import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
 import com.couchbase.client.core.logging.CouchbaseLogLevel;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
@@ -106,7 +105,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     public static final long DISCONNECT_TIMEOUT = TimeUnit.SECONDS.toMillis(25);
     public static final MemcachedHashingStrategy MEMCACHED_HASHING_STRATEGY =
         DefaultMemcachedHashingStrategy.INSTANCE;
-    public static final long CONFIG_POLL_INTERVAL = 2500;
+    public static final long CONFIG_POLL_INTERVAL = TimeUnit.SECONDS.toMillis(10);
     public static final boolean CERT_AUTH_ENABLED = false;
 
     public static String CORE_VERSION;
@@ -247,8 +246,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     private final MetricsCollector runtimeMetricsCollector;
     private final NetworkLatencyMetricsCollector networkLatencyMetricsCollector;
     private final Subscription metricsCollectorSubscription;
-
-    private final CouchbaseCoreSendHook couchbaseCoreSendHook;
 
     protected DefaultCoreEnvironment(final Builder builder) {
         boolean emitEnvWarnMessage = false;
@@ -455,8 +452,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         if (emitEnvWarnMessage) {
             eventBus.publish(new TooManyEnvironmentsEvent(instanceCounter));
         }
-
-        this.couchbaseCoreSendHook = builder.couchbaseCoreSendHook;
     }
 
     public static DefaultCoreEnvironment create() {
@@ -882,11 +877,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         return keepAliveTimeout;
     }
 
-    @Override
-    public CouchbaseCoreSendHook couchbaseCoreSendHook() {
-        return couchbaseCoreSendHook;
-    }
-
     public static class Builder {
 
         private boolean sslEnabled = SSL_ENABLED;
@@ -942,7 +932,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         private MemcachedHashingStrategy memcachedHashingStrategy = MEMCACHED_HASHING_STRATEGY;
         private long configPollInterval = CONFIG_POLL_INTERVAL;
         private boolean certAuthEnabled = CERT_AUTH_ENABLED;
-        private CouchbaseCoreSendHook couchbaseCoreSendHook;
 
         private MetricsCollectorConfig runtimeMetricsCollectorConfig;
         private LatencyMetricsCollectorConfig networkLatencyMetricsCollectorConfig;
@@ -1503,16 +1492,16 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
          * Allows to set the configuration poll interval which polls the server cluster
          * configuration proactively.
          *
-         * Note that the interval cannot be set lower than 50 milliseconds (other than 0
+         * Note that the interval cannot be set lower than 2500 millisconds (other than 0
          * to disable it).
          * @param configPollInterval the interval in milliseconds, 0 deactivates the polling.
          */
         @InterfaceStability.Experimental
         @InterfaceAudience.Public
         public Builder configPollInterval(long configPollInterval) {
-            if (configPollInterval < 50 && configPollInterval != 0) {
+            if (configPollInterval < 2500 && configPollInterval != 0) {
                 throw new IllegalArgumentException("The poll interval cannot be lower than " +
-                    "50 milliseconds");
+                    "2500 milliseconds");
             }
             this.configPollInterval = configPollInterval;
             return this;
@@ -1557,16 +1546,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         @InterfaceStability.Uncommitted
         public Builder keepAliveTimeout(final long keepAliveTimeout) {
             this.keepAliveTimeout = keepAliveTimeout;
-            return this;
-        }
-
-        /**
-         * Allows to configure a custom core send hook, see the javadocs for it for more details.
-         */
-        @InterfaceAudience.Public
-        @InterfaceStability.Experimental
-        public Builder couchbaseCoreSendHook(final CouchbaseCoreSendHook hook) {
-            this.couchbaseCoreSendHook = hook;
             return this;
         }
 
@@ -1664,8 +1643,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         sb.append(", disconnectTimeout=").append(disconnectTimeout);
         sb.append(", requestBufferWaitStrategy=").append(requestBufferWaitStrategy);
         sb.append(", certAuthEnabled=").append(certAuthEnabled);
-        sb.append(", coreSendHook=").append(couchbaseCoreSendHook == null ? "null" :
-            couchbaseCoreSendHook.getClass().getSimpleName());
+
         return sb;
     }
 
