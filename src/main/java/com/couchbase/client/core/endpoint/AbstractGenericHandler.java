@@ -31,7 +31,6 @@ import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.metrics.NetworkLatencyMetricsIdentifier;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.channel.Channel;
@@ -85,8 +84,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      */
     private final Queue<REQUEST> sentRequestQueue;
 
-    private final Queue<Long> sentRequestTimings;
-
     /**
      * If this handler is transient (will close after one request).
      */
@@ -103,8 +100,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     private REQUEST currentRequest;
 
     private DecodingState currentDecodingState;
-
-    private long currentOpTime;
 
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
@@ -131,7 +126,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         this.currentDecodingState = DecodingState.INITIAL;
         this.isTransient = isTransient;
         this.traceEnabled = LOGGER.isTraceEnabled();
-        this.sentRequestTimings = new ArrayDeque<Long>();
     }
 
     /**
@@ -172,7 +166,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         ENCODED request = encodeRequest(ctx, msg);
         sentRequestQueue.offer(msg);
         out.add(request);
-        sentRequestTimings.offer(System.nanoTime());
     }
 
     @Override
@@ -180,10 +173,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         if (currentDecodingState == DecodingState.INITIAL) {
             currentRequest = sentRequestQueue.poll();
             currentDecodingState = DecodingState.STARTED;
-            if (currentRequest != null) {
-                currentOpTime = System.nanoTime() - sentRequestTimings.poll();
-            }
-
             if (traceEnabled) {
                 LOGGER.trace("{}Started decoding of {}", logIdent(ctx, endpoint), currentRequest);
             }
@@ -193,19 +182,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             CouchbaseResponse response = decodeResponse(ctx, msg);
             if (response != null) {
                 publishResponse(response, currentRequest.observable());
-
-                if (currentDecodingState == DecodingState.FINISHED) {
-                    if (currentRequest != null && env() != null && env().networkLatencyMetricsCollector().isEnabled()) {
-                        NetworkLatencyMetricsIdentifier identifier = new NetworkLatencyMetricsIdentifier(
-                            ctx.channel().remoteAddress().toString(),
-                            serviceType().toString(),
-                            currentRequest.getClass().getSimpleName(),
-                            response.status().toString()
-                        );
-                        env().networkLatencyMetricsCollector().record(identifier, currentOpTime);
-                    }
-                }
-
             }
         } catch (CouchbaseException e) {
             currentRequest.observable().onError(e);
@@ -324,8 +300,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
         }
-
-        sentRequestTimings.clear();
     }
 
 

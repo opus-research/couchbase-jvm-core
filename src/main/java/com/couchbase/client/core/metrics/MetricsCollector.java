@@ -39,9 +39,4 @@ public interface MetricsCollector {
      */
     boolean shutdown();
 
-    /**
-     * True if this collector actually emits something.
-     */
-    boolean isEnabled();
-
 }

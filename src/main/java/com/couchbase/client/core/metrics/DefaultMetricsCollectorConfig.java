@@ -45,7 +45,7 @@ public class DefaultMetricsCollectorConfig implements MetricsCollectorConfig {
         return new Builder();
     }
 
-    protected DefaultMetricsCollectorConfig(Builder builder) {
+    private DefaultMetricsCollectorConfig(Builder builder) {
         emitFrequency = builder.emitFrequency;
         emitFrequencyUnit = builder.emitFrequencyUnit;
     }
