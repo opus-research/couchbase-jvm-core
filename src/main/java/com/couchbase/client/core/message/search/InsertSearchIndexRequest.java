@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2014 Couchbase, Inc.
+/*
+ * Copyright (c) 2015 Couchbase, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,53 +19,30 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.service;
 
-/**
- * Represents the different {@link ServiceType}s and how they map onto buckets.
- *
- * @author Michael Nitschinger
- * @since 1.0
- */
-public enum ServiceType {
+package com.couchbase.client.core.message.search;
 
-    /**
-     * Views and Design Documents.
-     */
-    VIEW(BucketServiceMapping.ONE_FOR_ALL),
 
-    /**
-     * Key/Value type operations.
-     */
-    BINARY(BucketServiceMapping.ONE_BY_ONE),
+import com.couchbase.client.core.message.AbstractCouchbaseRequest;
+import com.couchbase.client.core.message.BootstrapMessage;
 
-    /**
-     * Query (N1QL) operations.
-     */
-    QUERY(BucketServiceMapping.ONE_FOR_ALL),
+public class InsertSearchIndexRequest extends AbstractCouchbaseRequest implements SearchRequest, BootstrapMessage {
 
-    /**
-     * HTTP config operations.
-     */
-    CONFIG(BucketServiceMapping.ONE_FOR_ALL),
+    private final String indexName;
+    private final String payload;
 
-    /**
-     * DCP operations
-     */
-    DCP(BucketServiceMapping.ONE_BY_ONE),
-
-    /**
-     * Search (CBFT) operations.
-     */
-    SEARCH(BucketServiceMapping.ONE_FOR_ALL);
-
-    private final BucketServiceMapping mapping;
-
-    private ServiceType(BucketServiceMapping mapping) {
-        this.mapping = mapping;
+    public InsertSearchIndexRequest(String indexName, String payload, String username, String password) {
+        super(username, password);
+        this.indexName = indexName;
+        this.payload = payload;
     }
 
-    public BucketServiceMapping mapping() {
-        return mapping;
+    @Override
+    public String path() {
+        return "/api/index/" + indexName;
+    }
+
+    public String payload() {
+        return payload;
     }
 }

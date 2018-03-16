@@ -1,16 +1,16 @@
 /**
  * Copyright (C) 2014 Couchbase, Inc.
- *
+ * <p/>
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- *
+ * <p/>
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * <p/>
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -118,6 +118,29 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         super(endpoint, responseBuffer, queue, isTransient);
     }
 
+    /**
+     * Add basic authentication headers to a {@link HttpRequest}.
+     *
+     * The given information is Base64 encoded and the authorization header is set appropriately. Since this needs
+     * to be done for every request, it is refactored out.
+     *
+     * @param ctx the handler context.
+     * @param request the request where the header should be added.
+     * @param user the username for auth.
+     * @param password the password for auth.
+     */
+    private static void addAuth(final ChannelHandlerContext ctx, final HttpRequest request, final String user,
+                                final String password) {
+        final String pw = password == null ? "" : password;
+
+        ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
+        raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
+        ByteBuf encoded = Base64.encode(raw, false);
+        request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
+        encoded.release();
+        raw.release();
+    }
+
     @Override
     protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final ConfigRequest msg) throws Exception {
         HttpMethod httpMethod = HttpMethod.GET;
@@ -147,29 +170,6 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
         addAuth(ctx, request, msg.bucket(), msg.password());
 
         return request;
-    }
-
-    /**
-     * Add basic authentication headers to a {@link HttpRequest}.
-     *
-     * The given information is Base64 encoded and the authorization header is set appropriately. Since this needs
-     * to be done for every request, it is refactored out.
-     *
-     * @param ctx the handler context.
-     * @param request the request where the header should be added.
-     * @param user the username for auth.
-     * @param password the password for auth.
-     */
-    private static void addAuth(final ChannelHandlerContext ctx, final HttpRequest request, final String user,
-        final String password) {
-        final String pw = password == null ? "" : password;
-
-        ByteBuf raw = ctx.alloc().buffer(user.length() + pw.length() + 1);
-        raw.writeBytes((user + ":" + pw).getBytes(CHARSET));
-        ByteBuf encoded = Base64.encode(raw, false);
-        request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
-        encoded.release();
-        raw.release();
     }
 
     @Override
@@ -210,7 +210,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
 
             ResponseStatus status = ResponseStatusConverter.fromHttp(responseHeader.getStatus().code());
             String body = responseContent.readableBytes() > 0
-                ? responseContent.toString(CHARSET) : responseHeader.getStatus().reasonPhrase();
+                    ? responseContent.toString(CHARSET) : responseHeader.getStatus().reasonPhrase();
 
             if (request instanceof BucketConfigRequest) {
                 response = new BucketConfigResponse(body, status);
@@ -245,7 +245,7 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
      * @return a initialized {@link CouchbaseResponse}.
      */
     private CouchbaseResponse handleBucketStreamingResponse(final ChannelHandlerContext ctx,
-        final HttpResponse header) {
+                                                            final HttpResponse header) {
         SocketAddress addr = ctx.channel().remoteAddress();
         String host = addr instanceof InetSocketAddress ? ((InetSocketAddress) addr).getHostName() : addr.toString();
         ResponseStatus status = ResponseStatusConverter.fromHttp(header.getStatus().code());
@@ -256,10 +256,10 @@ public class ConfigHandler extends AbstractGenericHandler<HttpObject, HttpReques
             scheduledObservable = streamingConfigObservable.onBackpressureBuffer().observeOn(env().scheduler());
         }
         return new BucketStreamingResponse(
-            scheduledObservable,
-            host,
-            status,
-            currentRequest()
+                scheduledObservable,
+                host,
+                status,
+                currentRequest()
         );
     }
 
