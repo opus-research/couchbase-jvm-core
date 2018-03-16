@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.message.analytics;
 
-package com.couchbase.client.core.utils.yasjl.Callbacks;
-
-import com.couchbase.client.core.utils.yasjl.JsonPointer;
-import io.netty.buffer.ByteBuf;
+import com.couchbase.client.core.message.CouchbaseRequest;
 
 /**
- * @author Subhashni Balakrishnan
+ * Marker interface for all requests against the Analytics Service
+ *
+ * @author Michael Nitschinger
+ * @since 1.4.3
  */
-public interface JsonPointerCB2 extends JsonPointerCB {
-    void call(JsonPointer jsonPointer, ByteBuf value);
+public interface AnalyticsRequest extends CouchbaseRequest {
 }

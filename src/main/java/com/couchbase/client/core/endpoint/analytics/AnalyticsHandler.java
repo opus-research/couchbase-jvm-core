@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Couchbase, Inc.
+ * Copyright (c) 2017 Couchbase, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.couchbase.client.core.endpoint.query;
+package com.couchbase.client.core.endpoint.analytics;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
@@ -30,11 +30,11 @@ import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import com.couchbase.client.core.message.KeepAlive;
 import com.couchbase.client.core.message.ResponseStatus;
-import com.couchbase.client.core.message.query.GenericQueryRequest;
-import com.couchbase.client.core.message.query.GenericQueryResponse;
-import com.couchbase.client.core.message.query.QueryRequest;
-import com.couchbase.client.core.message.query.RawQueryRequest;
-import com.couchbase.client.core.message.query.RawQueryResponse;
+import com.couchbase.client.core.message.analytics.AnalyticsRequest;
+import com.couchbase.client.core.message.analytics.GenericAnalyticsRequest;
+import com.couchbase.client.core.message.analytics.GenericAnalyticsResponse;
+import com.couchbase.client.core.message.analytics.RawAnalyticsRequest;
+import com.couchbase.client.core.message.analytics.RawAnalyticsResponse;
 import com.couchbase.client.core.service.ServiceType;
 import com.couchbase.client.core.utils.UnicastAutoReleaseSubject;
 import com.lmax.disruptor.RingBuffer;
@@ -63,16 +63,16 @@ import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findSect
 import static com.couchbase.client.core.endpoint.util.ByteBufJsonHelper.findSplitPosition;
 
 /**
- * The {@link QueryHandler} is responsible for encoding {@link QueryRequest}s into lower level
+ * The {@link AnalyticsHandler} is responsible for encoding {@link AnalyticsRequest}s into lower level
  * {@link HttpRequest}s as well as decoding {@link HttpObject}s into
  * {@link CouchbaseResponse}s.
  *
  * @author Michael Nitschinger
- * @since 1.0
+ * @since 1.4.3
  */
-public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest, QueryRequest> {
+public class AnalyticsHandler extends AbstractGenericHandler<HttpObject, HttpRequest, AnalyticsRequest> {
 
-    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(QueryHandler.class);
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(AnalyticsHandler.class);
 
     protected static final byte QUERY_STATE_INITIAL = 0;
     protected static final byte QUERY_STATE_SIGNATURE = 1;
@@ -115,7 +115,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private UnicastAutoReleaseSubject<ByteBuf> queryRowObservable;
 
     /**
-     * Represents an observable that has the signature of the N1QL results if there are any.
+     * Represents an observable that has the signature of the Analytics results if there are any.
      */
     private UnicastAutoReleaseSubject<ByteBuf> querySignatureObservable;
 
@@ -146,52 +146,52 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private boolean sectionDone = false;
 
     /**
-     * Creates a new {@link QueryHandler} with the default queue for requests.
+     * Creates a new {@link AnalyticsHandler} with the default queue for requests.
      *
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      */
-    public QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
-                        final boolean pipeline) {
+    public AnalyticsHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, boolean isTransient,
+                            final boolean pipeline) {
         super(endpoint, responseBuffer, isTransient, pipeline);
     }
 
     /**
-     * Creates a new {@link QueryHandler} with a custom queue for requests (suitable for tests).
+     * Creates a new {@link AnalyticsHandler} with a custom queue for requests (suitable for tests).
      *
      * @param endpoint the {@link AbstractEndpoint} to coordinate with.
      * @param responseBuffer the {@link RingBuffer} to push responses into.
      * @param queue the queue which holds all outstanding open requests.
      */
-    QueryHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<QueryRequest> queue,
-                 boolean isTransient, final boolean pipeline) {
+    AnalyticsHandler(AbstractEndpoint endpoint, RingBuffer<ResponseEvent> responseBuffer, Queue<AnalyticsRequest> queue,
+                     boolean isTransient, final boolean pipeline) {
         super(endpoint, responseBuffer, queue, isTransient, pipeline);
     }
 
     @Override
-    protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final QueryRequest msg) throws Exception {
+    protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final AnalyticsRequest msg) throws Exception {
         FullHttpRequest request;
 
-        if (msg instanceof GenericQueryRequest) {
-            GenericQueryRequest queryRequest = (GenericQueryRequest) msg;
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/query");
+        if (msg instanceof GenericAnalyticsRequest) {
+            GenericAnalyticsRequest queryRequest = (GenericAnalyticsRequest) msg;
+            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/query/service");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
             if (queryRequest.isJsonFormat()) {
                 request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json");
             }
-            ByteBuf query = ctx.alloc().buffer(((GenericQueryRequest) msg).query().length());
-            query.writeBytes(((GenericQueryRequest) msg).query().getBytes(CHARSET));
+            ByteBuf query = ctx.alloc().buffer(((GenericAnalyticsRequest) msg).query().length());
+            query.writeBytes(((GenericAnalyticsRequest) msg).query().getBytes(CHARSET));
             request.headers().add(HttpHeaders.Names.CONTENT_LENGTH, query.readableBytes());
             request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
             request.content().writeBytes(query);
             query.release();
         } else if (msg instanceof KeepAliveRequest) {
-            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/admin/ping");
+            request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/analytics/version");
             request.headers().set(HttpHeaders.Names.USER_AGENT, env().userAgent());
             request.headers().set(HttpHeaders.Names.HOST, remoteHttpHost(ctx));
             return request;
         } else {
-            throw new IllegalArgumentException("Unknown incoming QueryRequest type "
+            throw new IllegalArgumentException("Unknown incoming AnalyticsRequest type "
                 + msg.getClass());
         }
 
@@ -224,12 +224,12 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
             boolean lastChunk = msg instanceof LastHttpContent;
 
             //important to place the RawQueryRequest test before, as it extends GenericQueryRequest
-            if (currentRequest() instanceof RawQueryRequest) {
-                response = handleRawQueryResponse(lastChunk, ctx);
-            } else if (currentRequest() instanceof GenericQueryRequest) {
+            if (currentRequest() instanceof RawAnalyticsRequest) {
+                response = handleRawAnalyticsResponse(lastChunk, ctx);
+            } else if (currentRequest() instanceof GenericAnalyticsRequest) {
                 if (queryRowObservable == null) {
                     //still in initial parsing
-                    response = handleGenericQueryResponse(lastChunk);
+                    response = handleGenericAnalyticsResponse(lastChunk);
                     //null response indicates need for more data before continuing parsing
                     if (response != null) {
                         parseQueryResponse(lastChunk);
@@ -243,7 +243,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         return response;
     }
 
-    private RawQueryResponse handleRawQueryResponse(boolean lastChunk, ChannelHandlerContext ctx) {
+    private RawAnalyticsResponse handleRawAnalyticsResponse(boolean lastChunk, ChannelHandlerContext ctx) {
         if (!lastChunk) {
             return null;
         }
@@ -253,7 +253,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
         cleanupQueryStates();
 
-        return new RawQueryResponse(status, currentRequest(), responseCopy,
+        return new RawAnalyticsResponse(status, currentRequest(), responseCopy,
                 responseHeader.getStatus().code(),
                 responseHeader.getStatus().reasonPhrase());
     }
@@ -272,14 +272,14 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
-     * Base method to handle the response for the generic query request.
+     * Base method to handle the response for the generic analytics request.
      *
      * It waits for the first few bytes on the actual response to determine if an error is raised or if a successful
      * response can be expected. The actual error and/or chunk parsing is deferred to other parts of this handler.
      *
      * @return a {@link CouchbaseResponse} if eligible.
      */
-    private CouchbaseResponse handleGenericQueryResponse(boolean lastChunk) {
+    private CouchbaseResponse handleGenericAnalyticsResponse(boolean lastChunk) {
         String requestId;
         String clientId = "";
 
@@ -369,7 +369,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         queryInfoObservable.withTraceIdentifier("queryInfo." + rid);
         querySignatureObservable.withTraceIdentifier("querySignature." + rid);
 
-        return new GenericQueryResponse(
+        return new GenericAnalyticsResponse(
                 queryErrorObservable.onBackpressureBuffer().observeOn(scheduler),
                 queryRowObservable.onBackpressureBuffer().observeOn(scheduler),
                 querySignatureObservable.onBackpressureBuffer().observeOn(scheduler),
@@ -530,7 +530,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     }
 
     /**
-     * Parse the signature section in the N1QL response.
+     * Parse the signature section in the Analytics response.
      */
     private void parseQuerySignature(boolean lastChunk) {
         ByteBufProcessor processor = null;
@@ -754,7 +754,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
         return new KeepAliveRequest();
     }
 
-    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements QueryRequest, KeepAlive {
+    protected static class KeepAliveRequest extends AbstractCouchbaseRequest implements AnalyticsRequest, KeepAlive {
         protected KeepAliveRequest() {
             super(null, null);
         }
@@ -768,7 +768,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
 
     @Override
     protected ServiceType serviceType() {
-        return ServiceType.QUERY;
+        return ServiceType.ANALYTICS;
     }
 
     public int getQueryParsingState() {

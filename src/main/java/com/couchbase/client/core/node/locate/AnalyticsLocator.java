@@ -13,14 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.couchbase.client.core.node.locate;
 
-package com.couchbase.client.core.utils.yasjl.Callbacks;
-
-import io.netty.buffer.ByteBuf;
+import com.couchbase.client.core.node.Node;
+import com.couchbase.client.core.service.ServiceType;
 
 /**
- * @author Subhashni Balakrishnan
+ * Round robin node locator for Analytics.
+ *
+ * @author Michael Nitschinger
+ * @since 1.4.3
  */
-public interface JsonPointerCB1 extends JsonPointerCB {
-    void call(ByteBuf value);
+public class AnalyticsLocator extends QueryLocator {
+
+    @Override
+    protected boolean checkNode(Node node) {
+        return node.serviceEnabled(ServiceType.ANALYTICS);
+    }
+
 }
