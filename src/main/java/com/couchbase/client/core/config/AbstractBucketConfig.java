@@ -25,9 +25,7 @@ import com.couchbase.client.core.service.ServiceType;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public abstract class AbstractBucketConfig implements BucketConfig {
 
@@ -38,7 +36,6 @@ public abstract class AbstractBucketConfig implements BucketConfig {
     private final String streamingUri;
     private final List<NodeInfo> nodeInfo;
     private final int enabledServices;
-    private final Map<InetAddress, Integer> nodeServices;
 
     protected AbstractBucketConfig(String name, BucketNodeLocator locator, String uri, String streamingUri,
         List<NodeInfo> nodeInfos, List<PortInfo> portInfos) {
@@ -48,23 +45,14 @@ public abstract class AbstractBucketConfig implements BucketConfig {
         this.streamingUri = streamingUri;
         this.nodeInfo = portInfos == null ? nodeInfos : nodeInfoFromExtended(portInfos, nodeInfos);
 
-        nodeServices = new HashMap<InetAddress, Integer>();
         int es = 0;
         for (NodeInfo info : nodeInfo) {
-            if (!nodeServices.containsKey(info.hostname())) {
-                nodeServices.put(info.hostname(), 0);
-            }
-            int ns = nodeServices.get(info.hostname());
             for (ServiceType type : info.services().keySet()) {
                 es |= 1 << type.ordinal();
-                ns |= 1 << type.ordinal();
-
             }
             for (ServiceType type : info.sslServices().keySet()) {
                 es |= 1 << type.ordinal();
-                ns |= 1 << type.ordinal();
             }
-            nodeServices.put(info.hostname(), ns);
         }
         this.enabledServices = es;
     }
@@ -129,14 +117,5 @@ public abstract class AbstractBucketConfig implements BucketConfig {
     @Override
     public boolean serviceEnabled(ServiceType type) {
         return (enabledServices & (1 << type.ordinal())) != 0;
-    }
-
-    @Override
-    public boolean serviceEnabled(final ServiceType type, final InetAddress node) {
-        Integer services = nodeServices.get(node);
-        if (services == null) {
-            return false;
-        }
-        return (services & (1 << type.ordinal())) != 0;
     }
 }
