@@ -86,12 +86,6 @@ public abstract class AbstractLatencyMetricsCollector<I extends LatencyMetricsId
     }
 
     @Override
-    public boolean shutdown() {
-        PAUSE_DETECTOR.shutdown();
-        return super.shutdown();
-    }
-
-    @Override
     public LatencyMetricsCollectorConfig config() {
         return config;
     }

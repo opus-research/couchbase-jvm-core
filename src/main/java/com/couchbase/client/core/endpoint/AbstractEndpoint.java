@@ -45,7 +45,6 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
 import io.netty.channel.oio.OioEventLoopGroup;
@@ -61,7 +60,6 @@ import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -222,7 +220,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
             .channel(channelClass)
             .option(ChannelOption.ALLOCATOR, allocator)
             .option(ChannelOption.TCP_NODELAY, tcpNodelay)
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, env.socketConnectTimeout())
             .handler(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(Channel channel) throws Exception {
@@ -284,24 +281,14 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                     } else {
                         if (future.cause() instanceof AuthenticationException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Authentication Failure.");
-                            transitionState(LifecycleState.DISCONNECTED);
-                            observable.onError(future.cause());
-                        } else if (future.cause() instanceof SSLHandshakeException) {
-                            LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "SSL Handshake Failure during connect.");
+                                    + "Authentication Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (future.cause() instanceof ClosedChannelException) {
                             LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Generic Failure.");
+                                    + "Generic Failure.");
                             transitionState(LifecycleState.DISCONNECTED);
                             LOGGER.warn(future.cause().getMessage());
-                            observable.onError(future.cause());
-                        } else if (future.cause() instanceof ConnectTimeoutException) {
-                            LOGGER.warn(logIdent(channel, AbstractEndpoint.this)
-                                + "Socket connect took longer than specified timeout.");
-                            transitionState(LifecycleState.DISCONNECTED);
                             observable.onError(future.cause());
                         } else if (isTransient) {
                             transitionState(LifecycleState.DISCONNECTED);
