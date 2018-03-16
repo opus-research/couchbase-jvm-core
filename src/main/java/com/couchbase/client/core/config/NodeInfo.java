@@ -25,7 +25,6 @@ import com.couchbase.client.core.service.ServiceType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
-import java.net.InetAddress;
 import java.util.Map;
 
 /**
@@ -47,7 +46,7 @@ public interface NodeInfo {
      *
      * @return
      */
-    InetAddress hostname();
+    String hostname();
 
     /**
      *

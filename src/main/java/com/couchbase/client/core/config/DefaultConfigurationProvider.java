@@ -38,7 +38,6 @@ import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 import rx.subjects.PublishSubject;
 
-import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -73,7 +72,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     /**
      * List of initial bootstrap seed hostnames.
      */
-    private final AtomicReference<List<InetAddress>> seedHosts;
+    private final AtomicReference<List<String>> seedHosts;
 
     /**
      * Jackson object mapper.
@@ -97,7 +96,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     public DefaultConfigurationProvider(final Cluster cluster, final Environment environment) {
         this.cluster = cluster;
         configObservable = PublishSubject.create();
-        seedHosts = new AtomicReference<List<InetAddress>>();
+        seedHosts = new AtomicReference<List<String>>();
         bootstrapped = false;
         this.environment = environment;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
@@ -109,7 +108,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     }
 
     @Override
-    public boolean seedHosts(final List<InetAddress> hosts) {
+    public boolean seedHosts(final List<String> hosts) {
         if (bootstrapped) {
             LOGGER.debug("Seed hosts called with {}, but already bootstrapped.", hosts);
             return false;
@@ -178,10 +177,10 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     private Observable<BucketConfig> bootstrapThroughCarrierPublication(final String bucket, final String password) {
         return Observable
             .from(seedHosts.get(), Schedulers.computation())
-            .flatMap(new Func1<InetAddress, Observable<AddNodeResponse>>() {
+            .flatMap(new Func1<String, Observable<AddNodeResponse>>() {
                 @Override
-                public Observable<AddNodeResponse> call(InetAddress addr) {
-                    return cluster.send(new AddNodeRequest(addr.getHostName()));
+                public Observable<AddNodeResponse> call(String hostname) {
+                    return cluster.send(new AddNodeRequest(hostname));
                 }
             }).flatMap(new Func1<AddNodeResponse, Observable<AddServiceResponse>>() {
                 @Override

@@ -83,32 +83,22 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public boolean sslEnabled() {
-        return getBoolean("bootstrap.sslEnabled");
+        return getBoolean("core.bootstrap.sslEnabled");
     }
 
     @Override
     public String sslKeystoreFile() {
-        return getString("bootstrap.sslKeystoreFile");
+        return getString("core.bootstrap.sslKeystoreFile");
     }
 
     @Override
     public String sslKeystorePassword() {
-        return getString("bootstrap.sslKeystorePassword");
-    }
-
-    @Override
-    public boolean queryEnabled() {
-        return getBoolean("queryEnabled");
-    }
-
-    @Override
-    public int queryPort() {
-        return getInt("queryPort");
+        return getString("core.bootstrap.sslKeystorePassword");
     }
 
     @Override
     public int bootstrapHttpDirectPort() {
-        int port = getInt("bootstrap.http.directPort");
+        int port = getInt("core.bootstrap.http.directPort");
         if (port <= 0) {
             throw new EnvironmentException("Port must be greater than 0.");
         }
@@ -117,7 +107,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int bootstrapHttpSslPort() {
-        int port = getInt("bootstrap.http.sslPort");
+        int port = getInt("core.bootstrap.http.sslPort");
         if (port <= 0) {
             throw new EnvironmentException("Port must be greater than 0.");
         }
@@ -126,7 +116,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int bootstrapCarrierDirectPort() {
-        int port = getInt("bootstrap.carrier.directPort");
+        int port = getInt("core.bootstrap.carrier.directPort");
         if (port <= 0) {
             throw new EnvironmentException("Port must be greater than 0.");
         }
@@ -135,7 +125,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int bootstrapCarrierSslPort() {
-        int port = getInt("bootstrap.carrier.sslPort");
+        int port = getInt("core.bootstrap.carrier.sslPort");
         if (port <= 0) {
             throw new EnvironmentException("Port must be greater than 0.");
         }
@@ -144,7 +134,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int ioPoolSize() {
-        int ioPoolSize = getInt("io.poolSize");
+        int ioPoolSize = getInt("core.io.poolSize");
         if (ioPoolSize <= 0) {
             return Runtime.getRuntime().availableProcessors();
         }
@@ -153,7 +143,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int requestBufferSize() {
-        int reqBufSize = getInt("requestBufferSize");
+        int reqBufSize = getInt("core.requestBufferSize");
         if (reqBufSize <= 0) {
             throw new EnvironmentException("Request Buffer Size must be > 0 and power of two");
         }
@@ -162,7 +152,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int responseBufferSize() {
-        int resBufSize = getInt("responseBufferSize");
+        int resBufSize = getInt("core.responseBufferSize");
         if (resBufSize <= 0) {
             throw new EnvironmentException("Response Buffer Size must be > 0 and power of two");
         }
@@ -176,7 +166,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int binaryServiceEndpoints() {
-        int endpoints = getInt("service.endpoints.binary");
+        int endpoints = getInt("core.service.endpoints.binary");
         if (endpoints <= 0) {
             throw new EnvironmentException("At least one Endpoint per Service is required");
         }
@@ -185,7 +175,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int configServiceEndpoints() {
-        int endpoints = getInt("service.endpoints.config");
+        int endpoints = getInt("core.service.endpoints.config");
         if (endpoints <= 0) {
             throw new EnvironmentException("At least one Endpoint per Service is required");
         }
@@ -194,7 +184,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int streamServiceEndpoints() {
-        int endpoints = getInt("service.endpoints.stream");
+        int endpoints = getInt("core.service.endpoints.stream");
         if (endpoints <= 0) {
             throw new EnvironmentException("At least one Endpoint per Service is required");
         }
@@ -203,7 +193,7 @@ public class CouchbaseEnvironment implements Environment {
 
     @Override
     public int viewServiceEndpoints() {
-        int endpoints = getInt("service.endpoints.view");
+        int endpoints = getInt("core.service.endpoints.view");
         if (endpoints <= 0) {
             throw new EnvironmentException("At least one Endpoint per Service is required");
         }
