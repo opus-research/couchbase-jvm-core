@@ -18,6 +18,7 @@ package com.couchbase.client.core.message.kv;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import io.netty.util.CharsetUtil;
+import io.opentracing.Tracer;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -99,6 +100,15 @@ public abstract class AbstractKeyValueRequest extends AbstractCouchbaseRequest i
         this.key = key;
         this.keyBytes = key == null || key.isEmpty() ? new byte[] {} : key.getBytes(CharsetUtil.UTF_8);
         opaque = GLOBAL_OPAQUE++;
+    }
+
+    @Override
+    public void span(Tracer.SpanBuilder span) {
+        super.span(span
+            .withTag("db.service", "kv")
+            .withTag("db.key", key)
+            .withTag("db.opaque", opaque)
+        );
     }
 
     @Override

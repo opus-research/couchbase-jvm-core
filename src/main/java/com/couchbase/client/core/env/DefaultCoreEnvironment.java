@@ -50,6 +50,10 @@ import com.lmax.disruptor.WaitStrategy;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.opentracing.NoopTracer;
+import io.opentracing.NoopTracerFactory;
+import io.opentracing.Tracer;
+import io.opentracing.util.GlobalTracer;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscription;
@@ -927,6 +931,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     @Override
     public CouchbaseCoreSendHook couchbaseCoreSendHook() {
         return couchbaseCoreSendHook;
+    }
+
+    @Override
+    public Tracer tracer() {
+        return GlobalTracer.get();
     }
 
     public static class Builder {

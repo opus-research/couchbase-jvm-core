@@ -25,6 +25,7 @@ import com.couchbase.client.core.metrics.NetworkLatencyMetricsCollector;
 import com.couchbase.client.core.retry.RetryStrategy;
 import com.couchbase.client.core.time.Delay;
 import io.netty.channel.EventLoopGroup;
+import io.opentracing.Tracer;
 import rx.Observable;
 import rx.Scheduler;
 
@@ -479,5 +480,14 @@ public interface CoreEnvironment extends SecureEnvironment, ConfigParserEnvironm
     @InterfaceStability.Experimental
     @InterfaceAudience.Public
     CouchbaseCoreSendHook couchbaseCoreSendHook();
+
+    /**
+     * The OpenTracing tracer implementation to use.
+     *
+     * @return the tracer to use.
+     */
+    @InterfaceStability.Experimental
+    @InterfaceAudience.Public
+    Tracer tracer();
 
 }

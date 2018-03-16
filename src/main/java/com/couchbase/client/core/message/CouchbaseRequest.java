@@ -18,6 +18,9 @@ package com.couchbase.client.core.message;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.time.Delay;
+import io.opentracing.ActiveSpan;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
 import rx.Subscriber;
 import rx.subjects.Subject;
 
@@ -131,4 +134,15 @@ public interface CouchbaseRequest extends CouchbaseMessage {
     String dispatchHostname();
 
     void dispatchHostname(String hostname);
+
+    /**
+     * The span which tracks this request/response cycle.
+     *
+     * @return the span used if not null.
+     */
+    @InterfaceAudience.Public
+    @InterfaceStability.Experimental
+    Span span();
+
+    void span(Tracer.SpanBuilder span);
 }
