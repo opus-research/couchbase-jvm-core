@@ -2,6 +2,7 @@ package com.couchbase.client.core.endpoint.view;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
+import com.couchbase.client.core.endpoint.GenericEndpointHandler;
 import com.couchbase.client.core.env.Environment;
 import com.lmax.disruptor.RingBuffer;
 import io.netty.channel.ChannelPipeline;
@@ -26,7 +27,7 @@ public class ViewEndpoint extends AbstractEndpoint {
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new ViewCodec());
+            .addLast(new ViewHandler(this, responseBuffer()));
     }
 
 }
