@@ -31,7 +31,6 @@ import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
 import com.lmax.disruptor.EventSink;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -40,13 +39,11 @@ import io.netty.handler.codec.MessageToMessageCodec;
 import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.Subscriber;
 import rx.functions.Action0;
-import rx.functions.Action1;
 import rx.subjects.Subject;
 
 import javax.net.ssl.SSLHandshakeException;
@@ -59,6 +56,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+
+import static com.couchbase.client.core.utils.Observables.failSafe;
 
 /**
  * Generic handler which acts as the common base type for all implementing handlers.
@@ -153,14 +152,16 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     private final int sentQueueLimit;
 
+    private final boolean pipeline;
+
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
      *
      * @param endpoint the endpoint reference.
      * @param responseBuffer the response buffer.
      */
-    protected AbstractGenericHandler(final AbstractEndpoint endpoint, final EventSink<ResponseEvent> responseBuffer, final boolean isTransient) {
-        this(endpoint, responseBuffer, new ArrayDeque<REQUEST>(), isTransient);
+    protected AbstractGenericHandler(final AbstractEndpoint endpoint, final EventSink<ResponseEvent> responseBuffer, final boolean isTransient, final boolean pipeline) {
+        this(endpoint, responseBuffer, new ArrayDeque<REQUEST>(), isTransient, pipeline);
     }
 
     /**
@@ -171,7 +172,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * @param queue the queue.
      */
     protected AbstractGenericHandler(final AbstractEndpoint endpoint, final EventSink<ResponseEvent> responseBuffer,
-        final Queue<REQUEST> queue, final boolean isTransient) {
+        final Queue<REQUEST> queue, final boolean isTransient, final boolean pipeline) {
+        this.pipeline = pipeline;
         this.endpoint = endpoint;
         this.responseBuffer = responseBuffer;
         this.sentRequestQueue = queue;
@@ -219,6 +221,14 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+        if (!pipeline && (!sentRequestQueue.isEmpty() || currentDecodingState != DecodingState.INITIAL)) {
+            if (traceEnabled) {
+                LOGGER.trace("Rescheduling {} because pipelining disable and a request is in-flight.", msg);
+            }
+            RetryHelper.retryOrCancel(env(), (CouchbaseRequest) msg, responseBuffer);
+            return;
+        }
+
         if (sentRequestQueue.size() < sentQueueLimit) {
             super.write(ctx, msg, promise);
         } else {
@@ -250,9 +260,9 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
                 }
             }
         } catch (CouchbaseException e) {
-            currentRequest.observable().onError(e);
+            failSafe(env().scheduler(), moveResponseOut, currentRequest.observable(), e);
         } catch (Exception e) {
-            currentRequest.observable().onError(new CouchbaseException(e));
+            failSafe(env().scheduler(), moveResponseOut, currentRequest.observable(), new CouchbaseException(e));
         }
 
         if (currentDecodingState == DecodingState.FINISHED) {
@@ -499,7 +509,8 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
             REQUEST req = sentRequestQueue.poll();
             try {
                 sideEffectRequestToCancel(req);
-                req.observable().onError(new RequestCancelledException("Request cancelled in-flight."));
+                failSafe(env().scheduler(), moveResponseOut, req.observable(),
+                        new RequestCancelledException("Request cancelled in-flight."));
             } catch (Exception ex) {
                 LOGGER.info("Exception thrown while cancelling outstanding operation: " + req, ex);
             }
@@ -524,6 +535,10 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
     @Override
     public void userEventTriggered(final ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
+            if (!shouldSendKeepAlive()) {
+                return;
+            }
+
             CouchbaseRequest keepAlive = createKeepAliveRequest();
             if (keepAlive != null) {
                 keepAlive.observable().subscribe(new KeepAliveResponseAction(ctx));
@@ -537,6 +552,21 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         } else {
             super.userEventTriggered(ctx, evt);
         }
+    }
+
+    /**
+     * Helper method to check if conditions are met to send a keepalive right now.
+     *
+     * @return true if keepalive can be sent, false otherwise.
+     */
+    private boolean shouldSendKeepAlive() {
+        if (pipeline) {
+            return true; // always send if pipelining is enabled
+        }
+
+        // if pipelining is disabled, only send if the request queue is empty and no response
+        // is currently being decoded.
+        return sentRequestQueue.isEmpty() && currentDecodingState == DecodingState.INITIAL;
     }
 
     /**
