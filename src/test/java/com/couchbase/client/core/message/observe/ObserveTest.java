@@ -40,8 +40,8 @@ import rx.Observable;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.isA;
+import static com.couchbase.client.core.util.Matchers.hasRequestFromFactory;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -67,7 +67,7 @@ public class ObserveTest {
         GetClusterConfigResponse clusterConfigResponse = new GetClusterConfigResponse(
             clusterConfig, ResponseStatus.SUCCESS
         );
-        when(cluster.send(any(GetClusterConfigRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(GetClusterConfigRequest.class)))).thenReturn(
                 Observable.just((CouchbaseResponse) clusterConfigResponse)
         );
 
@@ -90,7 +90,7 @@ public class ObserveTest {
         GetClusterConfigResponse clusterConfigResponse = new GetClusterConfigResponse(
                 clusterConfig, ResponseStatus.SUCCESS
         );
-        when(cluster.send(any(GetClusterConfigRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(GetClusterConfigRequest.class)))).thenReturn(
                 Observable.just((CouchbaseResponse) clusterConfigResponse)
         );
 
@@ -117,7 +117,7 @@ public class ObserveTest {
         GetClusterConfigResponse clusterConfigResponse = new GetClusterConfigResponse(
                 clusterConfig, ResponseStatus.SUCCESS
         );
-        when(cluster.send(isA(GetClusterConfigRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(GetClusterConfigRequest.class)))).thenReturn(
                 Observable.just((CouchbaseResponse) clusterConfigResponse)
         );
         ObserveResponse observeResponse = new ObserveResponse(
@@ -128,7 +128,7 @@ public class ObserveTest {
                 "bucket",
                 mock(CouchbaseRequest.class)
         );
-        when(cluster.send(isA(ObserveRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(ObserveRequest.class)))).thenReturn(
                 Observable.just((CouchbaseResponse) observeResponse)
         );
 
@@ -154,7 +154,7 @@ public class ObserveTest {
         GetClusterConfigResponse clusterConfigResponse = new GetClusterConfigResponse(
             clusterConfig, ResponseStatus.SUCCESS
         );
-        when(cluster.send(isA(GetClusterConfigRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(GetClusterConfigRequest.class)))).thenReturn(
             Observable.just((CouchbaseResponse) clusterConfigResponse)
         );
         ObserveResponse observeResponse = new ObserveResponse(
@@ -165,7 +165,7 @@ public class ObserveTest {
             "bucket",
             mock(CouchbaseRequest.class)
         );
-        when(cluster.send(isA(ObserveRequest.class))).thenReturn(
+        when(cluster.send(argThat(hasRequestFromFactory(ObserveRequest.class)))).thenReturn(
             Observable.just((CouchbaseResponse) observeResponse)
         );
 
@@ -178,7 +178,7 @@ public class ObserveTest {
             .toBlocking()
             .single();
 
-        verify(cluster, times(2)).send(isA(ObserveRequest.class));
+        verify(cluster, times(2)).send(argThat(hasRequestFromFactory(ObserveRequest.class)));
     }
 
 }

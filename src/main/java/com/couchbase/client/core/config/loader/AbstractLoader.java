@@ -22,6 +22,7 @@
 package com.couchbase.client.core.config.loader;
 
 import com.couchbase.client.core.ClusterFacade;
+import com.couchbase.client.core.RequestFactory;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.LoaderType;
 import com.couchbase.client.core.config.parser.BucketConfigParser;
@@ -30,6 +31,7 @@ import com.couchbase.client.core.lang.Tuple;
 import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
+import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.internal.AddNodeRequest;
 import com.couchbase.client.core.message.internal.AddNodeResponse;
 import com.couchbase.client.core.message.internal.AddServiceRequest;
@@ -37,6 +39,7 @@ import com.couchbase.client.core.message.internal.AddServiceResponse;
 import com.couchbase.client.core.service.ServiceType;
 import rx.Observable;
 import rx.functions.Func1;
+
 import java.net.InetAddress;
 import java.util.Set;
 
@@ -153,7 +156,12 @@ public abstract class AbstractLoader implements Loader {
             .flatMap(new Func1<InetAddress, Observable<AddNodeResponse>>() {
                 @Override
                 public Observable<AddNodeResponse> call(final InetAddress address) {
-                    return cluster.send(new AddNodeRequest(address));
+                    return cluster.send(new RequestFactory() {
+                        @Override
+                        public CouchbaseRequest call() {
+                            return new AddNodeRequest(address);
+                        }
+                    });
                 }
             }).flatMap(new Func1<AddNodeResponse, Observable<AddServiceResponse>>() {
                 @Override
@@ -162,9 +170,12 @@ public abstract class AbstractLoader implements Loader {
                         return Observable.error(new IllegalStateException("Could not add node for config loading."));
                     }
                     LOGGER.debug("Successfully added Node {}", response.hostname());
-                    return cluster.send(
-                        new AddServiceRequest(serviceType, bucket, password, port(), response.hostname())
-                    );
+                    return cluster.send(new RequestFactory() {
+                        @Override
+                        public CouchbaseRequest call() {
+                            return new AddServiceRequest(serviceType, bucket, password, port(), response.hostname());
+                        }
+                    });
                 }
             }).flatMap(new Func1<AddServiceResponse, Observable<String>>() {
                 @Override
