@@ -26,6 +26,8 @@ import com.couchbase.client.core.ClusterFacade;
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
+import com.couchbase.client.core.logging.CouchbaseLogger;
+import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.cluster.GetClusterConfigRequest;
 import com.couchbase.client.core.message.cluster.GetClusterConfigResponse;
 import com.couchbase.client.core.message.dcp.DCPRequest;
@@ -48,6 +50,7 @@ import rx.internal.util.RxRingBuffer;
 @InterfaceStability.Experimental
 @InterfaceAudience.Public
 public class BucketStreamAggregator {
+    private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(BucketStreamAggregator.class);
 
     private final ClusterFacade core;
     private final String bucket;
@@ -93,6 +96,11 @@ public class BucketStreamAggregator {
      * @return collection of stream objects
      */
     public Observable<StreamRequestResponse> open(final BucketStreamAggregatorState aggregatorState) {
+        if (aggregatorState.numberOfInfiniteStreams() > RxRingBuffer.SIZE) {
+            LOGGER.warn("Number of requested infinite streams({}) is bigger than RxRingBuffer.SIZE({}). " +
+                    "Consider either increasing rx.ring-buffer.size, or setting limits for the buckets",
+                    aggregatorState.numberOfInfiniteStreams(), RxRingBuffer.SIZE);
+        }
         return core
                 .<OpenConnectionResponse>send(new OpenConnectionRequest(aggregatorState.name(), bucket))
                 .flatMap(new Func1<OpenConnectionResponse, Observable<StreamRequestResponse>>() {
