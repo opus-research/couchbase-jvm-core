@@ -333,12 +333,14 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         int rowsStart = -1;
         for (int i = responseContent.readerIndex(); i < responseContent.writerIndex(); i++) {
             byte curr = responseContent.getByte(i);
-            byte f1 = responseContent.getByte(i + 1);
-            byte f2 = responseContent.getByte(i + 2);
+            if (i+2 < responseContent.readableBytes()) {
+                byte f1 = responseContent.getByte(i + 1);
+                byte f2 = responseContent.getByte(i + 2);
 
-            if (curr == '"' && f1 == 'r' && f2 == 'o') {
-                rowsStart = i;
-                break;
+                if (curr == '"' && f1 == 'r' && f2 == 'o') {
+                    rowsStart = i;
+                    break;
+                }
             }
         }
 
