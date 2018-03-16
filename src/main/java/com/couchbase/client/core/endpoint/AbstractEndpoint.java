@@ -119,11 +119,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private final CoreEnvironment env;
 
     /**
-     * Defines if the endpoint should destroy itself after one successful msg.
-     */
-    private final boolean isTransient;
-
-    /**
      * Factory which handles {@link SSLEngine} creation.
      */
     private SSLEngineFactory sslEngineFactory;
@@ -160,15 +155,13 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param password the password of the bucket.
      * @param adapter the bootstrap adapter.
      */
-    protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter,
-        final boolean isTransient) {
+    protected AbstractEndpoint(final String bucket, final String password, final BootstrapAdapter adapter) {
         super(LifecycleState.DISCONNECTED);
         bootstrap = adapter;
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = null;
         this.env = null;
-        this.isTransient = isTransient;
     }
 
     /**
@@ -182,13 +175,12 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      * @param responseBuffer the response buffer for passing responses up the stack.
      */
     protected AbstractEndpoint(final String hostname, final String bucket, final String password, final int port,
-        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer, boolean isTransient) {
+        final CoreEnvironment environment, final RingBuffer<ResponseEvent> responseBuffer) {
         super(LifecycleState.DISCONNECTED);
         this.bucket = bucket;
         this.password = password;
         this.responseBuffer = responseBuffer;
         this.env = environment;
-        this.isTransient = isTransient;
         if (environment.sslEnabled()) {
             this.sslEngineFactory = new SSLEngineFactory(environment);
         }
@@ -362,9 +354,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
      */
     public void notifyChannelInactive() {
         LOGGER.debug(logIdent(channel, this) + "Got notified from Channel as inactive.");
-        if (isTransient) {
-            return;
-        }
 
         responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, SignalConfigReload.INSTANCE, null);
         if (state() == LifecycleState.CONNECTED || state() == LifecycleState.CONNECTING) {
