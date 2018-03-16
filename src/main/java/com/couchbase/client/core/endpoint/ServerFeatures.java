@@ -61,7 +61,15 @@ public enum ServerFeatures {
      *
      * @since  Couchbase Server Spock (5.0)
      */
-    XATTR((short) 0x06);
+    XATTR((short) 0x06),
+
+
+    /**
+     * Enable select_bucket support
+     *
+     * @since  Couchbase Server Spock (5.0)
+     */
+    SELECT_BUCKET((short) 0x08);
 
     /**
      * The actual byte representation on the wire.

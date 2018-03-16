@@ -20,7 +20,7 @@ public class TouchRequest extends AbstractKeyValueRequest {
     private final int expiry;
 
     public TouchRequest(String key, int expiry, String bucket) {
-        super(key, bucket, null);
+        super(key, bucket, null, null);
         this.expiry = expiry;
     }
 

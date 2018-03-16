@@ -45,12 +45,12 @@ public abstract class AbstractDCPRequest extends AbstractCouchbaseRequest implem
      * @param password the optional password of the bucket.
      */
     public AbstractDCPRequest(String bucket, String password) {
-        super(bucket, password);
+        super(bucket, null, password);
     }
 
     public AbstractDCPRequest(String bucket, String password, Subject<CouchbaseResponse,
             CouchbaseResponse> observable) {
-        super(bucket, password, observable);
+        super(bucket, null, password, observable);
     }
 
     @Override
