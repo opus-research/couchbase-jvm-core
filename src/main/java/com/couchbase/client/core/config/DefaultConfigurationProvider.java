@@ -278,7 +278,6 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
             .onErrorResumeNext(new Func1<Throwable, Observable<ClusterConfig>>() {
                 @Override
                 public Observable<ClusterConfig> call(final Throwable throwable) {
-                    removeBucketConfig(bucket);
                     return Observable.error(new ConfigurationException("Could not open bucket.", throwable));
                 }
             });
