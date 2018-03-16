@@ -15,7 +15,6 @@
  */
 package com.couchbase.client.core.message;
 
-import com.couchbase.client.core.time.Delay;
 import rx.subjects.Subject;
 
 import java.util.Observable;
@@ -61,6 +60,7 @@ public interface CouchbaseRequest extends CouchbaseMessage {
      */
     int incrementRetryCount();
 
+
     /**
      * Returns the current retry count.
      *
@@ -68,45 +68,4 @@ public interface CouchbaseRequest extends CouchbaseMessage {
      */
     int retryCount();
 
-    /**
-     * Sets the initial retry after time for the request.
-     *
-     * @param after
-     */
-    void retryAfter(long after);
-
-    /**
-     * Gets the initial retry after time for the request.
-     *
-     * @returns initial after time
-     */
-    long retryAfter();
-
-    /**
-     * Sets the maximum retry duration for the request.
-     *
-     * @param duration
-     */
-    void maxRetryDuration(long duration);
-
-    /**
-     * Returns the maximum retry duration for the request.
-     *
-     * @return duration
-     */
-    long maxRetryDuration();
-
-    /**
-     * Sets the retry delay config
-     *
-     * @param delay
-     */
-    void retryDelay(Delay delay);
-
-    /**
-     * Returns the retry delay config
-     *
-     * @return delay
-     */
-    Delay retryDelay();
 }
