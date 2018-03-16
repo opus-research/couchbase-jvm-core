@@ -29,9 +29,9 @@ public class DCPService extends AbstractLazyService {
      */
     private static final EndpointFactory FACTORY = new DCPEndpointFactory();
 
-    public DCPService(String hostname, String bucket, String password, int port, CoreEnvironment env,
+    public DCPService(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
                       RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, responseBuffer, FACTORY);
+        super(hostname, bucket, username, password, port, env, responseBuffer, FACTORY);
     }
 
     @Override
@@ -39,11 +39,10 @@ public class DCPService extends AbstractLazyService {
         return ServiceType.DCP;
     }
 
-    static class DCPEndpointFactory implements EndpointFactory {
-        @Override
-        public Endpoint create(String hostname, String bucket, String password, int port, CoreEnvironment env,
+    static class DCPEndpointFactory extends AbstractEndpointFactory {
+        public Endpoint create(String hostname, String bucket, String username, String password, int port, CoreEnvironment env,
             RingBuffer<ResponseEvent> responseBuffer) {
-            return new DCPEndpoint(hostname, bucket, password, port, env, responseBuffer);
+            return new DCPEndpoint(hostname, bucket, username, password, port, env, responseBuffer);
         }
     }
 
