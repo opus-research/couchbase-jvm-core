@@ -58,8 +58,6 @@ public interface ConfigurationProvider {
      */
     Observable<ClusterConfig> openBucket(String name, String password);
 
-    Observable<ClusterConfig> openBucket(String name, String username, String password);
-
     Observable<ClusterConfig> closeBucket(String name);
 
     Observable<Boolean> closeBuckets();
