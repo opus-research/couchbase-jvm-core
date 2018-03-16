@@ -26,6 +26,7 @@ import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.CouchbaseResponse;
 import rx.Observable;
+import rx.functions.Func0;
 
 /**
  * Represents a Couchbase Cluster.
@@ -45,5 +46,10 @@ public interface ClusterFacade {
      */
     @InterfaceStability.Committed
     @InterfaceAudience.Public
+    @Deprecated
     <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request);
+
+    @InterfaceStability.Committed
+    @InterfaceAudience.Public
+    <R extends CouchbaseResponse> Observable<R> send(final Func0<CouchbaseRequest> requestFactory);
 }
