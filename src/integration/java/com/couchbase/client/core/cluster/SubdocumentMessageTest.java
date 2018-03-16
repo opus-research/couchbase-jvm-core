@@ -98,7 +98,6 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
 
     @BeforeClass
     public static void checkSubdocAvailable() throws Exception {
-        connect(false);
         assumeMinimumVersionCompatible(4, 5);
     }
 
