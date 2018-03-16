@@ -21,11 +21,7 @@
  */
 package com.couchbase.client.core.message.query;
 
-import com.couchbase.client.core.config.NodeInfo;
 import com.couchbase.client.core.message.AbstractCouchbaseRequest;
-import com.couchbase.client.core.message.CouchbasePrelocatedRequest;
-
-import java.net.InetAddress;
 
 /**
  * For the lack of a better name, a query request against a query server.
@@ -33,11 +29,10 @@ import java.net.InetAddress;
  * @author Michael Nitschinger
  * @since 1.0
  */
-public class GenericQueryRequest extends AbstractCouchbaseRequest implements QueryRequest, CouchbasePrelocatedRequest {
+public class GenericQueryRequest extends AbstractCouchbaseRequest implements QueryRequest {
 
     private final String query;
     private final boolean jsonFormat;
-    private InetAddress targetNode = null;
 
     private GenericQueryRequest(String query, boolean jsonFormat, String bucket, String password) {
         super(bucket, password);
@@ -51,22 +46,6 @@ public class GenericQueryRequest extends AbstractCouchbaseRequest implements Que
 
     public boolean isJsonFormat() {
         return jsonFormat;
-    }
-
-    @Override
-    public InetAddress sendTo() {
-        return targetNode;
-    }
-
-    /**
-     * Set the target node on which to execute this request, or null to revert to
-     * default dispatch mechanisms.
-     *
-     * @param targetNode the node on which to execute the query.
-     * @see #sendTo()
-     */
-    public void sendTo(InetAddress targetNode) {
-        this.targetNode = targetNode;
     }
 
     /**
