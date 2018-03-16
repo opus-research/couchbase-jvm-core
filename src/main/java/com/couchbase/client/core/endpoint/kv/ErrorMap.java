@@ -51,7 +51,7 @@ public class ErrorMap implements Comparable<ErrorMap> {
 
     private final int version;
     private final int revision;
-    private final Map<Long, ErrorCode> errors;
+    private final Map<Short, ErrorCode> errors;
 
     @JsonCreator
     public ErrorMap(
@@ -63,10 +63,10 @@ public class ErrorMap implements Comparable<ErrorMap> {
         this.errors = toShortKeys(errors);
     }
 
-    private static Map<Long, ErrorCode> toShortKeys(Map<String, ErrorCode> errors) {
-        Map<Long, ErrorCode> result = new HashMap<Long, ErrorCode>(errors.size());
+    private static Map<Short, ErrorCode> toShortKeys(Map<String, ErrorCode> errors) {
+        Map<Short, ErrorCode> result = new HashMap<Short, ErrorCode>(errors.size());
         for (Map.Entry<String, ErrorCode> entry : errors.entrySet()) {
-            result.put(Long.parseLong(entry.getKey(), 16), entry.getValue());
+            result.put(Short.parseShort(entry.getKey(), 16), entry.getValue());
         }
         return result;
     }
@@ -96,7 +96,7 @@ public class ErrorMap implements Comparable<ErrorMap> {
         return revision;
     }
 
-    public Map<Long, ErrorCode> errors() {
+    public Map<Short, ErrorCode> errors() {
         return errors;
     }
 
@@ -105,18 +105,15 @@ public class ErrorMap implements Comparable<ErrorMap> {
         private final String name;
         private final String description;
         private final List<ErrorAttribute> attributes;
-        private final RetrySpecification retrySpec;
 
         @JsonCreator
         public ErrorCode(
             @JsonProperty("name") String name,
             @JsonProperty("desc") String description,
-            @JsonProperty("attrs") List<ErrorAttribute> attributes,
-            @JsonProperty("retry") RetrySpecification retrySpec) {
+            @JsonProperty("attrs") List<ErrorAttribute> attributes) {
             this.name = name;
             this.description = description;
             this.attributes = attributes;
-            this.retrySpec = retrySpec;
         }
 
         public String name() {
@@ -131,20 +128,13 @@ public class ErrorMap implements Comparable<ErrorMap> {
             return attributes;
         }
 
-        public RetrySpecification retrySpec() { return retrySpec; }
-
         @Override
         public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("ErrorCode{");
-            sb.append("name='" + name + '\'');
-            sb.append(", description='" + description + '\'' );
-            sb.append(", attributes=" + attributes);
-            if (retrySpec != null) {
-                sb.append(", retryHint=" + retrySpec.toString());
-            }
-            sb.append("}");
-            return sb.toString();
+            return "ErrorCode{" +
+                    "name='" + name + '\'' +
+                    ", description='" + description + '\'' +
+                    ", attributes=" + attributes +
+                    '}';
         }
     }
 
@@ -214,11 +204,7 @@ public class ErrorMap implements Comparable<ErrorMap> {
         /**
          * The error is related to the DCP subsystem.
          */
-        DCP("dcp"),
-        /**
-         * Use retry specifications from the server
-         */
-        AUTO_RETRY("auto-retry");
+        DCP("dcp");
 
         private final String raw;
 
@@ -229,75 +215,6 @@ public class ErrorMap implements Comparable<ErrorMap> {
         @JsonValue
         public String raw() {
             return raw;
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class RetrySpecification {
-        private final RetryStrategy strategy;
-        private final long interval;
-        private final long after;
-        private final long maxDuration;
-        private final long ceil;
-
-        @JsonCreator
-        public RetrySpecification(
-                @JsonProperty("strategy") RetryStrategy strategy,
-                @JsonProperty("interval") int interval,
-                @JsonProperty("after") int after,
-                @JsonProperty("max-duration") int maxDuration,
-                @JsonProperty("ceil") int ceil) {
-            this.strategy = strategy;
-            this.interval = interval;
-            this.after = after;
-            this.maxDuration = maxDuration;
-            this.ceil = ceil;
-        }
-
-        public RetryStrategy strategy() {
-            return this.strategy;
-        }
-
-        public long interval() {
-            return this.interval;
-        }
-
-        public long after() {
-            return this.after;
-        }
-
-        public long maxDuration() {
-            return this.maxDuration;
-        }
-
-        public long ceil() { return this.ceil; }
-
-        @Override
-        public String toString() {
-            return "Retry{" +
-                    "strategy=" + strategy() +
-                    ", interval=" + interval() +
-                    ", after=" + after() +
-                    ", max-duration=" + maxDuration() +
-                    ", ceil=" + ceil() +
-                    "}";
-        }
-    }
-
-    public enum RetryStrategy {
-        EXPONENTIAL("exponential"),
-        LINEAR("linear"),
-        CONSTANT("constant");
-
-        private final String strategy;
-
-        RetryStrategy(String strategy) {
-            this.strategy = strategy;
-        }
-
-        @JsonValue
-        public String strategy() {
-            return strategy;
         }
     }
 
