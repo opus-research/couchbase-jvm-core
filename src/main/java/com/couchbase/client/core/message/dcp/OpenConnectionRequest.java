@@ -23,7 +23,7 @@ public class OpenConnectionRequest extends AbstractCouchbaseRequest implements C
     private final String connectionName;
 
     public OpenConnectionRequest(String connectionName, String bucket) {
-        super(bucket, null);
+        super(bucket, null, null);
         this.connectionName = connectionName;
     }
 
