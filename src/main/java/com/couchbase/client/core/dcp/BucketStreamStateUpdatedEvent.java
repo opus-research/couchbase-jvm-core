@@ -22,11 +22,17 @@
 
 package com.couchbase.client.core.dcp;
 
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+
 /**
  * This event generated when {@link BucketStreamAggregatorState} is being updated.
  *
  * @author Sergey Avseyev
+ * @since 1.2.0
  */
+@InterfaceStability.Experimental
+@InterfaceAudience.Public
 public class BucketStreamStateUpdatedEvent {
     private final BucketStreamAggregatorState aggregatorState;
     private final int partition;

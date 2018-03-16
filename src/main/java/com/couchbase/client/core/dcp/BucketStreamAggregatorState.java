@@ -22,6 +22,9 @@
 
 package com.couchbase.client.core.dcp;
 
+import com.couchbase.client.core.annotations.InterfaceAudience;
+import com.couchbase.client.core.annotations.InterfaceStability;
+import rx.Observable;
 import rx.subjects.PublishSubject;
 
 import java.util.Arrays;
@@ -34,7 +37,10 @@ import java.util.NoSuchElementException;
  * It basically contains list of the stream states.
  *
  * @author Sergey Avseyev
+ * @since 1.2.0
  */
+@InterfaceStability.Experimental
+@InterfaceAudience.Public
 public class BucketStreamAggregatorState implements Iterable<BucketStreamState> {
     /**
      * Default state, which matches all changes in the stream.
@@ -72,7 +78,7 @@ public class BucketStreamAggregatorState implements Iterable<BucketStreamState> 
     /**
      * @return subject where all state updates posted.
      */
-    public PublishSubject<BucketStreamStateUpdatedEvent> updates() {
+    public Observable<BucketStreamStateUpdatedEvent> updates() {
         return updates;
     }
 
