@@ -23,9 +23,6 @@ package com.couchbase.client.core.node;
 
 import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.env.CoreEnvironment;
-import com.couchbase.client.core.event.EventBus;
-import com.couchbase.client.core.event.system.NodeConnectedEvent;
-import com.couchbase.client.core.event.system.NodeDisconnectedEvent;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -77,11 +74,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     private final CoreEnvironment environment;
 
     /**
-     * The event bus to publish events onto.
-     */
-    private final EventBus eventBus;
-
-    /**
      * The {@link ResponseEvent} {@link RingBuffer}.
      */
     private final RingBuffer<ResponseEvent> responseBuffer;
@@ -107,7 +99,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.serviceRegistry = registry;
         this.environment = environment;
         this.responseBuffer = responseBuffer;
-        this.eventBus = environment.eventBus();
         this.serviceStates = new ConcurrentHashMap<Service, LifecycleState>();
     }
 
@@ -210,19 +201,12 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
                 if (newState == LifecycleState.CONNECTED) {
                     if (!connected) {
                         LOGGER.info("Connected to Node " + hostname.getHostName());
-
-                        if (eventBus !=  null) {
-                            eventBus.publish(new NodeConnectedEvent(hostname));
-                        }
                     }
                     connected = true;
                     LOGGER.debug("Connected (" + state() + ") to Node " + hostname);
                 } else if (newState == LifecycleState.DISCONNECTED) {
                     if (connected) {
                         LOGGER.info("Disconnected from Node " + hostname.getHostName());
-                        if (eventBus != null) {
-                            eventBus.publish(new NodeDisconnectedEvent(hostname));
-                        }
                     }
                     connected = false;
                     LOGGER.debug("Disconnected (" + state() + ") from Node " + hostname);
