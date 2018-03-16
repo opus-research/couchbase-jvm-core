@@ -56,14 +56,12 @@ import com.couchbase.client.core.message.internal.RemoveServiceRequest;
 import com.couchbase.client.core.message.internal.RemoveServiceResponse;
 import com.couchbase.client.core.service.Service;
 import com.couchbase.client.core.state.LifecycleState;
-import com.couchbase.client.core.utils.Buffers;
 import com.lmax.disruptor.EventTranslatorOneArg;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
-import rx.functions.Func0;
 import rx.functions.Func1;
 
 import java.util.concurrent.Executors;
@@ -201,17 +199,7 @@ public class CouchbaseCore implements ClusterFacade {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <R extends CouchbaseResponse> Observable<R> send(final CouchbaseRequest request) {
-        return Buffers.wrapColdWithAutoRelease(Observable.defer(new Func0<Observable<R>>() {
-            @Override
-            public Observable<R> call() {
-                return sendHot(request);
-            }
-        }));
-    }
-
-    @SuppressWarnings("unchecked")
-    /* package */ <R extends CouchbaseResponse> Observable<R> sendHot(CouchbaseRequest request) {
+    public <R extends CouchbaseResponse> Observable<R> send(CouchbaseRequest request) {
         if (request instanceof InternalRequest) {
             handleInternalRequest(request);
             return (Observable<R>) request.observable().observeOn(environment.scheduler());
