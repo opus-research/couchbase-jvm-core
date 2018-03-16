@@ -127,12 +127,7 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             ViewQueryRequest queryMsg = (ViewQueryRequest) msg;
             path.append("/").append(msg.bucket()).append("/_design/");
             path.append(queryMsg.development() ? "dev_" + queryMsg.design() : queryMsg.design());
-            if (queryMsg.spatial()) {
-                path.append("/_spatial/");
-            } else {
-                path.append("/_view/");
-            }
-            path.append(queryMsg.view());
+            path.append("/_view/").append(queryMsg.view());
             if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
                 path.append("?").append(queryMsg.query());
             }
