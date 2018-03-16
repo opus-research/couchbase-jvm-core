@@ -31,6 +31,12 @@ public class DefaultMemcachedHashingStrategy implements MemcachedHashingStrategy
 
     @Override
     public String hash(final NodeInfo info, final int repetition) {
+
+        // Note: Michael N: We are using getHostName() here instead of getHostAddress() for backwards compatibility
+        // reasons, otherwise it would break with older clients. If someone runs into an issue, ask the user
+        // to move to the {@link LegacyMemcachedHashingStrategy} instead, which is more compatible with the
+        // other SDKs anyways.
+
         return info.hostname().getHostName() + "-" + repetition;
     }
 

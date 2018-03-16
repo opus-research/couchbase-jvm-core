@@ -216,6 +216,6 @@ public abstract class AbstractLoader implements Loader {
      * @return a replaced configuration.
      */
     protected String replaceHostWildcard(String input, InetAddress hostname) {
-        return input.replace("$HOST", hostname.getHostName());
+        return input.replace("$HOST", hostname.getHostAddress());
     }
 }

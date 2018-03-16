@@ -61,11 +61,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
     private static final CouchbaseLogger LOGGER = CouchbaseLoggerFactory.getInstance(Node.class);
 
     /**
-     * The threshold above which reverse DNS lookup is logged as being too slow (in milliseconds).
-     */
-    private static final long DNS_RESOLUTION_THRESHOLD = TimeUnit.SECONDS.toMillis(1);
-
-    /**
      * The hostname or IP address of the node.
      */
     private final InetAddress hostname;
@@ -114,14 +109,6 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         this.eventBus = environment.eventBus();
         this.serviceStates = new ServiceStateZipper(LifecycleState.DISCONNECTED);
 
-        //JVMCBC-229: eagerly trigger and time a reverse DNS lookup
-        long lookupStart = System.nanoTime();
-        String lookupResult = hostname.getHostName();
-        long lookupDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lookupStart);
-        if (lookupDurationMs >= DNS_RESOLUTION_THRESHOLD) {
-            LOGGER.warn("DNS Reverse Lookup of " + lookupResult + " is slow, took " + lookupDurationMs + "ms");
-        }
-
         serviceStates.states().subscribe(new Action1<LifecycleState>() {
             @Override
             public void call(LifecycleState newState) {
@@ -160,7 +147,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * Log that this node is now connected and also inform all susbcribers on the event bus.
      */
     private void signalConnected() {
-        LOGGER.info("Connected to Node " + hostname.getHostName());
+        LOGGER.info("Connected to Node " + hostname.getHostAddress());
         if (eventBus != null && eventBus.hasSubscribers()) {
             eventBus.publish(new NodeConnectedEvent(hostname));
         }
@@ -170,7 +157,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * Log that this node is now disconnected and also inform all susbcribers on the event bus.
      */
     private void signalDisconnected() {
-        LOGGER.info("Disconnected from Node " + hostname.getHostName());
+        LOGGER.info("Disconnected from Node " + hostname.getHostAddress());
         if (eventBus != null && eventBus.hasSubscribers()) {
             eventBus.publish(new NodeDisconnectedEvent(hostname));
         }
@@ -252,7 +239,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
         }
 
         final Service service = ServiceFactory.create(
-            request.hostname().getHostName(),
+            request.hostname().getHostAddress(),
             request.bucket(),
             request.username(),
             request.password(),
@@ -300,7 +287,7 @@ public class CouchbaseNode extends AbstractStateMachine<LifecycleState> implemen
      * @return a prefix string for logs.
      */
     protected static String logIdent(final InetAddress hostname) {
-        return "[" + hostname.getHostName() + "]: ";
+        return "[" + hostname.getHostAddress() + "]: ";
     }
 
     @Override
