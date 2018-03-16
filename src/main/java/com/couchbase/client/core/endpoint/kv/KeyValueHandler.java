@@ -561,7 +561,7 @@ public class KeyValueHandler
             case ERR_TEMP_FAIL:
                 return ResponseStatus.TEMPORARY_FAILURE;
             case ERR_BUSY:
-                return ResponseStatus.SERVER_BUSY;
+                return ResponseStatus.TEMPORARY_FAILURE;
             case ERR_NO_MEM:
                 return ResponseStatus.OUT_OF_MEMORY;
             case ERR_UNKNOWN_COMMAND:
