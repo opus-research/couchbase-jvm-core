@@ -65,6 +65,8 @@ import java.util.Queue;
  */
 public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest, ViewRequest> {
 
+    private static final int MAX_GET_LENGTH = 2048;
+
     private static final byte QUERY_STATE_INITIAL = 0;
     private static final byte QUERY_STATE_ROWS = 1;
     private static final byte QUERY_STATE_INFO = 2;
@@ -128,8 +130,38 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             path.append("/").append(msg.bucket()).append("/_design/");
             path.append(queryMsg.development() ? "dev_" + queryMsg.design() : queryMsg.design());
             path.append("/_view/").append(queryMsg.view());
-            if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
-                path.append("?").append(queryMsg.query());
+
+            int queryLength = queryMsg.query() == null ? 0 : queryMsg.query().length();
+            int keysLength = queryMsg.keys() == null ? 0 : queryMsg.keys().length();
+            boolean hasQuery = queryLength > 0;
+            boolean hasKeys = keysLength > 0;
+
+            if (hasQuery || hasKeys) {
+                if (queryLength + keysLength < MAX_GET_LENGTH) {
+                    //the query is short enough for GET
+                    //it has query, query+keys or keys only
+                    if (hasQuery) {
+                        path.append("?").append(queryMsg.query());
+                        if (hasKeys) {
+                            path.append("&keys=").append(encodeKeysGet(queryMsg.keys()));
+                        }
+                    } else {
+                        //it surely has keys if not query
+                        path.append("?keys=").append(encodeKeysGet(queryMsg.keys()));
+                    }
+                } else {
+                    //the query is too long for GET, use the keys as JSON body
+                    if (hasQuery) {
+                        path.append("?").append(queryMsg.query());
+                    }
+                    String keysContent = encodeKeysPost(queryMsg.keys());
+
+                    //switch to POST
+                    method = HttpMethod.POST;
+                    //body is "keys" but in JSON
+                    content = ctx.alloc().buffer(keysContent.length());
+                    content.writeBytes(keysContent.getBytes(CHARSET));
+                }
             }
         } else if (msg instanceof GetDesignDocumentRequest) {
             GetDesignDocumentRequest queryMsg = (GetDesignDocumentRequest) msg;
@@ -161,6 +193,24 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         addAuth(ctx, request, msg.bucket(), msg.password());
 
         return request;
+    }
+
+    /**
+     * Encodes the "keys" JSON array into a JSON object suitable for a POST body on query service.
+     */
+    private String encodeKeysPost(String keys) {
+        return "{\"keys\":" + keys + "}";
+    }
+
+    /**
+     * Encodes the "keys" JSON array into an URL-encoded form suitable for a GET on query service.
+     */
+    private String encodeKeysGet(String keys) {
+        try {
+            return URLEncoder.encode(keys, "UTF-8");
+        } catch(Exception ex) {
+            throw new RuntimeException("Could not prepare view argument: " + ex);
+        }
     }
 
     @Override

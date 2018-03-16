@@ -30,17 +30,37 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
     private final String design;
     private final String view;
     private final String query;
+    private final String keysJson;
     private final boolean development;
 
-    public ViewQueryRequest(String design, String view, boolean development, String bucket, String password) {
-        this(design, view, development, null, bucket, password);
+    /**
+     * @param design the name of the design document.
+     * @param view the name of the view.
+     * @param development true if development mode.
+     * @param query the query parameters, except "keys".
+     * @param keys the "keys" parameter as a JSON array, null if not needed.
+     * @param bucket the bucket name.
+     * @param password the bucket password.
+     */
+    public ViewQueryRequest(String design, String view, boolean development, String query, String keys, String bucket, String password) {
+        this(design, view, development, query, keys, bucket, password);
     }
 
-    public ViewQueryRequest(String design, String view, boolean development, String query, String bucket, String password) {
-        super(bucket, password, ReplaySubject.<CouchbaseResponse>create());
+    /**
+     * @param design the name of the design document.
+     * @param view the name of the view.
+     * @param development true if development mode.
+     * @param query the query parameters, except "keys".
+     * @param keys the "keys" parameter as a JSON array, null if not needed.
+     * @param bucket the bucket name.
+     * @param password the bucket password.
+     */
+    public ViewQueryRequest(String design, String view, boolean development, String query, String keys, String bucket, String password) {
+        super(bucket, password);
         this.design = design;
         this.view = view;
         this.query = query;
+        this.keysJson = keys;
         this.development = development;
     }
 
@@ -54,6 +74,13 @@ public class ViewQueryRequest extends AbstractCouchbaseRequest implements ViewRe
 
     public String query() {
         return query;
+    }
+
+    /***
+     * @return the keys parameter as a JSON array String.
+     */
+    public String keys() {
+        return keysJson;
     }
 
     public boolean development() {
