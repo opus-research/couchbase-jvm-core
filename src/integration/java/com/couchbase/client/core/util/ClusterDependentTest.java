@@ -58,13 +58,11 @@ public class ClusterDependentTest {
     private static final String seedNode = TestProperties.seedNode();
     private static final String bucket = TestProperties.bucket();
     private static final String password = TestProperties.password();
-    private static final String adminUser = TestProperties.adminUser();
-    private static final String adminPassword = TestProperties.adminPassword();
 
     private static final CoreEnvironment env = DefaultCoreEnvironment
             .builder()
             .dcpEnabled(true)
-            .mutationMetadataEnabled(true)
+            .tcpNodelayEnabled(false)
             .build();
 
     private static ClusterFacade cluster;
@@ -111,18 +109,10 @@ public class ClusterDependentTest {
      */
     public static boolean isDCPEnabled() throws Exception {
         ClusterConfigResponse response = cluster()
-            .<ClusterConfigResponse>send(new ClusterConfigRequest(adminUser, adminPassword))
+            .<ClusterConfigResponse>send(new ClusterConfigRequest("Administrator", "password"))
             .toBlocking()
             .single();
         return minNodeVersionFromConfig(response.config()) >= 3;
-    }
-
-    public static boolean isMutationMetadataEnabled() throws Exception {
-        ClusterConfigResponse response = cluster()
-                .<ClusterConfigResponse>send(new ClusterConfigRequest(adminUser, adminPassword))
-                .toBlocking()
-                .single();
-        return minNodeVersionFromConfig(response.config()) >= 4;
     }
 
     private static Integer minNodeVersionFromConfig(String rawConfig) throws Exception {
