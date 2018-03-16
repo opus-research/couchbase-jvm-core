@@ -34,7 +34,8 @@ import io.netty.buffer.ByteBuf;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-public class MutationMessage extends AbstractDCPMessage {
+public class MutationMessage extends AbstractDCPRequest {
+    private final String key;
     private final ByteBuf content;
     private final int expiration;
     private final int flags;
@@ -53,7 +54,9 @@ public class MutationMessage extends AbstractDCPMessage {
     public MutationMessage(short partition, String key, ByteBuf content, int expiration,
                            long bySequenceNumber, long revisionSequenceNumber,
                            int flags, int lockTime, long cas, String bucket, String password) {
-        super(partition, key, bucket, password);
+        super(bucket, password);
+        this.partition(partition);
+        this.key = key;
         this.content = content;
         this.expiration = expiration;
         this.flags = flags;
@@ -61,6 +64,10 @@ public class MutationMessage extends AbstractDCPMessage {
         this.cas = cas;
         this.bySequenceNumber = bySequenceNumber;
         this.revisionSequenceNumber = revisionSequenceNumber;
+    }
+
+    public String key() {
+        return key;
     }
 
     public ByteBuf content() {
@@ -94,7 +101,7 @@ public class MutationMessage extends AbstractDCPMessage {
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("MutationMessage{");
-        sb.append("key='").append(key()).append('\'');
+        sb.append("key='").append(key).append('\'');
         sb.append(", content=").append(content);
         sb.append(", expiration=").append(expiration);
         sb.append(", flags=").append(flags);
