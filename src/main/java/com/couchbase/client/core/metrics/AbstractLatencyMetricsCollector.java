@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * The default abstract implementation for a latency metrics collector.
@@ -39,34 +38,21 @@ public abstract class AbstractLatencyMetricsCollector<I extends LatencyMetricsId
     extends AbstractMetricsCollector
     implements LatencyMetricsCollector<I> {
 
-    private final static Object PAUSE_DETECTOR_LOCK = new Object();
-    private static int pauseDetectorCount = 0;
-    private static PauseDetector staticPauseDetector;
+    private static final PauseDetector PAUSE_DETECTOR = new SimplePauseDetector(
+        TimeUnit.MILLISECONDS.toNanos(10),
+        TimeUnit.MILLISECONDS.toNanos(10),
+        3
+    );
 
-    private static PauseDetector acquirePauseDetector() {
-        synchronized (PAUSE_DETECTOR_LOCK) {
-            if (pauseDetectorCount++ == 0) {
-                staticPauseDetector = new SimplePauseDetector(
-                    TimeUnit.MILLISECONDS.toNanos(10),
-                    TimeUnit.MILLISECONDS.toNanos(10),
-                    3
-                );
+    static {
+        LatencyStats.setDefaultPauseDetector(PAUSE_DETECTOR);
+        Runtime.getRuntime().addShutdownHook(new Thread("cb-shutdown-pd") {
+            @Override
+            public void run() {
+                PAUSE_DETECTOR.shutdown();
             }
-            return staticPauseDetector;
-        }
+        });
     }
-
-    private static void releasePauseDetector() {
-        synchronized (PAUSE_DETECTOR_LOCK) {
-            if (--pauseDetectorCount == 0) {
-                staticPauseDetector.shutdown();
-                staticPauseDetector = null; // help GC
-            }
-        }
-    }
-
-    private final PauseDetector pauseDetector;
-    private final AtomicBoolean pauseDetectorHeld;
 
     private final Map<I, LatencyStats> latencyMetrics;
     private final LatencyMetricsCollectorConfig config;
@@ -75,8 +61,7 @@ public abstract class AbstractLatencyMetricsCollector<I extends LatencyMetricsId
         super(eventBus, scheduler, config);
         this.config = config;
         latencyMetrics = new ConcurrentHashMap<I, LatencyStats>();
-        pauseDetector = acquirePauseDetector();
-        pauseDetectorHeld = new AtomicBoolean(true);
+
     }
 
     protected abstract E generateLatencyMetricsEvent(Map<I, LatencyStats> latencyMetrics);
@@ -94,18 +79,10 @@ public abstract class AbstractLatencyMetricsCollector<I extends LatencyMetricsId
 
         LatencyStats metric = latencyMetrics.get(identifier);
         if (metric == null) {
-            metric = LatencyStats.Builder.create().pauseDetector(pauseDetector).build();
+            metric = new LatencyStats();
             latencyMetrics.put(identifier, metric);
         }
         metric.recordLatency(latency);
-    }
-
-    @Override
-    public boolean shutdown() {
-        if (pauseDetectorHeld.compareAndSet(true, false)) {
-            releasePauseDetector();
-        }
-        return super.shutdown();
     }
 
     @Override
