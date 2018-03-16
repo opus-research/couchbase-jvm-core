@@ -24,7 +24,6 @@ package com.couchbase.client.core.message.dcp;
 
 import com.couchbase.client.core.annotations.InterfaceAudience;
 import com.couchbase.client.core.annotations.InterfaceStability;
-import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 
 /**
  * Snapshot marker.
@@ -38,7 +37,7 @@ import com.couchbase.client.core.endpoint.dcp.DCPConnection;
  */
 @InterfaceStability.Experimental
 @InterfaceAudience.Private
-public class SnapshotMarkerMessage extends AbstractDCPMessage {
+public class SnapshotMarkerMessage extends AbstractDCPRequest {
     public static final int MEMORY = 0x01;
     public static final int DISK = 0x02;
     public static final int CHECKPOINT = 0x04;
@@ -49,7 +48,7 @@ public class SnapshotMarkerMessage extends AbstractDCPMessage {
 
     /**
      * Specifies binary representation of flags.
-     *
+     * <p/>
      * Note: use boolean accessors for clarity and readability
      */
     private final int flags;
@@ -73,14 +72,14 @@ public class SnapshotMarkerMessage extends AbstractDCPMessage {
      */
     private final boolean ack;
 
-    public SnapshotMarkerMessage(DCPConnection connection, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket) {
-        this(connection, totalBodyLength, partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
+        this(partition, startSequenceNumber, endSequenceNumber, flags, bucket, null);
     }
 
-    public SnapshotMarkerMessage(DCPConnection connection, int totalBodyLength, short partition, long startSequenceNumber, long endSequenceNumber,
+    public SnapshotMarkerMessage(short partition, long startSequenceNumber, long endSequenceNumber,
                                  int flags, String bucket, String password) {
-        super(connection, totalBodyLength, partition, null, bucket, password);
+        super(bucket, password);
         partition(partition);
         this.startSequenceNumber = startSequenceNumber;
         this.endSequenceNumber = endSequenceNumber;

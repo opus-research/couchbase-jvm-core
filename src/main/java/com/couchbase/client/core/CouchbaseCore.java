@@ -150,9 +150,9 @@ public class CouchbaseCore implements ClusterFacade {
             environment.responseBufferSize(),
             disruptorExecutor
         );
-        responseDisruptor.handleExceptionsWith(new ExceptionHandler<ResponseEvent>() {
+        responseDisruptor.handleExceptionsWith(new ExceptionHandler() {
             @Override
-            public void handleEventException(Throwable ex, long sequence, ResponseEvent event) {
+            public void handleEventException(Throwable ex, long sequence, Object event) {
                 LOGGER.warn("Exception while Handling Response Events {}", event, ex);
             }
 
@@ -176,9 +176,9 @@ public class CouchbaseCore implements ClusterFacade {
             disruptorExecutor
         );
         requestHandler = new RequestHandler(environment, configProvider.configs(), responseRingBuffer);
-        requestDisruptor.handleExceptionsWith(new ExceptionHandler<RequestEvent>() {
+        requestDisruptor.handleExceptionsWith(new ExceptionHandler() {
             @Override
-            public void handleEventException(Throwable ex, long sequence, RequestEvent event) {
+            public void handleEventException(Throwable ex, long sequence, Object event) {
                 LOGGER.warn("Exception while Handling Request Events {}", event, ex);
             }
 
