@@ -63,7 +63,6 @@ import io.netty.util.CharsetUtil;
 import rx.Scheduler;
 import rx.subjects.AsyncSubject;
 
-import java.net.URLEncoder;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
@@ -136,6 +135,40 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         super(endpoint, responseBuffer, queue, isTransient);
     }
 
+    /**
+     * A utility method to split a GET-like query String into a {@link Tuple2} of Strings if size
+     * of the original gets above a threshold. If not, the original String is returned as value1
+     * of the tuple, and value2 is null. Otherwise, value1 is the original query string minus a "keys"
+     * parameter, and value2 is a json representation of the keys parameter.
+     *
+     * @param queryString the GET-like query string to process if length is above threshold.
+     * @param splitThreshold the size processing threshold.
+     * @return a {@link Tuple2} with keys parameter isolated in value2 as a JSON object.
+     */
+    protected Tuple2<String, String> extractKeysFromQueryString(String queryString, int splitThreshold) {
+        if (queryString.length() < splitThreshold) {
+            return Tuple.create(queryString, null);
+        }
+
+        //split
+        String[] params = queryString.split("&");
+        StringBuilder reworkedQueryParams = new StringBuilder();
+        StringBuilder keys = new StringBuilder(queryString.length());
+        for (String param : params) {
+            if (param.startsWith("keys=")) {
+                keys.append("{\"keys\":").append(param.substring(5)).append('}');
+            } else {
+                reworkedQueryParams.append(param).append('&');
+            }
+        }
+        //eliminate last & in reworkedQueryParams
+        if (reworkedQueryParams.length() > 0) {
+            reworkedQueryParams.deleteCharAt(reworkedQueryParams.length() - 1);
+        }
+
+        return Tuple.create(reworkedQueryParams.toString(), keys.toString());
+    }
+
     @Override
     protected HttpRequest encodeRequest(final ChannelHandlerContext ctx, final ViewRequest msg) throws Exception {
         if (msg instanceof KeepAliveRequest) {
@@ -162,25 +195,19 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             path.append(queryMsg.view());
 
             if (queryMsg.query() != null && !queryMsg.query().isEmpty()) {
-                boolean hasKeys = queryMsg.keys() != null && !queryMsg.keys().trim().isEmpty();
-
-                if (!hasKeys) {
-                    //the query is short enough for GET, because it doesn't have keys
+                Tuple2<String, String> splitIfPostNeeded = extractKeysFromQueryString(
+                        queryMsg.query(), MAX_GET_LENGTH);
+                if (splitIfPostNeeded.value2() == null) {
+                    //the query is short enough for GET
                     path.append("?").append(queryMsg.query());
-                } else if (hasKeys && queryMsg.keys().length() + queryMsg.query().length() < MAX_GET_LENGTH) {
-                    //the query has keys but is short enough for GET
-                    path.append("?").append(queryMsg.query());
-                    path.append("&keys=").append(encodeKeysGet(queryMsg.keys()));
                 } else {
-                    //the query has keys which makes it too long for GET
-                    path.append("?").append(queryMsg.query());
-                    String keysContent = encodeKeysPost(queryMsg.keys());
-
                     //switch to POST
                     method = HttpMethod.POST;
+                    //parameter string is the reworked one
+                    path.append('?').append(splitIfPostNeeded.value1());
                     //body is "keys" but in JSON
-                    content = ctx.alloc().buffer(keysContent.length());
-                    content.writeBytes(keysContent.getBytes(CHARSET));
+                    content = ctx.alloc().buffer(splitIfPostNeeded.value2().length());
+                    content.writeBytes(splitIfPostNeeded.value2().getBytes(CHARSET));
                 }
             }
         } else if (msg instanceof GetDesignDocumentRequest) {
@@ -213,24 +240,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         addAuth(ctx, request, msg.bucket(), msg.password());
 
         return request;
-    }
-
-    /**
-     * Encodes the "keys" JSON array into a JSON object suitable for a POST body on query service.
-     */
-    private String encodeKeysPost(String keys) {
-        return "{\"keys\":" + keys + "}";
-    }
-
-    /**
-     * Encodes the "keys" JSON array into an URL-encoded form suitable for a GET on query service.
-     */
-    private String encodeKeysGet(String keys) {
-        try {
-            return URLEncoder.encode(keys, "UTF-8");
-        } catch(Exception ex) {
-            throw new RuntimeException("Could not prepare view argument: " + ex);
-        }
     }
 
     @Override
