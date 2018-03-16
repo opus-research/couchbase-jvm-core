@@ -15,10 +15,7 @@
  */
 package com.couchbase.client.core.message;
 
-import com.couchbase.client.core.annotations.InterfaceAudience;
-import com.couchbase.client.core.annotations.InterfaceStability;
 import com.couchbase.client.core.time.Delay;
-import rx.Subscriber;
 import rx.subjects.Subject;
 
 import java.util.Observable;
@@ -112,17 +109,4 @@ public interface CouchbaseRequest extends CouchbaseMessage {
      * @return delay
      */
     Delay retryDelay();
-    /**
-     * Checks if the request is unsubscribed on a timeout
-     *
-     * @return false if timed out, else true
-     */
-    @InterfaceAudience.Private
-    boolean isActive();
-
-    /**
-     * Optionally add subscriber to check for the timeouts
-     */
-    @InterfaceAudience.Private
-    void subscriber(Subscriber subscriber);
 }
