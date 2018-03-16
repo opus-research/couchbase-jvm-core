@@ -72,11 +72,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     public static final boolean SSL_ENABLED = false;
     public static final String SSL_KEYSTORE_FILE = null;
-    public static final String SSL_TRUSTSTORE_FILE = null;
     public static final String SSL_KEYSTORE_PASSWORD = null;
-    public static final String SSL_TRUSTSTORE_PASSWORD = null;
     public static final KeyStore SSL_KEYSTORE = null;
-    public static final KeyStore SSL_TRUSTSTORE = null;
     public static final boolean BOOTSTRAP_HTTP_ENABLED = true;
     public static final boolean BOOTSTRAP_CARRIER_ENABLED = true;
     public static final int BOOTSTRAP_HTTP_DIRECT_PORT = 8091;
@@ -183,11 +180,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
     private final boolean sslEnabled;
     private final String sslKeystoreFile;
-    private final String sslTruststoreFile;
     private final String sslKeystorePassword;
-    private final String sslTruststorePassword;
     private final KeyStore sslKeystore;
-    private final KeyStore sslTruststore;
     private final boolean bootstrapHttpEnabled;
     private final boolean bootstrapCarrierEnabled;
     private final int bootstrapHttpDirectPort;
@@ -266,9 +260,7 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         sslEnabled = booleanPropertyOr("sslEnabled", builder.sslEnabled);
         sslKeystoreFile = stringPropertyOr("sslKeystoreFile", builder.sslKeystoreFile);
-        sslTruststoreFile = stringPropertyOr("sslTruststoreFile", builder.sslTruststoreFile);
         sslKeystorePassword = stringPropertyOr("sslKeystorePassword", builder.sslKeystorePassword);
-        sslTruststorePassword = stringPropertyOr("sslTruststorePassword", builder.sslTruststorePassword);
         bootstrapHttpEnabled = booleanPropertyOr("bootstrapHttpEnabled", builder.bootstrapHttpEnabled);
         bootstrapHttpDirectPort = intPropertyOr("bootstrapHttpDirectPort", builder.bootstrapHttpDirectPort);
         bootstrapHttpSslPort = intPropertyOr("bootstrapHttpSslPort", builder.bootstrapHttpSslPort);
@@ -299,7 +291,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         callbacksOnIoPool = booleanPropertyOr("callbacksOnIoPool", builder.callbacksOnIoPool);
         disconnectTimeout = longPropertyOr("disconnectTimeout", builder.disconnectTimeout);
         sslKeystore = builder.sslKeystore;
-        sslTruststore = builder.sslTruststore;
         memcachedHashingStrategy = builder.memcachedHashingStrategy;
         configPollInterval = longPropertyOr("configPollInterval", builder.configPollInterval);
         certAuthEnabled = booleanPropertyOr("certAuthEnabled", builder.certAuthEnabled);
@@ -641,21 +632,6 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     }
 
     @Override
-    public String sslTruststoreFile() {
-        return sslTruststoreFile;
-    }
-
-    @Override
-    public KeyStore sslTruststore() {
-        return sslTruststore;
-    }
-
-    @Override
-    public String sslTruststorePassword() {
-        return sslTruststorePassword;
-    }
-
-    @Override
     public boolean bootstrapHttpEnabled() {
         return bootstrapHttpEnabled;
     }
@@ -915,11 +891,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
 
         private boolean sslEnabled = SSL_ENABLED;
         private String sslKeystoreFile = SSL_KEYSTORE_FILE;
-        private String sslTruststoreFile = SSL_TRUSTSTORE_FILE;
         private String sslKeystorePassword = SSL_KEYSTORE_PASSWORD;
-        private String sslTruststorePassword = SSL_TRUSTSTORE_PASSWORD;
         private KeyStore sslKeystore = SSL_KEYSTORE;
-        private KeyStore sslTruststore = SSL_TRUSTSTORE;
         private String userAgent = USER_AGENT;
         private String packageNameAndVersion = PACKAGE_NAME_AND_VERSION;
         private boolean bootstrapHttpEnabled = BOOTSTRAP_HTTP_ENABLED;
@@ -996,29 +969,11 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         /**
          * Defines the location of the SSL Keystore file (default value null, none).
          *
-         * If this method is used without also specifying
-         * {@link #sslTruststoreFile(String)} this keystore will be used to initialize
-         * both the key factory as well as the trust factory with java SSL. This
-         * needs to be the case for backwards compatibility, but if you do not need
-         * X.509 client cert authentication you might as well just use {@link #sslTruststoreFile(String)}
-         * alone.
+         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
+         * keystore is used it takes precedence over the file approach.
          */
         public Builder sslKeystoreFile(final String sslKeystoreFile) {
             this.sslKeystoreFile = sslKeystoreFile;
-            return this;
-        }
-
-        /**
-         * Defines the location of the SSL TrustStore keystore file (default value null, none).
-         *
-         * If this method is used without also specifying
-         * {@link #sslKeystoreFile(String)} this keystore will be used to initialize
-         * both the key factory as well as the trust factory with java SSL. Prefer
-         * this method over the {@link #sslKeystoreFile(String)} if you do not need
-         * X.509 client auth and just need server side certificate checking.
-         */
-        public Builder sslTruststoreFile(final String sslTruststoreFile) {
-            this.sslTruststoreFile = sslTruststoreFile;
             return this;
         }
 
@@ -1033,45 +988,15 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
         }
 
         /**
-         * Sets the SSL TrustStore password to be used with the Keystore file (default value null, none).
-         *
-         * @see #sslKeystoreFile(String)
-         */
-        public Builder sslTruststorePassword(final String sslTruststorePassword) {
-            this.sslTruststorePassword = sslTruststorePassword;
-            return this;
-        }
-
-        /**
          * Sets the SSL Keystore directly and not indirectly via filepath.
          *
-         * If this method is used without also specifying
-         * {@link #sslTruststore(KeyStore)} this keystore will be used to initialize
-         * both the key factory as well as the trust factory with java SSL. This
-         * needs to be the case for backwards compatibility, but if you do not need
-         * X.509 client cert authentication you might as well just use {@link #sslTruststore(KeyStore)}
-         * alone.
+         * You can either specify a file or the keystore directly via {@link #sslKeystore(KeyStore)}. If the explicit
+         * keystore is used it takes precedence over the file approach.
          *
          * @param sslKeystore the keystore to use.
          */
         public Builder sslKeystore(final KeyStore sslKeystore) {
             this.sslKeystore = sslKeystore;
-            return this;
-        }
-
-        /**
-         * Sets the SSL Keystore for the TrustStore directly and not indirectly via filepath.
-         *
-         * If this method is used without also specifying
-         * {@link #sslKeystore(KeyStore)} this keystore will be used to initialize
-         * both the key factory as well as the trust factory with java SSL. Prefer
-         * this method over the {@link #sslKeystore(KeyStore)} if you do not need
-         * X.509 client auth and just need server side certificate checking.
-         *
-         * @param sslTruststore the keystore to use.
-         */
-        public Builder sslTruststore(final KeyStore sslTruststore) {
-            this.sslTruststore = sslTruststore;
             return this;
         }
 
@@ -1660,11 +1585,8 @@ public class DefaultCoreEnvironment implements CoreEnvironment {
     protected StringBuilder dumpParameters(StringBuilder sb) {
         sb.append("sslEnabled=").append(sslEnabled);
         sb.append(", sslKeystoreFile='").append(sslKeystoreFile).append('\'');
-        sb.append(", sslTruststoreFile='").append(sslTruststoreFile).append('\'');
         sb.append(", sslKeystorePassword=").append(sslKeystorePassword != null && !sslKeystorePassword.isEmpty());
-        sb.append(", sslTruststorePassword=").append(sslTruststorePassword != null && !sslTruststorePassword.isEmpty());
         sb.append(", sslKeystore=").append(sslKeystore);
-        sb.append(", sslTruststore=").append(sslTruststore);
         sb.append(", bootstrapHttpEnabled=").append(bootstrapHttpEnabled);
         sb.append(", bootstrapCarrierEnabled=").append(bootstrapCarrierEnabled);
         sb.append(", bootstrapHttpDirectPort=").append(bootstrapHttpDirectPort);
