@@ -164,6 +164,12 @@ public class KeyValueHandler
      */
     public static final byte SUBDOC_FLAG_XATTR_PATH = (byte) 0x04;
 
+    /**
+     * The bitmask for sub-document create document
+     */
+    public static final byte SUBDOC_FLAG_MKDOC = (byte) 0x1;
+
+
     boolean seqOnMutation = false;
 
 
@@ -585,7 +591,7 @@ public class KeyValueHandler
             if (mut.createIntermediaryPath()) {
                 flags |= SUBDOC_BITMASK_MKDIR_P;
             }
-            if (mut.attributeAccess()) {
+            if (mut.xattr()) {
                 flags |= SUBDOC_FLAG_XATTR_PATH;
             }
             extras.writeByte(flags);
@@ -598,14 +604,14 @@ public class KeyValueHandler
             cas = mut.cas();
         } else if (msg instanceof SubGetRequest) {
             SubGetRequest req =  (SubGetRequest)msg;
-            if (req.attributeAccess()) {
+            if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
                 extras.writeByte(0);
             }
         } else if (msg instanceof SubExistRequest) {
             SubExistRequest req =  (SubExistRequest)msg;
-            if (req.attributeAccess()) {
+            if (req.xattr()) {
                 extras.writeByte(SUBDOC_FLAG_XATTR_PATH);
             } else {
                 extras.writeByte(0);
@@ -645,10 +651,23 @@ public class KeyValueHandler
 
         byte extrasLength = 0;
         ByteBuf extras = Unpooled.EMPTY_BUFFER;
+
         if (msg.expiration() != 0L) {
             extrasLength = 4;
-            extras = ctx.alloc().buffer(4, 4);
-            extras.writeInt(msg.expiration());
+        }
+
+        if (msg.docFlags() != 0) {
+            extrasLength += 1;
+        }
+
+        if (extrasLength > 0) {
+            extras = ctx.alloc().buffer(extrasLength, extrasLength);
+            if (msg.expiration() != 0L) {
+                extras.writeInt(msg.expiration());
+            }
+            if (msg.docFlags() != 0) {
+                extras.writeByte(msg.docFlags());
+            }
         }
 
         FullBinaryMemcacheRequest request = new DefaultFullBinaryMemcacheRequest(key, extras, msg.content());

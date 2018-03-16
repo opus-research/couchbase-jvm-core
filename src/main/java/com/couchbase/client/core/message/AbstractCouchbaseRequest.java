@@ -15,7 +15,6 @@
  */
 package com.couchbase.client.core.message;
 
-import rx.Subscriber;
 import rx.subjects.AsyncSubject;
 import rx.subjects.Subject;
 
@@ -51,11 +50,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
      * The time when the request was created.
      */
     private final long creationTime;
-
-    /**
-     * Additional subscriber information to check if the request has timed out
-     */
-    private Subscriber subscriber;
 
     private volatile int retryCount;
 
@@ -148,20 +142,6 @@ public abstract class AbstractCouchbaseRequest implements CouchbaseRequest {
     @Override
     public int retryCount() {
         return retryCount;
-    }
-
-    @Override
-    public boolean isTimedOut() {
-        if (this.subscriber != null) {
-            return this.subscriber.isUnsubscribed();
-        } else {
-            return false;
-        }
-    }
-
-    @Override
-    public void addSubscriber(Subscriber subscriber) {
-        this.subscriber = subscriber;
     }
 
     @Override
