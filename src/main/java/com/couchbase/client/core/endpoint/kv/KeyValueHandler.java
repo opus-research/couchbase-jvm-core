@@ -436,6 +436,7 @@ public class KeyValueHandler extends AbstractGenericHandler<FullBinaryMemcacheRe
                 + msg.getClass());
         }
 
+        finishedDecoding();
         return response;
     }
 
