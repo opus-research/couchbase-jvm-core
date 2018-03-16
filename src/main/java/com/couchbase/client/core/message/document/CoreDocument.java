@@ -19,30 +19,55 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.message.binary;
+package com.couchbase.client.core.message.document;
 
-import com.couchbase.client.core.message.document.CoreDocument;
+import io.netty.buffer.ByteBuf;
 
 /**
- * Insert a document.
+ * Core document to transfer content and flags between Couchbase client and Couchbase core io.
  *
- * @author Michael Nitschinger
  * @author David Sondermann
  * @since 2.0
  */
-public class InsertRequest extends AbstractCoreDocumentBinaryRequest
+public class CoreDocument
 {
+	private final ByteBuf content;
+	private final int flags;
+	private final int expiration;
+	private final long cas;
+	private final boolean json;
 
-	/**
-	 * Creates a new {@link InsertRequest}.
-	 *
-	 * @param key      the key of the document.
-	 * @param document the document.
-	 * @param bucket   the name of the bucket.
-	 */
-	public InsertRequest(final String key, final CoreDocument document, final String bucket)
+	public CoreDocument(final ByteBuf content, final int flags, final int expiration, final long cas, final boolean json)
 	{
-		super(key, document, bucket);
+		this.content = content;
+		this.flags = flags;
+		this.expiration = expiration;
+		this.cas = cas;
+		this.json = json;
 	}
 
+	public ByteBuf content()
+	{
+		return content;
+	}
+
+	public int flags()
+	{
+		return flags;
+	}
+
+	public int expiration()
+	{
+		return expiration;
+	}
+
+	public long cas()
+	{
+		return cas;
+	}
+
+	public boolean isJson()
+	{
+		return json;
+	}
 }

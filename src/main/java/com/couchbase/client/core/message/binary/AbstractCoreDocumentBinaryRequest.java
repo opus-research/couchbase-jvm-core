@@ -26,23 +26,38 @@ import com.couchbase.client.core.message.document.CoreDocument;
 /**
  * Insert a document.
  *
- * @author Michael Nitschinger
  * @author David Sondermann
  * @since 2.0
  */
-public class InsertRequest extends AbstractCoreDocumentBinaryRequest
+public abstract class AbstractCoreDocumentBinaryRequest extends AbstractBinaryRequest
 {
 
 	/**
-	 * Creates a new {@link InsertRequest}.
+	 * The document to insert.
+	 */
+	private final CoreDocument document;
+
+	/**
+	 * Creates a new {@link AbstractCoreDocumentBinaryRequest}.
 	 *
 	 * @param key      the key of the document.
 	 * @param document the document.
 	 * @param bucket   the name of the bucket.
 	 */
-	public InsertRequest(final String key, final CoreDocument document, final String bucket)
+	public AbstractCoreDocumentBinaryRequest(final String key, final CoreDocument document, final String bucket)
 	{
-		super(key, document, bucket);
+		super(key, bucket, null);
+		this.document = document;
+	}
+
+	/**
+	 * Returns the document of this request.
+	 *
+	 * @return the document.
+	 */
+	public CoreDocument document()
+	{
+		return document;
 	}
 
 }

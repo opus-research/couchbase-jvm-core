@@ -19,45 +19,50 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALING
  * IN THE SOFTWARE.
  */
-package com.couchbase.client.core.message.view;
+package com.couchbase.client.core.message.binary;
 
 import com.couchbase.client.core.message.AbstractCouchbaseResponse;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.ResponseStatus;
+import com.couchbase.client.core.message.document.CoreDocument;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.CharsetUtil;
 
 /**
- * @author Michael Nitschinger
- * @since 1.0
+ * Represents a response to a {@link com.couchbase.client.core.message.binary.AbstractCoreDocumentBinaryRequest}.
+ *
+ * @author David Sondermann
+ * @since 2.0
  */
-public class ViewQueryResponse extends AbstractCouchbaseResponse {
+public abstract class AbstractCoreDocumentBinaryResponse extends AbstractCouchbaseResponse implements BinaryResponse {
 
-    private final ByteBuf content;
-    private final int totalRows;
+    private final CoreDocument document;
+    private final String bucket;
 
-    public ViewQueryResponse(final ResponseStatus status, final int totalRows, final ByteBuf content,
-                             final CouchbaseRequest request) {
+    public AbstractCoreDocumentBinaryResponse(final ResponseStatus status, final CoreDocument document, final String bucket, final CouchbaseRequest request) {
         super(status, request);
-        this.content = content;
-        this.totalRows = totalRows;
+        this.document = document;
+        this.bucket = bucket;
     }
 
-    public ByteBuf content() {
-        return content;
-    }
-
-    public int totalRows() {
-        return totalRows;
+    public CoreDocument document() {
+        return document;
     }
 
     @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder("ViewQueryResponse{");
-        sb.append("content=").append(content.toString(CharsetUtil.UTF_8));
-        sb.append(", totalRows=").append(totalRows);
-        sb.append(", status=").append(status());
-        sb.append('}');
-        return sb.toString();
+    public ByteBuf content() {
+        return document.content();
+    }
+
+    @Override
+    public String bucket() {
+        return bucket;
+    }
+
+    protected String toStringInternal(final String className)
+    {
+        return className + '{' + "bucket='" + bucket() + '\'' + ", status=" + status() + ", cas=" + document.cas()
+                + ", flags=" + document.flags() + ", request=" + request()
+                + ", content=" + document.content().toString(CharsetUtil.UTF_8) + '}';
     }
 }

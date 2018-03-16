@@ -5,6 +5,7 @@ import com.couchbase.client.core.message.binary.GetRequest;
 import com.couchbase.client.core.message.binary.GetResponse;
 import com.couchbase.client.core.message.binary.UpsertRequest;
 import com.couchbase.client.core.message.binary.UpsertResponse;
+import com.couchbase.client.core.message.document.CoreDocument;
 import com.couchbase.client.core.message.config.FlushRequest;
 import com.couchbase.client.core.message.config.FlushResponse;
 import com.couchbase.client.core.util.ClusterDependentTest;
@@ -29,19 +30,20 @@ public class FlushTest extends ClusterDependentTest {
 
     @Test
     public void shouldFlush() {
-        List<String> keys = Arrays.asList("key1", "key2", "key3");
+        final List<String> keys = Arrays.asList("key1", "key2", "key3");
+        final CoreDocument document = new CoreDocument(Unpooled.copiedBuffer("Content", CharsetUtil.UTF_8), 0, 0, 0, false);
 
         Observable.from(keys).flatMap(new Func1<String, Observable<UpsertResponse>>() {
             @Override
             public Observable<UpsertResponse> call(String key) {
-                return cluster().send(new UpsertRequest(key, Unpooled.copiedBuffer("Content", CharsetUtil.UTF_8), bucket()));
+                return cluster().send(new UpsertRequest(key, document, bucket()));
             }
         }).toBlocking().last();
 
-        Observable<FlushResponse> response = cluster().send(new FlushRequest(bucket(), password()));
+        final Observable<FlushResponse> response = cluster().send(new FlushRequest(bucket(), password()));
         assertEquals(ResponseStatus.SUCCESS, response.toBlocking().first().status());
 
-        List<GetResponse> responses = Observable
+        final List<GetResponse> responses = Observable
             .from(keys)
             .flatMap(new Func1<String, Observable<GetResponse>>() {
                 @Override
