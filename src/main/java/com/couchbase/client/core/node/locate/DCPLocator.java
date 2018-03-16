@@ -22,22 +22,19 @@
 
 package com.couchbase.client.core.node.locate;
 
-import com.couchbase.client.core.ResponseEvent;
 import com.couchbase.client.core.config.BucketConfig;
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.config.NodeInfo;
-import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
 import com.couchbase.client.core.message.dcp.DCPRequest;
 import com.couchbase.client.core.message.dcp.OpenConnectionRequest;
 import com.couchbase.client.core.node.Node;
-import com.couchbase.client.core.retry.RetryHelper;
 import com.couchbase.client.core.service.ServiceType;
-import com.lmax.disruptor.RingBuffer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -54,8 +51,7 @@ public class DCPLocator implements Locator {
 
 
     @Override
-    public void locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster,
-        CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
+    public Node[] locate(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig cluster) {
         BucketConfig bucket = cluster.bucketConfig(request.bucket());
         if (!(bucket instanceof CouchbaseBucketConfig && request instanceof DCPRequest)) {
             throw new IllegalStateException("Unsupported Bucket Type: for request " + request);
@@ -64,29 +60,27 @@ public class DCPLocator implements Locator {
         DCPRequest dcpRequest = (DCPRequest) request;
 
         if (dcpRequest instanceof OpenConnectionRequest) {
-            boolean found = false;
+            List<Node> located = new ArrayList<Node>();
             for (NodeInfo nodeInfo : config.nodes()) {
                 if (nodeInfo.services().containsKey(ServiceType.DCP)) {
                     for (Node node : nodes) {
                         if (node.hostname().equals(nodeInfo.hostname())) {
-                            node.send(request);
-                            found = true;
+                            located.add(node);
                             break;
                         }
                     }
                 }
             }
-            if (found) {
-                return;
+            if (!located.isEmpty()) {
+                return located.toArray(new Node[located.size()]);
             }
         } else {
             int nodeId = config.nodeIndexForMaster(dcpRequest.partition());
             if (nodeId == -2) {
-                return;
+                return null;
             }
             if (nodeId == -1) {
-                RetryHelper.retryOrCancel(env, request, responseBuffer);
-                return;
+                return new Node[]{};
             }
 
             NodeInfo nodeInfo = config.nodeAtIndex(nodeId);
@@ -96,14 +90,12 @@ public class DCPLocator implements Locator {
                     LOGGER.debug("Node list and configuration's partition hosts sizes : {} <> {}, rescheduling",
                             nodes.size(), config.nodes().size());
                 }
-                RetryHelper.retryOrCancel(env, request, responseBuffer);
-                return;
+                return new Node[]{};
             }
 
             for (Node node : nodes) {
                 if (node.hostname().equals(nodeInfo.hostname())) {
-                    node.send(request);
-                    return;
+                    return new Node[]{node};
                 }
             }
         }
