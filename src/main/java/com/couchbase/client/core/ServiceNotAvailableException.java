@@ -30,6 +30,7 @@ package com.couchbase.client.core;
  */
 public class ServiceNotAvailableException extends CouchbaseException {
 
+    breakbuild
     public ServiceNotAvailableException() {
     }
 
