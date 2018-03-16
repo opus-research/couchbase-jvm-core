@@ -82,7 +82,7 @@ public class CarrierLoader extends AbstractLoader {
             public String call(GetBucketConfigResponse response) {
                 if (!response.status().isSuccess()) {
                     response.content().release();
-                    throw new LoadingFailedException("CarrierLoader response returned with: " + response.status());
+                    throw new IllegalStateException("Bucket config response did not return with success.");
                 }
 
                 LOGGER.debug("Successfully loaded config through carrier.");

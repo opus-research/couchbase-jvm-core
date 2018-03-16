@@ -93,7 +93,8 @@ public class HttpLoader extends AbstractLoader {
                 @Override
                 public String call(BucketConfigResponse response) {
                     if (!response.status().isSuccess()) {
-                        throw new LoadingFailedException("HttpLoader response returned with: " + response.status());
+                        throw new IllegalStateException("Could not load bucket configuration: "
+                            + response.status() + "(" + response.config() + ")");
                     }
 
                     LOGGER.debug("Successfully loaded config through HTTP.");
