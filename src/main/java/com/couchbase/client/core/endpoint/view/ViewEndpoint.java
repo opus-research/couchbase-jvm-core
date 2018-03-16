@@ -41,14 +41,14 @@ public class ViewEndpoint extends AbstractEndpoint {
      */
     public ViewEndpoint(final String hostname, String bucket, String password, int port, final CoreEnvironment env,
         final RingBuffer<ResponseEvent> responseBuffer) {
-        super(hostname, bucket, password, port, env, responseBuffer, false);
+        super(hostname, bucket, password, port, env, responseBuffer);
     }
 
     @Override
     protected void customEndpointHandlers(final ChannelPipeline pipeline) {
         pipeline
             .addLast(new HttpClientCodec())
-            .addLast(new ViewHandler(this, responseBuffer(), false));
+            .addLast(new ViewHandler(this, responseBuffer()));
     }
 
 }
