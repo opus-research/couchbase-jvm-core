@@ -92,7 +92,7 @@ public class KeyValueSelectBucketHandler extends SimpleChannelInboundHandler<Ful
      * @param bucket the name of the user/bucket.
      * @param selectBucketEnabled if it should be enabled without firing the event.
      */
-    KeyValueSelectBucketHandler(String bucket, boolean selectBucketEnabled) {
+    public KeyValueSelectBucketHandler(String bucket, boolean selectBucketEnabled) {
         this.bucket = bucket;
         this.selectBucketEnabled = selectBucketEnabled;
     }

@@ -22,7 +22,6 @@ import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.FullBina
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.util.CharsetUtil;
 import org.junit.Test;
 
 import java.net.InetSocketAddress;
@@ -36,13 +35,6 @@ import static org.junit.Assert.assertTrue;
  */
 public class KeyValueSelectBucketHandlerTest {
 
-
-    /**
-     * We are not importing the opcode from the handler to avoid tests passing
-     * if it should change not on purpose.
-     */
-    private static final byte OPCODE = (byte) 0x89;
-
     @Test
     public void selectBucketShouldCompleteConnectFuture() throws Exception {
         // Register the Handler
@@ -53,10 +45,9 @@ public class KeyValueSelectBucketHandlerTest {
 
         // Make sure the handler sends the select bucket command the right way
         BinaryMemcacheRequest request = (BinaryMemcacheRequest) channel.readOutbound();
-        assertEquals(OPCODE, request.getOpcode());
+        assertEquals((byte) 0x89, request.getOpcode());
         assertEquals("bucket".length(), request.getKeyLength());
         assertEquals("bucket".length(), request.getTotalBodyLength());
-        assertEquals("bucket", new String(request.getKey(), CharsetUtil.UTF_8));
 
         // now fake a "not found" response
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(
@@ -80,10 +71,9 @@ public class KeyValueSelectBucketHandlerTest {
 
         // Make sure the handler sends the select bucket command the right way
         BinaryMemcacheRequest request = (BinaryMemcacheRequest) channel.readOutbound();
-        assertEquals(OPCODE, request.getOpcode());
+        assertEquals((byte) 0x89, request.getOpcode());
         assertEquals("bucket".length(), request.getKeyLength());
         assertEquals("bucket".length(), request.getTotalBodyLength());
-        assertEquals("bucket", new String(request.getKey(), CharsetUtil.UTF_8));
 
         // now fake a "not found" response
         FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(
