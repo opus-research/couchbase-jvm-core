@@ -60,7 +60,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import rx.Scheduler;
-import rx.subjects.AsyncSubject;
 
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
@@ -102,11 +101,6 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * Contains info-level data about the view response.
      */
     private UnicastAutoReleaseSubject<ByteBuf> viewInfoObservable;
-
-    /**
-     * Contains optional errors that happened during execution.
-     */
-    private AsyncSubject<String> viewErrorObservable;
 
     /**
      * Represents the current query parsing state.
@@ -327,12 +321,9 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         long ttl = env().autoreleaseAfter();
         viewRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         viewInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
-        viewErrorObservable = AsyncSubject.create();
-
         return new ViewQueryResponse(
             viewRowObservable.onBackpressureBuffer().observeOn(scheduler),
             viewInfoObservable.onBackpressureBuffer().observeOn(scheduler),
-            viewErrorObservable,
             code,
             phrase,
             status,
@@ -354,12 +345,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             parseViewInfo();
         }
 
-        if (viewParsingState == QUERY_STATE_ROWS) {
-            parseViewRows(last);
-        }
-
         if (viewParsingState == QUERY_STATE_ERROR) {
             parseViewError(last);
+        }
+
+        if (viewParsingState == QUERY_STATE_ROWS) {
+            parseViewRows(last);
         }
 
         if (viewParsingState == QUERY_STATE_DONE) {
@@ -499,15 +490,9 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (viewRowObservable != null) {
             viewRowObservable.onCompleted();
-            viewRowObservable = null;
         }
         if (viewInfoObservable != null) {
             viewInfoObservable.onCompleted();
-            viewInfoObservable = null;
-        }
-        if (viewErrorObservable != null) {
-            viewErrorObservable.onCompleted();
-            viewErrorObservable = null;
         }
         cleanupViewStates();
         if (responseContent != null && responseContent.refCnt() > 0) {
