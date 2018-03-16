@@ -44,10 +44,10 @@ import rx.subjects.AsyncSubject;
 import rx.subjects.PublishSubject;
 import rx.subjects.Subject;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -70,7 +70,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldAddNodes() {
-        CopyOnWriteArrayList<Node> nodes = new CopyOnWriteArrayList<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         assertEquals(0, nodes.size());
@@ -82,7 +82,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldIgnoreAlreadyAddedNode() throws Exception {
-        CopyOnWriteArrayList<Node> nodes = new CopyOnWriteArrayList<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         assertEquals(0, nodes.size());
@@ -96,7 +96,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldRemoveNodes() {
-        CopyOnWriteArrayList<Node> nodes = new CopyOnWriteArrayList<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         Node node1 = mock(Node.class);
@@ -130,7 +130,7 @@ public class RequestHandlerTest {
 
     @Test
     public void shouldRemoveNodeEvenIfNotDisconnected() throws Exception {
-        CopyOnWriteArrayList<Node> nodes = new CopyOnWriteArrayList<Node>();
+        List<Node> nodes = new ArrayList<Node>();
         RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);
 
         Node node1 = mock(Node.class);
@@ -303,7 +303,7 @@ public class RequestHandlerTest {
         final Subject<ClusterConfig, ClusterConfig> configObservable = PublishSubject.<ClusterConfig>create();
 
         //this simulates the race condition in JVMCBC-231, otherwise calls all methods of HashSet
-        CopyOnWriteArrayList<Node> nodes = Mockito.spy(new CopyOnWriteArrayList<Node>());
+        List<Node> nodes = Mockito.spy(new ArrayList<Node>());
         when(nodes.isEmpty()).thenReturn(false);
 
         final RequestHandler handler = new RequestHandler(nodes, environment, configObservable, null);

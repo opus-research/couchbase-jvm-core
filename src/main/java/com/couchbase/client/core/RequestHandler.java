@@ -113,7 +113,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
     /**
      * The list of currently managed nodes against the cluster.
      */
-    private final CopyOnWriteArrayList<Node> nodes;
+    private final List<Node> nodes;
 
     /**
      * The shared couchbase environment.
@@ -149,7 +149,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
      * This constructor should only be used for testing purposes.
      * @param nodes the node list to start with.
      */
-    RequestHandler(CopyOnWriteArrayList<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
+    RequestHandler(List<Node> nodes, CoreEnvironment environment, Observable<ClusterConfig> configObservable,
         RingBuffer<ResponseEvent> responseBuffer) {
         this.nodes = nodes;
         this.environment = environment;
@@ -277,7 +277,7 @@ public class RequestHandler implements EventHandler<RequestEvent> {
             @Override
             public LifecycleState call(LifecycleState lifecycleState) {
                 LOGGER.debug("Connect finished, registering for use.");
-                nodes.addIfAbsent(node);
+                nodes.add(node);
                 return lifecycleState;
             }
         });
