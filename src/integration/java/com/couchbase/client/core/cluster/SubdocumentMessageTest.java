@@ -24,12 +24,13 @@ import com.couchbase.client.core.message.kv.RemoveResponse;
 import com.couchbase.client.core.message.kv.UpsertRequest;
 import com.couchbase.client.core.message.kv.UpsertResponse;
 import com.couchbase.client.core.message.kv.subdoc.multi.Lookup;
-import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommand;
+import com.couchbase.client.core.message.kv.subdoc.multi.LookupCommandBuilder;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiLookupResponse;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiMutationResponse;
 import com.couchbase.client.core.message.kv.subdoc.multi.MultiResult;
 import com.couchbase.client.core.message.kv.subdoc.multi.Mutation;
 import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommand;
+import com.couchbase.client.core.message.kv.subdoc.multi.MutationCommandBuilder;
 import com.couchbase.client.core.message.kv.subdoc.multi.SubMultiLookupRequest;
 import com.couchbase.client.core.message.kv.subdoc.multi.SubMultiMutationRequest;
 import com.couchbase.client.core.message.kv.subdoc.simple.AbstractSubdocRequest;
@@ -89,6 +90,8 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
     /** Use this key when you want existing data that include a deep complex array*/
     private static final String testComplexSubArray = "testComplexSubArray";
 
+    private static final String testXAttrKey = "testXAttrKey";
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String jsonContent = "{\"value\":\"stringValue\", \"sub\": {\"value\": \"subStringValue\",\"array\": [\"array1\", 2, true]}}";
@@ -116,6 +119,11 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
         ReferenceCountUtil.releaseLater(response.content());
         assertTrue("Couldn't insert " + testComplexSubArray, response.status().isSuccess());
+
+        upsert = new UpsertRequest(testXAttrKey, Unpooled.copiedBuffer(jsonContent, CharsetUtil.UTF_8), bucket(), true);
+        response = cluster().<UpsertResponse>send(upsert).toBlocking().single();
+        ReferenceCountUtil.releaseLater(response.content());
+        assertTrue("Couldn't insert " + testSubKey, response.status().isSuccess());
     }
 
     @After
@@ -939,11 +947,11 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
                 "GET(sub2): SUBDOC_PATH_NOT_FOUND\n";
 
         SubMultiLookupRequest request = new SubMultiLookupRequest(testSubKey, bucket(),
-                new LookupCommand(Lookup.EXIST, "sub"),
-                new LookupCommand(Lookup.EXIST, "sub2"),
-                new LookupCommand(Lookup.GET, "sub"),
-                new LookupCommand(Lookup.GET, "sub.array[1]"),
-                new LookupCommand(Lookup.GET, "sub2"));
+                new LookupCommandBuilder(Lookup.EXIST, "sub").build(),
+                new LookupCommandBuilder(Lookup.EXIST, "sub2").build(),
+                new LookupCommandBuilder(Lookup.GET, "sub").build(),
+                new LookupCommandBuilder(Lookup.GET, "sub.array[1]").build(),
+                new LookupCommandBuilder(Lookup.GET, "sub2").build());
 
         MultiLookupResponse response = cluster().<MultiLookupResponse>send(request).toBlocking().single();
         assertEquals(Unpooled.EMPTY_BUFFER, response.content());
@@ -964,8 +972,8 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
                 "GET(sub.array[1]): SUCCESS = 2\n";
 
         SubMultiLookupRequest request = new SubMultiLookupRequest(testSubKey, bucket(),
-                new LookupCommand(Lookup.EXIST, "sub"),
-                new LookupCommand(Lookup.GET, "sub.array[1]"));
+                new LookupCommandBuilder(Lookup.EXIST, "sub").build(),
+                new LookupCommandBuilder(Lookup.GET, "sub.array[1]").build());
 
         MultiLookupResponse response = cluster().<MultiLookupResponse>send(request).toBlocking().single();
         assertEquals(Unpooled.EMPTY_BUFFER, response.content());
@@ -994,17 +1002,17 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         ByteBuf uniqueFragment = Unpooled.copiedBuffer("\"unique\"", CharsetUtil.UTF_8);
 
         MutationCommand[] commands = new MutationCommand[] {
-                new MutationCommand(Mutation.COUNTER, "counter", counterFragment, false),
-                new MutationCommand(Mutation.COUNTER, "another.counter", counterFragment, true),
-                new MutationCommand(Mutation.COUNTER, "another.counter", counterFragment, false),
-                new MutationCommand(Mutation.DICT_ADD, "sub.value2", stringFragment),
-                new MutationCommand(Mutation.DICT_UPSERT, "sub.value3", stringFragment),
-                new MutationCommand(Mutation.REPLACE, "value", stringFragment),
-                new MutationCommand(Mutation.ARRAY_INSERT, "sub.array[1]", arrayInsertedFragment),
-                new MutationCommand(Mutation.ARRAY_PUSH_FIRST, "sub.array", arrayFirstFragment),
-                new MutationCommand(Mutation.ARRAY_PUSH_LAST, "sub.array", arrayLastFragment),
-                new MutationCommand(Mutation.ARRAY_ADD_UNIQUE, "sub.array", uniqueFragment),
-                new MutationCommand(Mutation.DELETE, "sub.value")
+                new MutationCommandBuilder(Mutation.COUNTER, "counter").fragment(counterFragment).build(),
+                new MutationCommandBuilder(Mutation.COUNTER, "another.counter").fragment(counterFragment).createIntermediaryPath(true).build(),
+                new MutationCommandBuilder(Mutation.COUNTER, "another.counter").fragment(counterFragment).build(),
+                new MutationCommandBuilder(Mutation.DICT_ADD, "sub.value2").fragment(stringFragment).build(),
+                new MutationCommandBuilder(Mutation.DICT_UPSERT, "sub.value3").fragment(stringFragment).build(),
+                new MutationCommandBuilder(Mutation.REPLACE, "value").fragment(stringFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_INSERT, "sub.array[1]").fragment(arrayInsertedFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_PUSH_FIRST, "sub.array").fragment(arrayFirstFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_PUSH_LAST, "sub.array").fragment(arrayLastFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_ADD_UNIQUE, "sub.array").fragment(uniqueFragment).build(),
+                new MutationCommandBuilder(Mutation.DELETE, "sub.value").build()
         };
 
         SubMultiMutationRequest request = new SubMultiMutationRequest(testSubKey, bucket(), commands);
@@ -1072,18 +1080,18 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         ByteBuf uniqueFragment = Unpooled.copiedBuffer("\"unique\"", CharsetUtil.UTF_8);
 
         SubMultiMutationRequest request = new SubMultiMutationRequest(testSubKey, bucket(),
-                new MutationCommand(Mutation.COUNTER, "counter", counterFragment, false),
-                new MutationCommand(Mutation.COUNTER, "another.counter", counterFragment, true),
-                new MutationCommand(Mutation.DICT_ADD, "sub.value2", stringFragment),
-                new MutationCommand(Mutation.DICT_UPSERT, "sub.value3", stringFragment),
-                new MutationCommand(Mutation.REPLACE, "value", stringFragment),
+                new MutationCommandBuilder(Mutation.COUNTER, "counter", counterFragment).build(),
+                new MutationCommandBuilder(Mutation.COUNTER, "another.counter", counterFragment).createIntermediaryPath(true).build(),
+                new MutationCommandBuilder(Mutation.DICT_ADD, "sub.value2", stringFragment).build(),
+                new MutationCommandBuilder(Mutation.DICT_UPSERT, "sub.value3", stringFragment).build(),
+                new MutationCommandBuilder(Mutation.REPLACE, "value", stringFragment).build(),
                 //this one fails
-                new MutationCommand(Mutation.ARRAY_INSERT, "sub.array[5]", arrayInsertedFragment),
-                new MutationCommand(Mutation.ARRAY_PUSH_FIRST, "sub.array", arrayFirstFragment),
-                new MutationCommand(Mutation.ARRAY_PUSH_LAST, "sub.array", arrayLastFragment),
-                new MutationCommand(Mutation.ARRAY_ADD_UNIQUE, "sub.array", uniqueFragment),
+                new MutationCommandBuilder(Mutation.ARRAY_INSERT, "sub.array[5]", arrayInsertedFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_PUSH_FIRST, "sub.array", arrayFirstFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_PUSH_LAST, "sub.array", arrayLastFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_ADD_UNIQUE, "sub.array", uniqueFragment).build(),
                 //this one would also fail, but server stops at first failure
-                new MutationCommand(Mutation.DELETE, "path.not.found")
+                new MutationCommandBuilder(Mutation.DELETE, "path.not.found").build()
         );
         MultiMutationResponse response = cluster().<MultiMutationResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.SUBDOC_MULTI_PATH_FAILURE, response.status());
@@ -1111,10 +1119,10 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         ByteBuf arrayFirstFragment = Unpooled.copiedBuffer("\"first\"", CharsetUtil.UTF_8);
 
         SubMultiMutationRequest request = new SubMultiMutationRequest(testInsertionSubKey, bucket(),
-                new MutationCommand(Mutation.COUNTER, "counter", counterFragment, false),
-                new MutationCommand(Mutation.DICT_UPSERT, "sub.value3", stringFragment),
-                new MutationCommand(Mutation.ARRAY_PUSH_FIRST, "sub.array", arrayFirstFragment),
-                new MutationCommand(Mutation.DELETE, "some.paht")
+                new MutationCommandBuilder(Mutation.COUNTER, "counter", counterFragment).build(),
+                new MutationCommandBuilder(Mutation.DICT_UPSERT, "sub.value3", stringFragment).build(),
+                new MutationCommandBuilder(Mutation.ARRAY_PUSH_FIRST, "sub.array", arrayFirstFragment).build(),
+                new MutationCommandBuilder(Mutation.DELETE, "some.paht").build()
         );
         MultiMutationResponse response = cluster().<MultiMutationResponse>send(request).toBlocking().single();
         assertEquals(ResponseStatus.NOT_EXISTS, response.status());
@@ -1166,5 +1174,82 @@ public class SubdocumentMessageTest extends ClusterDependentTest {
         } else {
             assertNull(token);
         }
+    }
+
+    @Test
+    public void shouldBeAbleToAccessXAttrs() {
+        String subPath = "spring.class";
+        ByteBuf fragment = Unpooled.copiedBuffer("\"SomeClass\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(fragment);
+
+        //insert
+        SubDictAddRequest insertRequest = new SubDictAddRequest(testXAttrKey, subPath, fragment, bucket());
+        insertRequest.attributeAccess(true);
+        insertRequest.createIntermediaryPath(true);
+        SimpleSubdocResponse insertResponse = cluster().<SimpleSubdocResponse>send(insertRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(insertResponse.content());
+        assertTrue(insertResponse.status().isSuccess());
+        assertEquals(0, insertResponse.content().readableBytes());
+
+        //get
+        SubGetRequest getRequest = new SubGetRequest(testXAttrKey, "spring.class", bucket());
+        getRequest.attributeAccess(true);
+        SimpleSubdocResponse lookupResponse = cluster().<SimpleSubdocResponse>send(getRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(lookupResponse.content());
+        assertTrue(lookupResponse.status().isSuccess());
+        assertEquals(lookupResponse.content().toString(CharsetUtil.UTF_8) , "\"SomeClass\"");
+
+
+        //delete
+        SubDeleteRequest deleteRequest = new SubDeleteRequest(testXAttrKey, subPath, bucket());
+        deleteRequest.attributeAccess(true);
+        SimpleSubdocResponse deleteResponse = cluster().<SimpleSubdocResponse>send(deleteRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(deleteResponse.content());
+        assertTrue(deleteResponse.status().isSuccess());
+        assertEquals(0, deleteResponse.content().readableBytes());
+
+
+        getRequest = new SubGetRequest(testXAttrKey, "spring.class", bucket());
+        getRequest.attributeAccess(true);
+        lookupResponse = cluster().<SimpleSubdocResponse>send(getRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(lookupResponse.content());
+        assertTrue(lookupResponse.status() == ResponseStatus.SUBDOC_PATH_NOT_FOUND);
+    }
+
+    @Test
+    public void shouldBeAbleToAccessMultipleXAttrsInSameNameSpace() {
+        ByteBuf classFragment = Unpooled.copiedBuffer("\"SomeClass\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(classFragment);
+        ByteBuf refFragment = Unpooled.copiedBuffer("\"ids\"", CharsetUtil.UTF_8);
+        ReferenceCountUtil.releaseLater(refFragment);
+
+        SubMultiMutationRequest mutationRequest = new SubMultiMutationRequest(testXAttrKey, bucket(),
+                new MutationCommandBuilder(Mutation.DICT_UPSERT, "spring.class")
+                .fragment(classFragment).createIntermediaryPath(true).attributeAccess(true).build(),
+                new MutationCommandBuilder(Mutation.DICT_UPSERT, "spring.refs")
+                .fragment(refFragment).createIntermediaryPath(true).attributeAccess(true).build());
+        MultiMutationResponse mutationResponse = cluster().<MultiMutationResponse>send(mutationRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(mutationResponse.responses().get(0).value());
+        ReferenceCountUtil.releaseLater(mutationResponse.responses().get(1).value());
+        assertTrue(mutationResponse.status().isSuccess());
+
+        SubMultiLookupRequest lookupRequest = new SubMultiLookupRequest(testXAttrKey, bucket(),
+                new LookupCommandBuilder(Lookup.GET, "spring.class")
+                      .attributeAccess(true).build(),
+                new LookupCommandBuilder(Lookup.GET, "spring.refs")
+                        .attributeAccess(true).build());
+
+        MultiLookupResponse lookupResponse = cluster().<MultiLookupResponse>send(lookupRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(lookupResponse.responses().get(0).value());
+        ReferenceCountUtil.releaseLater(lookupResponse.responses().get(1).value());
+        assertTrue(lookupResponse.status().isSuccess());
+
+        mutationRequest = new SubMultiMutationRequest(testXAttrKey, bucket(),
+                new MutationCommandBuilder(Mutation.DELETE, "spring.class").attributeAccess(true).build(),
+                new MutationCommandBuilder(Mutation.DELETE, "spring.refs").attributeAccess(true).build());
+        mutationResponse = cluster().<MultiMutationResponse>send(mutationRequest).toBlocking().single();
+        ReferenceCountUtil.releaseLater(mutationResponse.responses().get(0).value());
+        ReferenceCountUtil.releaseLater(mutationResponse.responses().get(1).value());
+        assertTrue(mutationResponse.status().isSuccess());
     }
 }
