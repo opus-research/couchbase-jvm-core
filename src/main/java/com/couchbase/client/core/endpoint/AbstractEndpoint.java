@@ -94,11 +94,6 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
     private static final NotConnectedException NOT_CONNECTED_EXCEPTION = new NotConnectedException();
 
     /**
-     * A static listener which logs failed writes.
-     */
-    private static final WriteLogListener WRITE_LOG_LISTENER = new WriteLogListener();
-
-    /**
      * The netty bootstrap adapter.
      */
     private final BootstrapAdapter bootstrap;
@@ -334,7 +329,15 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
                 }
             } else {
                 if (channel.isWritable()) {
-                    channel.write(request).addListener(WRITE_LOG_LISTENER);
+                    ChannelFuture future = channel.write(request);
+                    future.addListener(new GenericFutureListener<Future<Void>>() {
+                        @Override
+                        public void operationComplete(Future<Void> future) throws Exception {
+                            if (!future.isSuccess()) {
+                                LOGGER.warn("Error during IO write phase.", future);
+                            }
+                        }
+                    });
                     hasWritten = true;
                 } else {
                     responseBuffer.publishEvent(ResponseHandler.RESPONSE_TRANSLATOR, request, request.observable());
@@ -426,19 +429,4 @@ public abstract class AbstractEndpoint extends AbstractStateMachine<LifecycleSta
         SocketAddress addr = chan != null ? chan.remoteAddress() : null;
         return "[" + addr + "][" + endpoint.getClass().getSimpleName() + "]: ";
     }
-
-    /**
-     * A generic future listener which logs unsuccessful writes.
-     */
-    static class WriteLogListener implements GenericFutureListener<Future<Void>> {
-
-        @Override
-        public void operationComplete(Future<Void> future) throws Exception {
-            if (!future.isSuccess()) {
-                LOGGER.warn("Error during IO write phase.", future);
-            }
-        }
-
-    }
-
 }
