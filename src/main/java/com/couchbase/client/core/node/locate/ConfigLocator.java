@@ -29,30 +29,18 @@ import com.lmax.disruptor.RingBuffer;
 import java.net.InetAddress;
 import java.util.List;
 
-/**
- * Locates the proper CONFIG node for a given config request.
- *
- * Note that since the CONFIG service is not intended for high performance data ops, it does not implement the more
- * complex logic of MDS awareness that happens in other locators like for N1QL. The consequence of this is that in
- * MDS scenarios one config server might be hit more than once if the next one comes along, but that shouldn't
- * be a problem at all. If this needs to be fixed at some point, take a look at the {@link QueryLocator} which recently
- * got fixed to do all the right (but more complex) things.
- *
- * @author Michael Nitschinger
- * @since 1.0.0
- */
 public class ConfigLocator implements Locator {
 
-    private volatile long counter = 0;
+    private long counter = 0;
 
     @Override
     public void locateAndDispatch(final CouchbaseRequest request, final List<Node> nodes, final ClusterConfig config,
         CoreEnvironment env, RingBuffer<ResponseEvent> responseBuffer) {
-        if (request instanceof BucketConfigRequest && ((BucketConfigRequest) request).hostname() != null) {
+        if (request instanceof BucketConfigRequest) {
             BucketConfigRequest req = (BucketConfigRequest) request;
             InetAddress hostname = req.hostname();
             for (Node node : nodes) {
-                if (node.hostname().equals(hostname)) {
+                if (hostname == null || node.hostname().equals(hostname)) {
                     node.send(request);
                     return;
                 }
@@ -81,13 +69,9 @@ public class ConfigLocator implements Locator {
         RetryHelper.retryOrCancel(env, request, responseBuffer);
     }
 
-    private boolean checkNode(final Node node, final CouchbaseRequest request) {
-        if (request instanceof GetDesignDocumentsRequest) {
-            // This request type needs the view service enabled!
-            return node.serviceEnabled(ServiceType.VIEW);
-        } else {
-            return node.serviceEnabled(ServiceType.CONFIG);
-        }
+    protected boolean checkNode(final Node node, final CouchbaseRequest request) {
+        return !(request instanceof GetDesignDocumentsRequest)
+                || node.serviceEnabled(ServiceType.VIEW);
     }
 
 }
