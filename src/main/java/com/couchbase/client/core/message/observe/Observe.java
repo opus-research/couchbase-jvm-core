@@ -23,7 +23,6 @@
 package com.couchbase.client.core.message.observe;
 
 import com.couchbase.client.core.ClusterFacade;
-import com.couchbase.client.core.DocumentConcurrentlyModifiedException;
 import com.couchbase.client.core.ReplicaNotConfiguredException;
 import com.couchbase.client.core.config.CouchbaseBucketConfig;
 import com.couchbase.client.core.message.cluster.GetClusterConfigRequest;
@@ -238,11 +237,6 @@ public class Observe {
                                 response.content().release();
                             }
                             ObserveResponse.ObserveStatus status = response.observeStatus();
-
-                            if (status == ObserveResponse.ObserveStatus.MODIFIED) {
-                                throw new DocumentConcurrentlyModifiedException();
-                            }
-
                             if (response.master()) {
                                 if (status == persistIdentifier) {
                                     persisted++;
