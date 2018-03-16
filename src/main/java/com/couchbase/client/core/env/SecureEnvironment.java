@@ -19,11 +19,14 @@ package com.couchbase.client.core.env;
 import java.security.KeyStore;
 import com.couchbase.client.core.endpoint.SSLEngineFactory;
 
+import javax.net.ssl.TrustManagerFactory;
+
 /**
  * A {@link SecureEnvironment} interface defines all methods which environment implementation should have
  * to be accepted by {@link SSLEngineFactory}.
  */
 public interface SecureEnvironment {
+
     /**
      * Identifies if SSL should be enabled.
      *
@@ -51,5 +54,36 @@ public interface SecureEnvironment {
      * @return the keystore to use.
      */
     KeyStore sslKeystore();
+
+    /**
+     * Identifies the filepath to the ssl TrustManager keystore.
+     *
+     * Note that this only needs to be used if you need to split up the keystore
+     * for certificates and truststore in separate files. If no TrustStore path
+     * is used explicitly, the {@link #sslKeystoreFile()} is used. The files is
+     * used to load the {@link TrustManagerFactory}.
+     *
+     * @return the path to the truststore file.
+     */
+    String sslTruststoreFile();
+
+    /**
+     * The password which is used to protect the TrustManager keystore.
+     *
+     * Only needed if {@link #sslTruststoreFile()} is used.
+     *
+     * @return the keystore password.
+     */
+    String sslTruststorePassword();
+
+    /**
+     * Allows to directly configure {@link KeyStore} which is used to initialize
+     * the {@link TrustManagerFactory} internally. Note that this file only needs
+     * to be used if two different keystores should be used, and if not set the
+     * regular {@link #sslKeystore()} is used.
+     *
+     * @return the keystore to use when initializing the {@link TrustManagerFactory}.
+     */
+    KeyStore sslTruststore();
 
 }

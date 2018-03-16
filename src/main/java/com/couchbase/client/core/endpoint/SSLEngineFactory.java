@@ -66,11 +66,27 @@ public class SSLEngineFactory {
                 }
                 ks.load(new FileInputStream(ksFile), password);
             }
+
+            KeyStore ts = env.sslTruststore();
+            if (ts == null) {
+                String tsFile = env.sslTruststoreFile();
+                if (tsFile == null || tsFile.isEmpty()) {
+                    // no truststore found, just use the regular loaded keystore
+                    ts = ks;
+                } else {
+                    // filepath found, open and init
+                    String tsPassword = env.sslTruststorePassword();
+                    char[] tspass = tsPassword == null || tsPassword.isEmpty() ? null : tsPassword.toCharArray();
+                    ts = KeyStore.getInstance(KeyStore.getDefaultType());
+                    ts.load(new FileInputStream(tsFile), tspass);
+                }
+            }
+
             String defaultAlgorithm = KeyManagerFactory.getDefaultAlgorithm();
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(defaultAlgorithm);
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(defaultAlgorithm);
             kmf.init(ks, password);
-            tmf.init(ks);
+            tmf.init(ts);
 
             SSLContext ctx = SSLContext.getInstance("TLS");
             ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
