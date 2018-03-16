@@ -539,7 +539,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private void parseQueryRows(boolean lastChunk) {
         while (true) {
             int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos) || (lastChunk && openBracketPos < 0)) {
+            if (isEmptySection(openBracketPos)) {
                 sectionDone();
                 queryParsingState = transitionToNextToken(lastChunk);
                 break;
@@ -596,7 +596,7 @@ public class QueryHandler extends AbstractGenericHandler<HttpObject, HttpRequest
     private void parseQueryError(boolean lastChunk) {
         while (true) {
             int openBracketPos = findNextChar(responseContent, '{');
-            if (isEmptySection(openBracketPos) || (lastChunk && openBracketPos < 0)) {
+            if (isEmptySection(openBracketPos) || (openBracketPos < 0 && lastChunk)) {
                 sectionDone();
                 queryParsingState = transitionToNextToken(lastChunk); //warnings or status
                 break;
