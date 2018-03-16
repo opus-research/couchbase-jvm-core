@@ -234,10 +234,6 @@
                             <pattern>com.lmax</pattern>
                             <shadedPattern>com.couchbase.client.deps.com.lmax</shadedPattern>
                         </relocation>
-                        <relocation>
-                            <pattern>com.couchbase.client.deps.com.couchbase.client</pattern>
-                            <shadedPattern>com.couchbase.client</shadedPattern>
-                        </relocation>
                     </relocations>
                     <createSourcesJar>true</createSourcesJar>
                     <shadeSourcesContent>true</shadeSourcesContent>
