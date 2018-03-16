@@ -22,6 +22,9 @@ import com.couchbase.client.core.endpoint.dcp.DCPConnection;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.env.Diagnostics;
+import com.couchbase.client.core.hooks.CouchbaseCoreSendHook;
+import com.couchbase.client.core.lang.Tuple;
+import com.couchbase.client.core.lang.Tuple2;
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -61,6 +64,7 @@ import com.lmax.disruptor.dsl.ProducerType;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import rx.Observable;
 import rx.functions.Func1;
+import rx.subjects.Subject;
 
 import java.util.concurrent.ThreadFactory;
 
@@ -93,6 +97,13 @@ public class CouchbaseCore implements ClusterFacade {
      */
     public static final BackpressureException BACKPRESSURE_EXCEPTION = new BackpressureException();
 
+    private static final CouchbaseCoreSendHook DEFAULT_CORE_HOOK = new CouchbaseCoreSendHook() {
+        @Override
+        public Tuple2<CouchbaseRequest, Subject<CouchbaseResponse, CouchbaseResponse>> beforeSend(CouchbaseRequest originalRequest, Subject<CouchbaseResponse, CouchbaseResponse> originalResponse) {
+            return Tuple.create(originalRequest, originalResponse);
+        }
+    };
+
     /**
      * The {@link RequestEvent} {@link RingBuffer}.
      */
@@ -114,6 +125,7 @@ public class CouchbaseCore implements ClusterFacade {
     private final Disruptor<ResponseEvent> responseDisruptor;
 
     private volatile boolean sharedEnvironment = true;
+    private final CouchbaseCoreSendHook coreSendHook;
 
     /**
      * Populate the static exceptions with stack trace elements.
@@ -138,6 +150,8 @@ public class CouchbaseCore implements ClusterFacade {
         LOGGER.debug(Diagnostics.collectAndFormat());
 
         this.environment = environment;
+        this.coreSendHook = environment.couchbaseCoreSendHook() == null ?
+            DEFAULT_CORE_HOOK : environment.couchbaseCoreSendHook();
         configProvider = new DefaultConfigurationProvider(this, environment);
         ThreadFactory disruptorThreadFactory = new DefaultThreadFactory("cb-core", true);
         responseDisruptor = new Disruptor<ResponseEvent>(
@@ -204,11 +218,13 @@ public class CouchbaseCore implements ClusterFacade {
             handleClusterRequest(request);
             return (Observable<R>) request.observable().observeOn(environment.scheduler());
         } else {
-            boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, request);
+            Tuple2<CouchbaseRequest, Subject<CouchbaseResponse, CouchbaseResponse>> hook = coreSendHook
+                .beforeSend(request, request.observable());
+            boolean published = requestRingBuffer.tryPublishEvent(REQUEST_TRANSLATOR, hook.value1());
             if (!published) {
-                request.observable().onError(BACKPRESSURE_EXCEPTION);
+                hook.value2().onError(BACKPRESSURE_EXCEPTION);
             }
-            return (Observable<R>) request.observable();
+            return (Observable<R>) hook.value2();
         }
     }
 
