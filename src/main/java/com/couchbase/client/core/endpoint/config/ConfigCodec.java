@@ -65,11 +65,9 @@ public class ConfigCodec extends MessageToMessageCodec<HttpObject, ConfigRequest
         }
 
 
-        ByteBuf raw = Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8);
-        ByteBuf encoded = Base64.encode(raw);
+        ByteBuf encoded = Base64.encode(Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8));
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CharsetUtil.UTF_8));
         encoded.release();
-        raw.release();
 
         out.add(request);
         queue.offer(msg);

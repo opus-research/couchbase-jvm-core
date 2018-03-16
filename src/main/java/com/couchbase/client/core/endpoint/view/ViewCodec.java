@@ -104,11 +104,9 @@ public class ViewCodec extends MessageToMessageCodec<HttpObject, ViewRequest> {
             throw new IllegalArgumentException("Unknown Message to encode: " + msg);
         }
 
-        ByteBuf raw = Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8);
-        ByteBuf encoded = Base64.encode(raw);
+        ByteBuf encoded = Base64.encode(Unpooled.copiedBuffer(msg.bucket() + ":" + msg.password(), CharsetUtil.UTF_8));
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CharsetUtil.UTF_8));
         encoded.release();
-        raw.release();
 
         out.add(request);
         queue.offer(msg.getClass());
