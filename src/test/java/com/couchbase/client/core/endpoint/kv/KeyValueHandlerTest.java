@@ -23,6 +23,7 @@ package com.couchbase.client.core.endpoint.kv;
 
 import com.couchbase.client.core.CouchbaseException;
 import com.couchbase.client.core.endpoint.AbstractEndpoint;
+import com.couchbase.client.core.endpoint.ResponseStatusConverter;
 import com.couchbase.client.core.env.CoreEnvironment;
 import com.couchbase.client.core.env.DefaultCoreEnvironment;
 import com.couchbase.client.core.message.CouchbaseRequest;
@@ -96,11 +97,6 @@ public class KeyValueHandlerTest {
     private static final Charset CHARSET = CharsetUtil.UTF_8;
 
     /**
-     * Dummy key name which can be reused.
-     */
-    private static final byte[] KEY = "key".getBytes(CHARSET);
-
-    /**
      * The channel in which the handler is tested.
      */
     private EmbeddedChannel channel;
@@ -131,7 +127,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals(id, new String(outbound.getKey(), CHARSET));
+        assertEquals(id, outbound.getKey());
         assertEquals(id.length(), outbound.getKeyLength());
         assertEquals(id.length(), outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
@@ -143,7 +139,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldDecodeSuccessfulGet() {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content.copy());
         response.setCAS(123456789L);
         response.setExtras(Unpooled.buffer().writeInt(123));
@@ -165,7 +161,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldDecodeNotFoundGet() {
         ByteBuf content = Unpooled.copiedBuffer("Not Found", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content.copy());
         response.setStatus(BinaryMemcacheResponseStatus.KEY_ENOENT);
 
@@ -191,7 +187,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals(id, new String(outbound.getKey(), CHARSET));
+        assertEquals(id, outbound.getKey());
         assertEquals(id.length(), outbound.getKeyLength());
         assertEquals(id.length(), outbound.getTotalBodyLength());
         assertEquals(512, outbound.getReserved());
@@ -202,7 +198,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldDecodeReplicaGetResponse() {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content.copy());
         response.setCAS(123456789L);
         response.setExtras(Unpooled.buffer().writeInt(123));
@@ -230,7 +226,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length() + 4, outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
@@ -247,7 +243,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length() + 4, outbound.getTotalBodyLength());
         assertEquals(1024, outbound.getReserved());
@@ -279,7 +275,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         FullBinaryMemcacheRequest outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_INSERT, outbound.getOpcode());
@@ -295,7 +291,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_INSERT, outbound.getOpcode());
@@ -310,7 +306,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_INSERT, outbound.getOpcode());
@@ -325,7 +321,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_INSERT, outbound.getOpcode());
@@ -347,7 +343,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         FullBinaryMemcacheRequest outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_UPSERT, outbound.getOpcode());
@@ -363,7 +359,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_UPSERT, outbound.getOpcode());
@@ -378,7 +374,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_UPSERT, outbound.getOpcode());
@@ -393,7 +389,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_UPSERT, outbound.getOpcode());
@@ -415,7 +411,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         FullBinaryMemcacheRequest outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_REPLACE, outbound.getOpcode());
@@ -431,7 +427,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_REPLACE, outbound.getOpcode());
@@ -446,7 +442,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_REPLACE, outbound.getOpcode());
@@ -461,7 +457,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         outbound = (FullBinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals(512, outbound.getReserved());
         assertEquals(KeyValueHandler.OP_REPLACE, outbound.getOpcode());
@@ -493,7 +489,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length(), outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
@@ -510,7 +506,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length() + 20, outbound.getTotalBodyLength());
         assertEquals(20, outbound.getExtrasLength());
@@ -528,7 +524,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length() + 20, outbound.getTotalBodyLength());
         assertEquals(20, outbound.getExtrasLength());
@@ -546,7 +542,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length() + 4, outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
@@ -564,7 +560,7 @@ public class KeyValueHandlerTest {
         channel.writeOutbound(request);
         BinaryMemcacheRequest outbound = (BinaryMemcacheRequest) channel.readOutbound();
         assertNotNull(outbound);
-        assertEquals("key", new String(outbound.getKey(), CHARSET));
+        assertEquals("key", outbound.getKey());
         assertEquals("key".length(), outbound.getKeyLength());
         assertEquals("key".length(), outbound.getTotalBodyLength());
         assertEquals(1, outbound.getReserved());
@@ -593,7 +589,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldDecodeGetBucketConfigResponse() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content.copy());
 
         GetBucketConfigRequest requestMock = mock(GetBucketConfigRequest.class);
@@ -615,7 +611,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldDecodeObserveResponseDuringRebalance() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("{someconfig...}", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(new byte[] {}, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("", Unpooled.EMPTY_BUFFER,
             content.copy());
         response.setStatus(KeyValueStatus.ERR_NOT_MY_VBUCKET.code());
 
@@ -631,7 +627,7 @@ public class KeyValueHandlerTest {
 
     @Test
     public void shouldDecodeCounterResponseWhenNotSuccessful() throws Exception {
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(new byte[] {}, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("", Unpooled.EMPTY_BUFFER,
             Unpooled.EMPTY_BUFFER);
         response.setStatus(BinaryMemcacheResponseStatus.DELTA_BADVAL);
 
@@ -692,7 +688,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldReleaseStoreRequestContentOnSuccess() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
@@ -713,7 +709,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldNotReleaseStoreRequestContentOnRetry() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(KeyValueStatus.ERR_NOT_MY_VBUCKET.code());
 
@@ -734,7 +730,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldReleaseAppendRequestContentOnSuccess() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
@@ -755,7 +751,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldNotReleaseAppendRequestContentOnRetry() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(KeyValueStatus.ERR_NOT_MY_VBUCKET.code());
 
@@ -775,7 +771,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldReleasePrependRequestContentOnSuccess() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
 
@@ -796,7 +792,7 @@ public class KeyValueHandlerTest {
     @Test
     public void shouldNotReleasePrependRequestContentOnRetry() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
             content);
         response.setStatus(KeyValueStatus.ERR_NOT_MY_VBUCKET.code());
 
@@ -817,7 +813,7 @@ public class KeyValueHandlerTest {
     @Test(expected = CouchbaseException.class)
     public void shouldFailWhenOpaqueDoesNotMatch() throws Exception {
         ByteBuf content = Unpooled.copiedBuffer("content", CharsetUtil.UTF_8);
-        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(KEY, Unpooled.EMPTY_BUFFER,
+        FullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("key", Unpooled.EMPTY_BUFFER,
                 content);
         response.setStatus(BinaryMemcacheResponseStatus.SUCCESS);
         response.setOpaque(1);
@@ -875,7 +871,7 @@ public class KeyValueHandlerTest {
         KeyValueHandler.KeepAliveRequest keepAliveRequest = (KeyValueHandler.KeepAliveRequest) requestQueue.peek();
 
         //test responding to the request with memcached response is interpreted into a KeepAliveResponse, hook is called
-        DefaultFullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse(new byte[] {}, Unpooled.EMPTY_BUFFER);
+        DefaultFullBinaryMemcacheResponse response = new DefaultFullBinaryMemcacheResponse("", Unpooled.EMPTY_BUFFER);
         response.setOpaque(keepAliveRequest.opaque());
         response.setStatus(KeyValueStatus.ERR_NO_MEM.code());
 
