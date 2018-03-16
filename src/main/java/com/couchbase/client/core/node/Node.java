@@ -73,5 +73,4 @@ public interface Node extends Stateful<LifecycleState> {
     Observable<Service> addService(AddServiceRequest request);
 
     Observable<Service> removeService(RemoveServiceRequest request);
-
 }
