@@ -35,7 +35,7 @@ public class UpsertUserRequest extends AbstractCouchbaseRequest implements Confi
 
     @Override
     public String path() {
-        return "/settings/rbac/users/local/" + userid;
+        return "/settings/rbac/users/builtin/" + userid;
     }
 
     public String payload() {
