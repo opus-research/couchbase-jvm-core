@@ -23,7 +23,6 @@ package com.couchbase.client.core.endpoint.kv;
 
 import com.couchbase.client.core.logging.CouchbaseLogger;
 import com.couchbase.client.core.logging.CouchbaseLoggerFactory;
-import com.couchbase.client.core.security.sasl.Sasl;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.BinaryMemcacheResponseStatus;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultBinaryMemcacheRequest;
 import com.couchbase.client.deps.io.netty.handler.codec.memcache.binary.DefaultFullBinaryMemcacheRequest;
@@ -39,12 +38,12 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -194,7 +193,6 @@ public class KeyValueAuthHandler
             throw new AuthenticationException("Received empty SASL mechanisms list from server: " + remote);
         }
 
-        supportedMechanisms = new String[] {"PLAIN"};
         saslClient = Sasl.createSaslClient(supportedMechanisms, null, "couchbase", remote, null, this);
         selectedMechanism = saslClient.getMechanismName();
         int mechanismLength = selectedMechanism.length();
@@ -240,13 +238,8 @@ public class KeyValueAuthHandler
         byte[] evaluatedBytes = saslClient.evaluateChallenge(response);
 
         if (evaluatedBytes != null) {
-            ByteBuf content;
-            if (selectedMechanism == "CRAM-MD5") {
-                String[] evaluated = new String(evaluatedBytes).split(" ");
-                content = Unpooled.copiedBuffer(username + "\0" + evaluated[1], CharsetUtil.UTF_8);
-            } else {
-                content = Unpooled.wrappedBuffer(evaluatedBytes);
-            }
+            String[] evaluated = new String(evaluatedBytes).split(" ");
+            ByteBuf content = Unpooled.copiedBuffer(username + "\0" + evaluated[1], CharsetUtil.UTF_8);
 
             FullBinaryMemcacheRequest stepRequest = new DefaultFullBinaryMemcacheRequest(
                 selectedMechanism,
