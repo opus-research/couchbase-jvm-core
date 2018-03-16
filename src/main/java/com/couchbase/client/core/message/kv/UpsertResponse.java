@@ -35,9 +35,8 @@ public class UpsertResponse extends AbstractKeyValueResponse {
 
     private final long cas;
 
-    public UpsertResponse(ResponseStatus status, short serverStatusCode, long cas, String bucket, ByteBuf content,
-                          CouchbaseRequest request) {
-        super(status, serverStatusCode, bucket, content, request);
+    public UpsertResponse(ResponseStatus status, long cas, String bucket, ByteBuf content, CouchbaseRequest request) {
+        super(status, bucket, content, request);
         this.cas = cas;
     }
 
