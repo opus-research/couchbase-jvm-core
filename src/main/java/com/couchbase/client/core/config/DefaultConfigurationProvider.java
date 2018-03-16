@@ -40,7 +40,6 @@ import rx.Observable;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.subjects.PublishSubject;
-import rx.subjects.Subject;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -104,7 +103,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
     /**
      * The observable which will push out new config changes to interested parties.
      */
-    private final Subject<ClusterConfig, ClusterConfig> configObservable;
+    private final PublishSubject<ClusterConfig> configObservable;
 
     /**
      * Represents the current cluster-wide configuration.
@@ -171,7 +170,7 @@ public class DefaultConfigurationProvider implements ConfigurationProvider {
         this.environment = environment;
         this.eventBus = environment.eventBus();
 
-        configObservable = PublishSubject.<ClusterConfig>create().toSerialized();
+        configObservable = PublishSubject.create();
         seedHosts = new AtomicReference<Set<InetAddress>>();
         bootstrapped = false;
         currentConfig = new AtomicReference<ClusterConfig>(new DefaultClusterConfig());
