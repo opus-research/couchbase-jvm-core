@@ -59,7 +59,9 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.CharsetUtil;
 import rx.Scheduler;
+import rx.subjects.AsyncSubject;
 
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
@@ -101,6 +103,11 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
      * Contains info-level data about the view response.
      */
     private UnicastAutoReleaseSubject<ByteBuf> viewInfoObservable;
+
+    /**
+     * Contains optional errors that happened during execution.
+     */
+    private AsyncSubject<String> viewErrorObservable;
 
     /**
      * Represents the current query parsing state.
@@ -321,9 +328,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
         long ttl = env().autoreleaseAfter();
         viewRowObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
         viewInfoObservable = UnicastAutoReleaseSubject.create(ttl, TimeUnit.MILLISECONDS, scheduler);
+        viewErrorObservable = AsyncSubject.create();
+
         return new ViewQueryResponse(
             viewRowObservable.onBackpressureBuffer().observeOn(scheduler),
             viewInfoObservable.onBackpressureBuffer().observeOn(scheduler),
+            viewErrorObservable,
             code,
             phrase,
             status,
@@ -345,12 +355,12 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             parseViewInfo();
         }
 
-        if (viewParsingState == QUERY_STATE_ERROR) {
-            parseViewError(last);
-        }
-
         if (viewParsingState == QUERY_STATE_ROWS) {
             parseViewRows(last);
+        }
+
+        if (viewParsingState == QUERY_STATE_ERROR) {
+            parseViewError(last);
         }
 
         if (viewParsingState == QUERY_STATE_DONE) {
@@ -392,8 +402,16 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             return;
         }
 
-        viewInfoObservable.onNext(responseContent.copy());
-        viewInfoObservable.onCompleted();
+        if (responseHeader.getStatus().code() == 200) {
+            int openBracketPos = responseContent.bytesBefore((byte) '[') + responseContent.readerIndex();
+            int closeBracketLength = findSectionClosingPosition(responseContent, '[', ']') - openBracketPos + 1;
+            ByteBuf slice = responseContent.slice(openBracketPos, closeBracketLength);
+            viewErrorObservable.onNext("{\"errors\":" + slice.toString(CharsetUtil.UTF_8) + "}");
+        } else {
+            viewErrorObservable.onNext("{\"errors\":[" + responseContent.toString(CharsetUtil.UTF_8) + "]}");
+        }
+
+        viewErrorObservable.onCompleted();
         viewParsingState = QUERY_STATE_DONE;
     }
 
@@ -445,6 +463,15 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     private void parseViewRows(boolean last) {
         while (true) {
             int openBracketPos = responseContent.bytesBefore((byte) '{');
+            int errorBlockPosition = findErrorBlockPosition();
+
+            if (errorBlockPosition > 0 && errorBlockPosition < openBracketPos) {
+                responseContent.readerIndex(errorBlockPosition + responseContent.readerIndex());
+                viewRowObservable.onCompleted();
+                viewParsingState = QUERY_STATE_ERROR;
+                return;
+            }
+
             int closeBracketPos = findSectionClosingPosition(responseContent, '{', '}');
             if (closeBracketPos == -1) {
                 break;
@@ -461,6 +488,21 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
             viewRowObservable.onCompleted();
             viewParsingState = QUERY_STATE_DONE;
         }
+    }
+
+    private int findErrorBlockPosition() {
+        int errorPosition = -1;
+        for (int i = responseContent.readerIndex(); i < responseContent.writerIndex() - 2; i++) {
+            byte curr = responseContent.getByte(i);
+            byte f1 = responseContent.getByte(i + 1);
+            byte f2 = responseContent.getByte(i + 2);
+
+            if (curr == '"' && f1 == 'e' && f2 == 'r') {
+                errorPosition = i;
+                break;
+            }
+        }
+        return errorPosition > -1 ? errorPosition - responseContent.readerIndex() : errorPosition;
     }
 
     /**
@@ -490,9 +532,15 @@ public class ViewHandler extends AbstractGenericHandler<HttpObject, HttpRequest,
     public void handlerRemoved(final ChannelHandlerContext ctx) throws Exception {
         if (viewRowObservable != null) {
             viewRowObservable.onCompleted();
+            viewRowObservable = null;
         }
         if (viewInfoObservable != null) {
             viewInfoObservable.onCompleted();
+            viewInfoObservable = null;
+        }
+        if (viewErrorObservable != null) {
+            viewErrorObservable.onCompleted();
+            viewErrorObservable = null;
         }
         cleanupViewStates();
         if (responseContent != null && responseContent.refCnt() > 0) {
