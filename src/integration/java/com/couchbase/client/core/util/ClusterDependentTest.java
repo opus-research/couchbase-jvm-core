@@ -75,7 +75,6 @@ public class ClusterDependentTest {
     private static final String adminUser = TestProperties.adminUser();
     private static final String adminPassword = TestProperties.adminPassword();
     private static final CouchbaseMock couchbaseMock = TestProperties.couchbaseMock();
-    private static final Boolean useMock = TestProperties.useMock();
     private static CoreEnvironment env;
 
     protected static final int KEEPALIVE_INTERVAL = 1000;
@@ -130,7 +129,7 @@ public class ClusterDependentTest {
     }
 
 
-    public static void connect() throws Exception {
+    public static void connect(boolean useMock) throws Exception {
 
         /*
          * If we are running under RBAC, set the user and password to the admin
