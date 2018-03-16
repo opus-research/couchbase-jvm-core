@@ -54,7 +54,6 @@ import rx.subjects.Subject;
 
 import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.util.ArrayDeque;
@@ -148,11 +147,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
      * The future which is used to eventually signal a connected channel.
      */
     private ChannelPromise connectFuture;
-
-    /**
-     * Returns the remote http host in usable format.
-     */
-    private String remoteHttpHost;
 
     /**
      * Creates a new {@link AbstractGenericHandler} with the default queue.
@@ -646,19 +640,6 @@ public abstract class AbstractGenericHandler<RESPONSE, ENCODED, REQUEST extends 
         request.headers().add(HttpHeaders.Names.AUTHORIZATION, "Basic " + encoded.toString(CHARSET));
         encoded.release();
         raw.release();
-    }
-
-    /**
-     * Helper method to return the remote http host, cached.
-     *
-     * @param ctx the handler context.
-     * @return the remote http host.
-     */
-    protected String remoteHttpHost(ChannelHandlerContext ctx) {
-        if (remoteHttpHost == null) {
-            remoteHttpHost = ctx.channel().remoteAddress().toString();
-        }
-        return remoteHttpHost;
     }
 
 }
