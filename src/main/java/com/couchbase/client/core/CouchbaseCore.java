@@ -15,6 +15,7 @@
  */
 package com.couchbase.client.core;
 
+
 import com.couchbase.client.core.config.ClusterConfig;
 import com.couchbase.client.core.config.ConfigurationProvider;
 import com.couchbase.client.core.config.DefaultConfigurationProvider;
